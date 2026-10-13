@@ -1,0 +1,8 @@
+# Real schedules and staff lists (coworkers' names) stay on this computer
+plans/*
+!plans/.gitkeep
+staff-lists/*
+!staff-lists/.gitkeep
+*.json
+*.schedule.html
+*.bak
