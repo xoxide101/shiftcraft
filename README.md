@@ -1,2 +1,101 @@
-# shiftcraft
-Employee Associate Scheduler and Planner for Day, Week, Month planning of labor
+# ShiftCraft
+
+**Employee scheduler and planner for day, week and month labor planning.**
+
+ShiftCraft is a planning board for building a work schedule *before* you type it into the real scheduling system (which is often locked or slow). Lay out the day on a timeline, check coverage and labor hours against the sales forecast, then hand the finished schedule off, print it, or email it.
+
+It is one HTML file. No install, no account, no server: open `index.html` in Chrome or Edge and everything stays on your computer.
+
+![The day schedule: shifts on a 4am–11pm timeline grouped by Manager, Supervisor, Team Member and Training](docs/schedule.png)
+
+![The week table in dark mode with daily forecast, target hours and variance](docs/week-dark.png)
+
+## Getting started
+
+1. Download this repository (green **Code** button › **Download ZIP**) or clone it.
+2. Double-click `index.html`. It opens in your browser.
+3. It starts with **made-up example staff and sales** so you can try everything. When you are ready: **Staff** tab › **Clear list**, add your own team, then **File › Save team only**.
+4. Set your company and location with **File › Company & location** (or click the store name at the top right).
+
+> Example names in this repository are invented. Your own team, schedules and settings are saved in your browser and in the files you choose to save; nothing is uploaded anywhere.
+
+## What it does
+
+### Plan the day
+- **Timeline from 4:00am to 11:00pm** in 15-minute steps, grouped into **Manager** (GM, AGM), **Supervisor** (Shift Manager), **Team Member** and **Training** (New Hire).
+- **Click a name** under *Unscheduled* to add that person with their usual shift.
+- **Drag** a shift to move it; **drag its left or right edge** to change the start or finish.
+- **Double-click** a shift to type exact times (am/pm). Times always read like `6:00am – 2:30pm`.
+- **Click** a shift for that person's **notes for the day**. Notes appear under the bar in yellow highlighter (`NOTES: …`) and on every printout.
+- **Right-click** a shift: edit, add a note, tasks and training, or remove.
+- **Ctrl+Z** undoes.
+
+### Weeks and months
+- Weeks run **Monday to Sunday**.
+- Pick a **month** at the top. A month is the weeks whose Monday falls in it, so it is always **4 or 5 weeks**. **Week out 1–5** jumps between them.
+- Every day is stored by date, so you can move between months and come back.
+- **Copy** a day, week or month to new dates (from any dates, past ones too). **Clear** a day, week or month. Move weeks around.
+
+### Labor and forecast
+- **Forecast**: by default, the average of the same weekday over the last 4 weeks of past sales. Type your own number to override it.
+- **Target hours** = forecast ÷ sales per labor hour (set in Settings).
+- **Hours variance**: scheduled hours minus target, for the day and the week.
+- **Hours by section**: each person's hours today, week so far and week total, with day and week totals for every group.
+
+### Staff
+- Name, role (GM, AGM, Shift Manager, Team Member, New Hire), usual shift, max hours, notes, active or not.
+- **Not available** on chosen weekdays (M T W T F S S), and **AM / MID / PM** availability. Shifts outside someone's availability are flagged.
+- **Tasks and training** per person with dates, plus an editable **new-hire checklist**.
+- Save, load or clear the team list.
+
+### Check the schedule
+**Edit › Check schedule** finds people booked twice, shifts outside availability, inactive people on the schedule, shifts over 10 hours, people over their weekly max, and times with **no Manager or Shift Manager on the floor**.
+
+### Print, pictures and hand-off
+- **Hand-off** tab: the day's shifts in order, ready to copy into the real scheduler.
+- **Print schedules** for one person or a whole group.
+- **Week table**, **visual timeline** (bars plus a *people on the floor* chart) and **calendar** (week, 2 weeks, month or whole plan).
+- **Print screen** (Ctrl+Shift+P): a picture of exactly what is on screen, including parts you would scroll to.
+- Save pictures as **PNG, JPG, BMP or SVG** at **150 to 4800 DPI** (300 DPI default). Very high DPI saves as SVG, which prints sharp at any size.
+- **Printouts and pictures always use light colors**, even when you edit in dark mode.
+- Text and CSV export.
+
+### Files and sharing
+- **File › Save…** asks *what* to save:
+  - **Everything**: team plus all weeks, months, forecasts, past sales and settings (a *location* file)
+  - **Team only**
+  - **Schedule only**: a day, week, month, or a range of weeks
+- File names look like `Company - Location - 11-02-2026 - 12-06-2026.json`.
+- **File › Open** recognises the kind of file, checks it, and fixes small problems (times out of range, missing ids, unknown roles), telling you what it fixed. Weeks match people by name, so a schedule can be opened on another computer with a different team list.
+- **File › Save emailable file (.html)**: one file containing ShiftCraft *and* the schedule. Attach it to an email; the person double-clicks it and it opens, no install needed.
+- **File › Email or share…** uses Windows sharing (Mail, Outlook…) when available, or saves the files and starts an email.
+
+### Other
+- **Light and dark mode** (sun/moon button). Dark mode is for editing only.
+- Autosaves in the browser; **Settings** shows how much storage is used and can clear old weeks.
+- If something goes wrong at start-up, a banner offers a backup of your data.
+
+## Keyboard shortcuts
+
+| Action | Keys |
+| --- | --- |
+| Save week | Ctrl+S |
+| Save… (choose what) | Ctrl+Shift+S |
+| Open | Ctrl+O |
+| Print | Ctrl+P |
+| Print screen | Ctrl+Shift+P |
+| Undo | Ctrl+Z |
+| Previous / next day | ← / → |
+
+## Requirements
+
+Chrome or Edge on Windows, macOS or Linux (recent versions). Firefox and Safari work too, but cannot save straight into a folder; they download files instead.
+
+## Files in this repository
+
+| File | What it is |
+| --- | --- |
+| `index.html` | The whole app (HTML, CSS and JavaScript in one file, no libraries) |
+| `README.txt` | The same help in plain text, for people who download only the app |
+| `docs/` | Screenshots for this page |
+| `plans/`, `staff-lists/` | Suggested folders for your saved files (their contents are never uploaded to GitHub) |

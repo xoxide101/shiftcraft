@@ -9,10 +9,11 @@ When you're ready: Staff tab > Clear list, then add your team, then Save list…
 
 Tabs
 ----
-Schedule   Day timeline 4:00 AM - 11:00 PM in 15-minute steps.
+Schedule   Day timeline 4:00am - 11:00pm in 15-minute steps.
            Click a name under Unscheduled to add them with their usual shift.
            Drag a shift to move it. Drag its left/right edge to change start/finish.
-           Click a shift to remove it (Undo appears). Double-click to type exact times.
+           Click a shift for that day's notes. Double-click to type exact times.
+           Right-click a shift to edit it, add a note, see tasks, or remove it (Ctrl+Z undoes).
 Week       Everyone's shifts and weekly hours, with daily totals. Click a cell to open that day.
 Forecast   Trend = average of the same weekday over the last 4 weeks of past sales.
            Type a forecast to override. Target hours = forecast / sales-per-labor-hour.
@@ -53,7 +54,8 @@ Print screen (File > Print screen, or Ctrl+Shift+P)
 ---------------------------------------------------
 A picture of exactly what is on screen, for whichever tab you are on, including parts you
 would scroll to. Save as PNG / JPG / BMP / SVG at 150-4800 DPI (very high DPI saves as SVG),
-or Print it. "Light colors" saves ink even in dark mode. Works offline.
+or Print it. Pictures and printouts always use light colors, even when you edit in dark mode.
+Works offline.
 
 Note: "localhost" links only work while Claude is testing. Always open index.html directly.
 
