@@ -48,6 +48,16 @@ A planning board for labor schedules: build the schedule here first, then copy i
 
 **Emailable file:** `portableHtml` clones the page (minus `#embedded-plan`) and adds the plan as `<script id="embedded-plan" type="application/json">`, so the file opens ShiftCraft with the schedule inside. `checkEmbedded` asks once per `savedAt`. A literal `</script>` inside JavaScript strings must be written `<\/script>`.
 
+## Title bar
+
+The Office-style strip at the very top comes from the shared `CraftTitlebar` component (the same code as `craft-titlebar.js` in SiteCraft and DataCraft), pasted **inside** the main script. That matters: the emailable file copies the page as it was at start-up (`SOURCE`), before the title bar exists, and looks for the first `<script>
+(function () {` marker, so the component must not add a separate `<script>` tag.
+
+- **Quick buttons:** save week, undo, print the week table, email/share, check the schedule.
+- **Info chips:** company and location (click to edit), the week being worked on.
+- **Search:** Alt+Q searches every menu command.
+- **Layout:** the title bar is sticky; the menu bar sticks just below it (`top: 38px`).
+
 ## Pictures and printing
 
 - Week table, visual timeline and calendar are drawn on a canvas at the chosen DPI (150 to 4800).
