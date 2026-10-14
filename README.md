@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" width="64" height="64" alt="ShiftCraft logo">
+
 # ShiftCraft
 
 **Employee scheduler and planner for day, week and month labor planning.**
@@ -18,6 +20,15 @@ It is one HTML file. No install, no account, no server: open `index.html` in Chr
 4. Set your company and location with **File › Company & location** (or click the store name at the top right).
 
 > Example names in this repository are invented. Your own team, schedules and settings are saved in your browser and in the files you choose to save; nothing is uploaded anywhere.
+
+## Finding your way
+
+| Where | What is there |
+| --- | --- |
+| **ShiftCraft logo** (top left) | Every command in classic menus: File, Edit, View, Help (also F10) |
+| **Top bar** | Quick buttons (save week, undo, print, email/share, check schedule; customize them with ⌄), the plan name, **Search commands (Alt+Q)**, company and week, theme, help |
+| **Ribbon tabs** | **Schedule, Week, Forecast, Hand-off, Staff:** each switches to that view and shows its tools. **Print & share:** pictures, printing, email and saving |
+| **Schedule tab** | Copy or clear a day, week or month, the month picker, move weeks, check the schedule, undo |
 
 ## What it does
 
