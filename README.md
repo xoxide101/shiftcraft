@@ -99,3 +99,7 @@ Chrome or Edge on Windows, macOS or Linux (recent versions). Firefox and Safari 
 | `README.txt` | The same help in plain text, for people who download only the app |
 | `docs/` | Screenshots for this page |
 | `plans/`, `staff-lists/` | Suggested folders for your saved files (their contents are never uploaded to GitHub) |
+
+## Development notes
+
+How the app is built, the decisions behind it, and known pitfalls: see [NOTES.md](NOTES.md).

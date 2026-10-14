@@ -1,0 +1,86 @@
+# ShiftCraft – development notes
+
+How ShiftCraft is built, why it works the way it does, and what to watch out for when changing it. For what it does and how to use it, see [README.md](README.md).
+
+## What it is for
+
+A planning board for labor schedules: build the schedule here first, then copy it into the real (often locked) scheduling system. That is why there are **no approvals** and why the **Hand-off** tab lists shifts in the order you type them in.
+
+## How it is built
+
+- **One file:** `index.html` holds the HTML, CSS and JavaScript, with no libraries and no build step. It must keep working when double-clicked (`file://`) and fully offline.
+- **State:** a single `plan` object, autosaved to `localStorage`:
+
+  ```
+  plan = { app, version, company, location, storeNo, address, phone, splh, startDate, weeks (1–8), month 'YYYY-MM',
+           midStart, pmStart, staff[], shifts{ 'YYYY-MM-DD': [{ id, staffId, start, end, note? }] },
+           forecast{}, history{}, checklist[] }
+  staff = { id, name, role (GM | AGM | SM | TM | NH), active, defStart, defEnd, maxHours, notes,
+            tasks[{ id, text, date, done }], off[7] (Mon–Sun), parts ['am','mid','pm'] }
+  ```
+
+  Times are minutes after midnight. Shifts are stored **by date**, so moving between months never loses anything.
+- **localStorage keys:** `shiftcraft-v1` (the plan), `-ui`, `-img`, `-screen`, `-theme`, `-place` (the company and location profile, shared by every plan), `-seen`.
+- **Groups:** Manager (GM, AGM), Supervisor (Shift Manager), Team Member, Training (New Hire).
+
+## Decisions worth keeping
+
+- **Months are the weeks whose Monday falls in the month**, so a month is always 4 or 5 weeks, never 3 or 6. "Week out 1–5" jumps between them.
+- **Times always read `6:00am – 2:30pm`.** People reading schedules on phones misread short forms like "6a".
+- **Clicking a shift opens its notes.** Double-click edits the times, right-click opens a menu, and Ctrl+Z undoes. A single click never deletes anything.
+- **Printouts and pictures are always light,** even when editing in dark mode (`@media print` forces the light tokens with `!important`; `snapshotScreen(true)` everywhere).
+- **Notes appear under the shift bar** in yellow highlighter with `NOTES:`, and on every printout and export.
+- **Example data uses invented names only.** Never put real people in examples or screenshots.
+
+## File kinds
+
+`File › Save…` asks what to save. Every file is JSON with a `kind`:
+
+| kind | Holds |
+| --- | --- |
+| `location` | Everything: team, every week, forecasts, past sales, settings |
+| `team` | The staff list only |
+| `weeks` | Shifts for a day (`days: 1`), a week, a month or a range, plus `people` [{ id, name, role }] so shifts can be matched **by name** on another computer |
+
+- **Names** look like `Company - Location - MM-DD-YYYY - MM-DD-YYYY.json`.
+- **Opening a file:** `loadFile` runs `validatePlan`, which fixes times out of range, missing ids and unknown roles, then says what it fixed.
+- **Older files:** the old `week`, `month` and `staff` kinds still open.
+
+**Emailable file:** `portableHtml` clones the page (minus `#embedded-plan`) and adds the plan as `<script id="embedded-plan" type="application/json">`, so the file opens ShiftCraft with the schedule inside. `checkEmbedded` asks once per `savedAt`. A literal `</script>` inside JavaScript strings must be written `<\/script>`.
+
+## Pictures and printing
+
+- Week table, visual timeline and calendar are drawn on a canvas at the chosen DPI (150 to 4800).
+- **Big images:** browsers cap canvas size (`tooBig`: over 32,000 px on a side or 200 million pixels). Above that, or when SVG is chosen, a recording `svgContext` replaces the canvas (`makeSurface`) and the output is vector SVG.
+- **DPI is written into the files:** PNG gets a `pHYs` chunk (with its own crc32), JPG gets a patched JFIF density, and BMP is a hand-written 24-bit encoder.
+- **Print screen** clones the visible app, inlines computed styles, and draws it through an SVG `foreignObject` onto a canvas.
+
+## Version history
+
+All built on 2026-10-13.
+
+| Version | Added |
+| --- | --- |
+| 0.1 | Day timeline 4am–11pm in 15-minute steps; drag, resize, double-click to edit; forecast and hours variance; Week, Forecast, Hand-off and Staff tabs |
+| 0.2 | File/Edit/View/Help menus; company and location; save weeks and months; week sheet pictures (PNG/JPG/BMP) |
+| 0.3 | New Hire role and Training row; tasks and new-hire checklist; hours by section; copy and clear days, weeks and months from any dates; print per person or group |
+| 0.4 | Not-available days and AM/MID/PM availability; visual timeline sheet; emailable .html; plans up to 8 weeks; crash banner; light/dark |
+| 0.5 | `6:00am` time format; DPI up to 4800 with automatic SVG; calendar layout |
+| 0.6 | Month plans with Week out 1–5; copy and clear week; storage meter |
+| 0.7 | Location, team and weeks file kinds; notes per shift; right-click menu |
+| 0.8 | "Save what" dialog; day files; global company profile; schedule checks; notes on printouts |
+| 0.9 | Notes under the bars in highlighter; Print screen |
+| 1.0 | Printing always light |
+
+## Testing approach
+
+- Serve the folder (`python -m http.server`) and drive the real app in a browser.
+- Stub `showSaveFilePicker` and wrap `URL.createObjectURL` to capture what would be saved.
+- Send pointer events to shift bars to test dragging and resizing.
+- Clear localStorage afterwards.
+- Not yet tested: real print, save and share dialogs on physical printers and phones.
+
+## Ideas for later
+
+- Adjust the defaults (sales per labor hour, variance rule, AM/MID/PM boundaries) after real use.
+- Import past sales from a CSV export.
