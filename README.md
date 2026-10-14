@@ -111,6 +111,17 @@ Chrome or Edge on Windows, macOS or Linux (recent versions). Firefox and Safari 
 | `docs/` | Screenshots for this page |
 | `plans/`, `staff-lists/` | Suggested folders for your saved files (their contents are never uploaded to GitHub) |
 
+## How this was made
+
+This app is **vibe coded**: its author designed and directed it in plain conversation, feature by feature, and an AI coding assistant (Claude, by Anthropic) wrote the code.
+
+It is a **genuine clean-room build**, not a decompiled or AI-rebuilt copy of anything:
+- Nothing was decompiled, disassembled or reverse-engineered, in whole or in part.
+- No code, artwork, fonts, icons or data files from any original program were used, and none were given to the AI to work from.
+- ShiftCraft takes ideas from everyday spreadsheet and scheduling tools; only publicly known features and general ideas guided the design. Every line of code and every picture here was made new.
+
+It uses no outside code libraries: everything is in one file.
+
 ## Development notes
 
 How the app is built, the decisions behind it, and known pitfalls: see [NOTES.md](NOTES.md).
