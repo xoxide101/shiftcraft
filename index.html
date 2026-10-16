@@ -96,6 +96,18 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 @media (max-width: 760px) { .co-grid { grid-template-columns: 1fr; } }
 .co-h3 { margin: 16px 0 6px; font-size: 14px; }
 .co-hours { display: grid; grid-template-columns: 170px auto auto; gap: 10px; align-items: center; justify-content: start; padding: 4px 0; }
+/* Trained in: people by positions, with the position names written upwards */
+table.trained { width: auto; }
+table.trained td.nowrap { padding-right: 18px; }
+table.trained th.vert { vertical-align: bottom; padding: 4px 2px; width: 34px; min-width: 34px; }
+table.trained th.vert button { border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+table.trained th.vert span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; display: inline-block; max-height: 150px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-size: 12px; }
+table.trained th.vert button:hover span { color: var(--accent); }
+table.trained td.tcell { padding: 2px; }
+table.trained .tbox { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: #fff; font-weight: 700; cursor: pointer; padding: 0; }
+table.trained .tbox.on { background: var(--good); border-color: var(--good); }
+table.trained .tbox:hover { border-color: var(--accent); }
+table.trained tbody tr:hover td { background: var(--accent-soft); }
 .staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 /* the staff table: compact time pickers so every column fits */
 table.t .timepick { gap: 1px; flex-wrap: nowrap; }
@@ -968,7 +980,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact', 'Email, phone number and notes']];
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
@@ -1051,7 +1063,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
     const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
-      contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). More details will come here later.' }[staffTab];
+      contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
@@ -1063,6 +1075,36 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
         h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
+    if (staffTab === 'contact') main.append(trainedGrid());
+  }
+  // Trained in: a grid of people (rows) and the location's positions (columns, titles written upwards). Click a box: Yes / No.
+  // Stored as p.trained = [position ids]. Positions not in use at the location are left out.
+  function trainedGrid() {
+    const positions = (plan.positions || []).filter((x) => x.active);
+    const people = sortStaff(plan.staff);
+    const isOn = (p, pos) => Array.isArray(p.trained) && p.trained.includes(pos.id);
+    const toggle = (p, pos) => change(() => { const t = new Set(p.trained || []); t.has(pos.id) ? t.delete(pos.id) : t.add(pos.id); p.trained = [...t]; });
+    const setColumn = (pos, on) => change(() => { people.forEach((p) => { const t = new Set(p.trained || []); on ? t.add(pos.id) : t.delete(pos.id); p.trained = [...t]; }); });
+    const setRow = (p, on) => change(() => { p.trained = on ? positions.map((x) => x.id) : (p.trained || []).filter((id) => !positions.some((x) => x.id === id)); });
+    const card = h('div', { class: 'card' },
+      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, 'Trained in'), h('span', { class: 'muted small' }, `${positions.length} positions in use at this location`), h('span', { class: 'spacer' }),
+        h('button', { class: 'btn sm', onclick: () => { ui.tab = 'company'; persist(); render(); } }, 'Change the positions…')),
+      h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'Click a box to switch between Yes (trained) and No. Click a position’s name to mark everyone, or a person’s count to mark all positions for them (click again to clear).'));
+    if (!positions.length) { card.append(h('p', { class: 'muted' }, 'This location has no positions in use. Add them on the Company & Location tab.')); return card; }
+    if (!people.length) { card.append(h('p', { class: 'muted' }, 'No one yet. Add your team above.')); return card; }
+    card.append(h('div', { class: 'table-wrap' }, h('table', { class: 't trained' },
+      h('thead', null, h('tr', null, h('th', { class: 'tn' }, 'Name'), h('th', { class: 'tn' }, 'Role'),
+        positions.map((pos) => { const all = people.every((p) => isOn(p, pos)); return h('th', { class: 'vert', title: `${pos.name}: click to mark ${all ? 'no one' : 'everyone'} as trained` }, h('button', { type: 'button', onclick: () => setColumn(pos, !all) }, h('span', null, pos.name))); }),
+        h('th', { class: 'num' }, 'Trained'))),
+      h('tbody', null, people.map((p) => {
+        const n = positions.filter((pos) => isOn(p, pos)).length;
+        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } },
+          h('td', { class: 'nowrap' }, h('b', null, p.name)), h('td', { class: 'nowrap muted small' }, ROLES[p.role].short),
+          positions.map((pos) => { const on = isOn(p, pos); return h('td', { class: 'c tcell' }, h('button', { type: 'button', class: 'tbox' + (on ? ' on' : ''), 'aria-pressed': String(on), 'aria-label': `${p.name} trained in ${pos.name}: ${on ? 'Yes' : 'No'}`, title: `${p.name} · ${pos.name}: ${on ? 'Yes, trained' : 'No'} (click to change)`, onclick: () => toggle(p, pos) }, on ? '✓' : '')); }),
+          h('td', { class: 'num' }, h('button', { type: 'button', class: 'btn sm ghost', title: n === positions.length ? 'Clear all positions for ' + p.name : 'Mark ' + p.name + ' as trained in every position', onclick: () => setRow(p, n !== positions.length) }, `${n} / ${positions.length}`)));
+      })),
+      h('tfoot', null, h('tr', null, h('td', { colspan: 2 }, 'People trained'), positions.map((pos) => h('td', { class: 'c' }, String(people.filter((p) => p.active && isOn(p, pos)).length))), h('td', null, ''))))));
+    return card;
   }
 
   // ---------- Company & Location ----------
