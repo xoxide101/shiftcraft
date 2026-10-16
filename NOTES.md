@@ -117,3 +117,9 @@ All built on 2026-10-13.
 - Contact: `p.email`, `p.phone` (and `p.notes` shown there). All of these travel in team and location files as part of the staff list.
 - The Staff tab's section is remembered in `localStorage['shiftcraft-staff-tab']`.
 
+## Company & Location tab (v1.2)
+
+- `companyView` edits the place profile inline (`PLACE_FIELDS` now include `email` and `website`; each change is checked like the old dialog and written to `localStorage[PLACE_KEY]` and the plan). The File menu item, the store name in the bar and the title-bar chip open this tab; Settings' Edit… still opens the quick dialog.
+- `plan.hours = { wk: { open, close }, we: { open, close } }` (minutes; missing = not set) and `plan.placeNotes`.
+- `plan.positions = [{ id, name, active }]`, ordered. `validatePlan` gives older plans the standard list (`defaultPositions()`, a function so the start-up check can use it before its definition is reached).
+

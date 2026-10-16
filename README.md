@@ -27,7 +27,7 @@ It is one HTML file. No install, no account, no server: open `index.html` in Chr
 | --- | --- |
 | **ShiftCraft logo** (top left) | Every command in classic menus: File, Edit, View, Help (also F10) |
 | **Top bar** | Quick buttons (save week, undo, print, email/share, check schedule; customize them with ⌄), the plan name, **Search commands (Alt+Q)**, company and week, theme, help |
-| **Ribbon tabs** | **Schedule, Week, Forecast, Hand-off, Staff:** each switches to that view and shows its tools. **Print & share:** pictures, printing, email and saving |
+| **Ribbon tabs** | **Schedule, Week, Forecast, Hand-off, Staff, Company & Location:** each switches to that view and shows its tools. **Print & share:** pictures, printing, email and saving |
 | **Schedule tab** | Copy or clear a day, week or month, the month picker, move weeks, check the schedule, undo |
 
 ## What it does
@@ -62,6 +62,11 @@ The Staff tab has three sections:
 - **Tasks and training** per person with dates, plus an editable **new-hire checklist**.
 - Save, load or clear the team list.
 
+
+### Company & Location
+- The **company and location details** used on every plan, printout and file name: company, location, store number, address, phone, **email** and **website**, edited right on the page (they save as you go). Click the store name in the top bar to get here.
+- **Opening hours** for weekdays and for the weekend, and **notes** about the location.
+- **Positions** at the location, starting with the standard list (Open, Close, Hot Prep, Cold Prep, Juices & Smoothies, Dish, Greeting, Salad Line, Sandwich Line, Bowls & Wrapping, Cashier & Register, Online, Dining Room, Catering): rename, reorder, untick **In use** for ones this location doesn't have, add your own, or go back to the standard list. Saved with the location.
 ### Check the schedule
 **Edit › Check schedule** finds people booked twice, shifts outside availability, inactive people on the schedule, shifts over 10 hours, people over their weekly max, and times with **no Manager or Shift Manager on the floor**.
 

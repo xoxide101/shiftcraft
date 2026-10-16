@@ -91,6 +91,11 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .daytoggles { display: flex; gap: 2px; }
 .daytoggles button { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .daytoggles button.pt { width: 40px; }
+.co-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
+.co-grid .field.wide { grid-column: 1 / -1; }
+@media (max-width: 760px) { .co-grid { grid-template-columns: 1fr; } }
+.co-h3 { margin: 16px 0 6px; font-size: 14px; }
+.co-hours { display: grid; grid-template-columns: 170px auto auto; gap: 10px; align-items: center; justify-content: start; padding: 4px 0; }
 .staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 /* the staff table: compact time pickers so every column fits */
 table.t .timepick { gap: 1px; flex-wrap: nowrap; }
@@ -614,7 +619,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // ===================================================================
   // Screens
   // ===================================================================
-  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['forecast', 'Forecast'], ['handoff', 'Hand-off'], ['staff', 'Staff']];
+  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['forecast', 'Forecast'], ['handoff', 'Hand-off'], ['staff', 'Staff'], ['company', 'Company & Location']];
   function render() {
     if (!planDays().includes(ui.day)) ui.day = plan.startDate;
     $('#tabs').replaceChildren(...TABS.map(([k, l]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(ui.tab === k), onclick: () => { ui.tab = k; persist(); render(); } }, l)));
@@ -623,7 +628,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     fillMonthSelect();
     const main = $('#main');
     main.replaceChildren();
-    ({ schedule: scheduleView, week: weekView, forecast: forecastView, handoff: handoffView, staff: staffView })[ui.tab](main);
+    ({ schedule: scheduleView, week: weekView, forecast: forecastView, handoff: handoffView, staff: staffView, company: companyView })[ui.tab](main);
     document.title = (ui.fileName ? ui.fileName + ' – ' : '') + 'ShiftCraft';
     paintThemeButton();
   }
@@ -1060,6 +1065,78 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
   }
 
+  // ---------- Company & Location ----------
+  function companyView(main) {
+    const err = h('p', { class: 'error bad', hidden: true });
+    const savePlace = (k, v) => {
+      v = v.replace(/\s+/g, ' ').trim();
+      const problem = (k === 'company' || k === 'location') && /[\\/:*?"<>|]/.test(v) ? 'Company and location names can’t contain \\ / : * ? " < > | (they are used in file names).'
+        : k === 'phone' && v && !/^[\d\s()+.\-x]{7,}$/i.test(v) ? 'The phone number has characters that don’t look like a phone number.'
+          : k === 'email' && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'That email address doesn’t look right (like name@example.com).' : '';
+      if (problem) { err.textContent = problem; err.hidden = false; render(); return; }
+      err.hidden = true;
+      const pl = { ...(loadPlace() || {}), ...Object.fromEntries(PLACE_FIELDS.map(([f]) => [f, plan[f] || ''])), [k]: v };
+      try { localStorage.setItem(PLACE_KEY, JSON.stringify(pl)); } catch (e) { /* ignore */ }
+      change(() => applyPlace(pl));
+    };
+    const field = (k, label, ph, wide) => {
+      const inp = h('input', { class: 'input', id: 'co-' + k, value: plan[k] || '', placeholder: ph, maxLength: k === 'address' ? 160 : 80, type: k === 'email' ? 'email' : k === 'phone' ? 'tel' : 'text' });
+      inp.addEventListener('change', () => savePlace(k, inp.value));
+      return h('label', { class: 'field' + (wide ? ' wide' : '') }, h('span', null, label), inp);
+    };
+    // opening hours, weekdays and weekend (like the Staff tab)
+    plan.hours = plan.hours || {};
+    const hoursRow = (k, label) => {
+      const cur = plan.hours[k];
+      if (!cur) return h('div', { class: 'co-hours' }, h('b', null, label), h('span', { class: 'muted' }, 'Not set'), h('button', { class: 'btn sm', onclick: () => change(() => { plan.hours[k] = { open: 420, close: 1260 }; }) }, 'Set hours'));
+      const a = timePicker(cur.open, label + ' open'), b = timePicker(cur.close, label + ' close');
+      const save = (moved) => { let o = a.value, c = b.value; if (c <= o) { if (moved === 'open') c = Math.min(DAY_END, o + 60); else o = Math.max(DAY_START, c - 60); } change(() => { plan.hours[k] = { open: o, close: c }; }); };
+      a.addEventListener('change', () => save('open')); b.addEventListener('change', () => save('close'));
+      return h('div', { class: 'co-hours' }, h('b', null, label), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b), h('button', { class: 'btn sm ghost', title: 'Clear these hours', onclick: () => change(() => { delete plan.hours[k]; }) }, 'Clear'));
+    };
+    const notes = h('textarea', { class: 'input', rows: 3, placeholder: 'e.g. Delivery Tuesdays 7am · Parking behind the building' }, plan.placeNotes || '');
+    notes.addEventListener('change', () => change(() => { plan.placeNotes = notes.value; }));
+    main.append(h('div', { class: 'card' },
+      h('h2', { style: { margin: '0 0 4px' } }, 'Company & location'),
+      h('p', { class: 'hint', style: { margin: '0 0 12px' } }, 'Used on every plan, printout and file name on this computer, and saved inside Location files. Changes save as you go.'),
+      h('div', { class: 'co-grid' },
+        field('company', 'Company name', 'e.g. Sunny Bowl Cafe'), field('location', 'Location name', 'e.g. Main & 5th'), field('storeNo', 'Store number', 'e.g. 0042'),
+        field('address', 'Address', 'e.g. 1234 Main St, Denver CO 80202', true),
+        field('phone', 'Phone', 'e.g. (303) 555-0142'), field('email', 'Email', 'e.g. manager@example.com'), field('website', 'Website', 'e.g. www.example.com')),
+      err,
+      h('h3', { class: 'co-h3' }, 'Opening hours'),
+      hoursRow('wk', 'Weekdays (Mon–Fri)'), hoursRow('we', 'Weekend (Sat–Sun)'),
+      h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
+
+    // positions at this location
+    const list = plan.positions || (plan.positions = defaultPositions());
+    const move = (i, d) => change(() => { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; });
+    const rows = list.map((pos, i) => {
+      const name = h('input', { class: 'input', value: pos.name, 'aria-label': 'Position name', style: { width: '100%' } });
+      name.addEventListener('change', () => { const v = name.value.replace(/\s+/g, ' ').trim(); if (v) change(() => { pos.name = v; }); else name.value = pos.name; });
+      return h('tr', { style: { opacity: pos.active ? 1 : 0.55 } },
+        h('td', { class: 'num muted' }, String(i + 1)),
+        h('td', { style: { minWidth: '240px' } }, name),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: pos.active, 'aria-label': 'In use at this location', onchange: (e) => change(() => { pos.active = e.target.checked; }) })),
+        h('td', { class: 'nowrap' },
+          h('button', { class: 'btn sm ghost', title: 'Move up', disabled: i === 0, onclick: () => move(i, -1) }, '▲'),
+          h('button', { class: 'btn sm ghost', title: 'Move down', disabled: i === list.length - 1, onclick: () => move(i, 1) }, '▼'), ' ',
+          h('button', { class: 'btn sm ghost danger-text', onclick: () => confirmBox(`Remove ${pos.name}?`, 'It is taken off this location’s list. You can undo this, or untick In use to keep it for later.', 'Remove', () => change(() => { plan.positions = list.filter((x) => x !== pos); })) }, 'Remove')));
+    });
+    const newPos = h('input', { class: 'input', id: 'co-newpos', placeholder: 'New position, e.g. Drive-thru', 'aria-label': 'New position name', style: { width: '100%' } });
+    const addPos = () => { const v = newPos.value.replace(/\s+/g, ' ').trim(); if (!v) { newPos.focus(); return; } if (list.some((x) => x.name.toLowerCase() === v.toLowerCase())) { toast(`${v} is already on the list.`); return; } change(() => { list.push({ id: uid(), name: v, active: true }); }); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }); };
+    newPos.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPos(); });
+    const inUse = list.filter((x) => x.active).length;
+    main.append(h('div', { class: 'card' },
+      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Positions · ${inUse} in use`), h('span', { class: 'muted small' }, list.length !== inUse ? `${list.length - inUse} not in use` : ''), h('span', { class: 'spacer' }),
+        h('button', { class: 'btn sm', onclick: () => confirmBox('Go back to the standard list?', 'The list goes back to the 14 standard positions. You can undo this.', 'Use the standard list', () => change(() => { plan.positions = defaultPositions(); })) }, 'Standard list')),
+      h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'The stations and jobs at this location. Rename any of them, put them in the order you use, untick In use for ones this location doesn’t have, or add your own. The list is saved with the location.'),
+      h('div', { class: 'table-wrap' }, h('table', { class: 't' },
+        h('thead', null, h('tr', null, h('th', { class: 'num' }, '#'), h('th', null, 'Position'), h('th', { class: 'c' }, 'In use'), h('th', null, ''))),
+        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 4, class: 'muted' }, 'No positions yet. Add them below, or use the standard list.'))),
+        h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position'))))))));
+  }
+
   // ===================================================================
   // Hours by section, and day / week totals
   // ===================================================================
@@ -1486,10 +1563,14 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // Company & location: one profile used everywhere on this computer
   // ===================================================================
   const PLACE_KEY = KEY + '-place';
-  const PLACE_FIELDS = [['company', 'Company name', 'e.g. Sunny Bowl Cafe'], ['location', 'Location name', 'e.g. Main & 5th'], ['storeNo', 'Store number', 'e.g. 0042'], ['address', 'Address', 'e.g. 1234 Main St, Denver CO'], ['phone', 'Phone', 'e.g. (303) 555-0142']];
+  const PLACE_FIELDS = [['company', 'Company name', 'e.g. Sunny Bowl Cafe'], ['location', 'Location name', 'e.g. Main & 5th'], ['storeNo', 'Store number', 'e.g. 0042'], ['address', 'Address', 'e.g. 1234 Main St, Denver CO'], ['phone', 'Phone', 'e.g. (303) 555-0142'], ['email', 'Email', 'e.g. manager@example.com'], ['website', 'Website', 'e.g. www.example.com']];
   function loadPlace() { try { return JSON.parse(localStorage.getItem(PLACE_KEY)) || null; } catch (e) { return null; } }
   function applyPlace(pl) { PLACE_FIELDS.forEach(([k]) => { plan[k] = (pl && pl[k]) || ''; }); }
   const samePlace = (a, b) => a && b && String(a.company || '').trim().toLowerCase() === String(b.company || '').trim().toLowerCase() && String(a.location || '').trim().toLowerCase() === String(b.location || '').trim().toLowerCase();
+  // Positions (stations and jobs) at this location: the standard list, which each location can change.
+  // (functions, so the start-up check can use them before this point)
+  function standardPositions() { return ['Open', 'Close', 'Hot Prep', 'Cold Prep', 'Juices & Smoothies', 'Dish', 'Greeting', 'Salad Line', 'Sandwich Line', 'Bowls & Wrapping', 'Cashier & Register', 'Online', 'Dining Room', 'Catering']; }
+  function defaultPositions() { return standardPositions().map((name) => ({ id: uid(), name, active: true })); }
   const placeLine = () => [plan.storeNo ? `Store #${plan.storeNo}` : '', plan.address, plan.phone].filter(Boolean).join('  ·  ');
   function placeDialog() {
     const inputs = {};
@@ -1530,6 +1611,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // Fixes anything that could break the schedule (bad times, missing ids). Returns how many fixes.
   function validatePlan(p) {
     let fixes = 0;
+    if (!Array.isArray(p.positions)) p.positions = defaultPositions();
+    p.positions = p.positions.filter((x) => x && String(x.name || '').trim()).map((x) => ({ id: x.id || uid(), name: String(x.name).trim(), active: x.active !== false }));
     const ids = new Set();
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {
       const q = { ...x, name: String(x.name).trim() };
@@ -2567,7 +2650,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       { label: 'Print screen (what you see)…', key: 'Ctrl+Shift+P', run: printScreenDialog },
       { label: 'Print…', key: 'Ctrl+P', run: () => { if (inFrame) blockedHere(); else window.print(); } },
       '-',
-      { label: 'Company & location…', run: placeDialog },
+      { label: 'Company & location…', run: () => { ui.tab = 'company'; persist(); render(); } },
       { label: 'Settings…', run: settingsDialog },
     ]],
     ['Edit', [
@@ -2656,7 +2739,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   });
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (ui.tab === 'schedule') render(); }, 150); });
   { const pl = loadPlace(); if (pl) applyPlace(pl); else if (plan.company || plan.location) { try { localStorage.setItem(PLACE_KEY, JSON.stringify(Object.fromEntries(PLACE_FIELDS.map(([k]) => [k, plan[k] || ''])))); } catch (e) { /* ignore */ } } }
-  $('#store-name').onclick = placeDialog;
+  $('#store-name').onclick = () => { ui.tab = 'company'; persist(); render(); };
   $('#store-name').title = 'Company & location (click to edit)';
   /* Craft title bar and ribbon, shared by the Craft apps (the same file in every app).
      CraftTitlebar: the Office-style strip at the very top. Logo (opens every menu side by side), quick buttons
@@ -3225,7 +3308,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
     const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
-    const VIEWS = ['schedule', 'week', 'forecast', 'handoff', 'staff'];
+    const VIEWS = ['schedule', 'week', 'forecast', 'handoff', 'staff', 'company'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
     const ribbon = window.CraftRibbon({
       mount: document.body, storageKey: 'shiftcraft', start: VIEWS.includes(ui.tab) ? ui.tab : 'schedule',
@@ -3250,6 +3333,10 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
           ['Team', [C('Save team only', 'Save team', I.save, { big: true }), C('Open', 'Open a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
+        { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [
+          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' })]],
+          ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
+        ] },
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
@@ -3273,7 +3360,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       getTitle: () => ui.fileName || placeName(),
       getStatus: () => ({ text: plan.example ? 'Example data · autosaves in this browser' : 'Autosaves in this browser' }),
       getInfo: () => [
-        { text: placeName(), title: 'Company and location (click to change)', run: placeDialog },
+        { text: placeName(), title: 'Company and location (click to change)', run: () => { ui.tab = 'company'; persist(); render(); } },
         { text: 'Week of ' + shortDate(weekDays(weekOf(ui.day))[0]), title: 'The week you are working on' },
       ],
       rightEls: [document.getElementById('theme-btn')],
