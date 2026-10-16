@@ -109,3 +109,11 @@ All built on 2026-10-13.
 
 - Adjust the defaults (sales per labor hour, variance rule, AM/MID/PM boundaries) after real use.
 - Import past sales from a CSV export.
+
+## Weekdays, weekend and contact (v1.1)
+
+- A person's **weekday set** is `defStart`, `defEnd`, `parts`, `from`, `to` (from/to = the hours they can work, `null` = any time); the **weekend set** is `p.we = { defStart, defEnd, parts, from, to }`. When `p.we` (or one of its fields) is missing, the weekday value is used, so older files work unchanged. `setOf(p, 'wk' | 'we')`, `setFor(p, isoDate)` and `setSet(p, kind, patch)` read and write them; `off[7]` (Mon–Sun) is still one list.
+- `addShift` uses the set for the day; `availIssue` checks the day's set (days off, then from–until, then AM / MID / PM); "Make this the usual shift" saves into the weekday or weekend set.
+- Contact: `p.email`, `p.phone` (and `p.notes` shown there). All of these travel in team and location files as part of the staff list.
+- The Staff tab's section is remembered in `localStorage['shiftcraft-staff-tab']`.
+

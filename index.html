@@ -91,6 +91,13 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 .daytoggles { display: flex; gap: 2px; }
 .daytoggles button { width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .daytoggles button.pt { width: 40px; }
+.staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+/* the staff table: compact time pickers so every column fits */
+table.t .timepick { gap: 1px; flex-wrap: nowrap; }
+table.t .timepick select.input { padding: 0 1px 0 4px; height: 28px; font-size: 12.5px; width: auto; min-width: 0; }
+table.t td .inline { gap: 4px; }
+table.t td .check.small { font-size: 12px; }
+.daytoggles button.dt { min-width: 26px; width: auto; padding: 0 5px; }
 .daytoggles button.dt.on { background: var(--bad); border-color: var(--bad); color: #fff; }
 .daytoggles button.pt.on { background: var(--good); border-color: var(--good); color: #fff; }
 .chip.na { opacity: .6; border-style: dashed; }
@@ -446,11 +453,28 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   const PARTS = [['am', 'AM'], ['mid', 'MID'], ['pm', 'PM']];
   const partsOf = (p) => (Array.isArray(p.parts) && p.parts.length ? p.parts : ['am', 'mid', 'pm']);
   const offOn = (p, d) => !!(p.off && p.off[(parseIso(d).getDay() + 6) % 7]);
+  // Weekdays (Mon–Fri) and the weekend (Sat–Sun) each have their own usual shift, available hours and parts of the day.
+  // The weekday set is p.defStart, p.defEnd, p.parts, p.from, p.to; the weekend set is p.we (missing parts = same as weekdays).
+  const isWkend = (d) => { const g = parseIso(d).getDay(); return g === 0 || g === 6; };
+  function setOf(p, k) {
+    const w = { start: p.defStart ?? 540, end: p.defEnd ?? 1020, parts: partsOf(p), from: p.from ?? null, to: p.to ?? null };
+    if (k !== 'we' || !p.we) return w;
+    const e = p.we;
+    return { start: e.defStart ?? w.start, end: e.defEnd ?? w.end, parts: Array.isArray(e.parts) && e.parts.length ? e.parts : w.parts, from: 'from' in e ? e.from : w.from, to: 'to' in e ? e.to : w.to };
+  }
+  const setFor = (p, d) => setOf(p, d && isWkend(d) ? 'we' : 'wk');
+  function setSet(p, k, patch) {
+    const map = { start: 'defStart', end: 'defEnd', parts: 'parts', from: 'from', to: 'to' };
+    if (k === 'we') { const cur = setOf(p, 'we'); p.we = { defStart: cur.start, defEnd: cur.end, parts: cur.parts, from: cur.from, to: cur.to, ...(p.we || {}) }; Object.entries(patch).forEach(([a, v]) => { p.we[map[a]] = v; }); }
+    else Object.entries(patch).forEach(([a, v]) => { p[map[a]] = v; });
+  }
+  const partWord = (k) => (k === 'we' ? 'weekends' : 'weekdays');
   function availIssue(p, d, s) {
     const first = p.name.split(' ')[0];
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
-    const parts = partsOf(p);
+    const st = setFor(p, d), parts = st.parts;
+    if (st.from != null && st.to != null && (s.start < st.from || s.end > st.to)) return `${first} is only available ${clock(st.from)} – ${clock(st.to)} on ${partWord(isWkend(d) ? 'we' : 'wk')}`;
     if (parts.length === 3) return '';
     const win = { am: [DAY_START, plan.midStart], mid: [plan.midStart, plan.pmStart], pm: [plan.pmStart, DAY_END] };
     const bad = Object.entries(win).filter(([k, [a, b]]) => !parts.includes(k) && s.start < b && s.end > a).map(([k]) => k.toUpperCase());
@@ -502,10 +526,11 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   function addShift(d, staffId) {
     const p = staffById(staffId);
     change(() => {
-      (plan.shifts[d] = plan.shifts[d] || []).push(clampShift({ id: uid(), staffId, start: p.defStart ?? 540, end: p.defEnd ?? 1020 }));
+      const st = setFor(p, d);
+      (plan.shifts[d] = plan.shifts[d] || []).push(clampShift({ id: uid(), staffId, start: st.start, end: st.end }));
     });
     const added = plan.shifts[d][plan.shifts[d].length - 1], issue = availIssue(p, d, added);
-    toast(issue ? `Added ${p.name}. Heads up: ${issue}.` : `Added ${p.name}, ${clock(p.defStart ?? 540)} – ${clock(p.defEnd ?? 1020)}`);
+    toast(issue ? `Added ${p.name}. Heads up: ${issue}.` : `Added ${p.name}, ${clock(added.start)} – ${clock(added.end)}`);
   }
   function removeShift(d, id) {
     const s = shiftsOn(d).find((x) => x.id === id); if (!s) return;
@@ -527,7 +552,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       h('label', { class: 'field' }, h('span', null, 'Start'), a),
       h('label', { class: 'field' }, h('span', null, 'Finish'), b),
       info,
-      h('label', { class: 'check' }, saveDefault, ` Make this ${p.name.split(' ')[0]}'s usual shift`),
+      h('label', { class: 'check' }, saveDefault, ` Make this ${p.name.split(' ')[0]}'s usual ${isWkend(d) ? 'weekend' : 'weekday'} shift`),
       h('label', { class: 'field' }, h('span', null, `Notes for ${p.name.split(' ')[0]} on ${dayName(d)}`), note),
       h('p', { class: 'hint' }, 'The day runs from 4:00am to 11:00pm in 15-minute steps.')],
     actions: [
@@ -538,7 +563,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         change(() => {
           Object.assign(s, clampShift({ start: a.value, end: b.value }));
           if (note.value.trim()) s.note = note.value.trim(); else delete s.note;
-          if (saveDefault.checked) { p.defStart = s.start; p.defEnd = s.end; }
+          if (saveDefault.checked) setSet(p, isWkend(d) ? 'we' : 'wk', { start: s.start, end: s.end });
         });
       } }] });
   }
@@ -703,7 +728,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'Unscheduled'), h('span', { class: 'muted small' }, 'Click a name to add them with their usual shift.')),
       free.length ? h('div', { class: 'unsched' }, free.map((p) => {
         const wh = personWeekHours(p.id, week);
-        return h('button', { class: 'chip' + (offOn(p, d) ? ' na' : ''), title: (offOn(p, d) ? availIssue(p, d) + '\n' : '') + (partsOf(p).length < 3 ? `Works ${partsOf(p).map((x) => x.toUpperCase()).join(' / ')}\n` : '') + `Usual shift ${clock(p.defStart)} – ${clock(p.defEnd)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}`, onclick: () => addShift(d, p.id) },
+        return h('button', { class: 'chip' + (offOn(p, d) ? ' na' : ''), title: (offOn(p, d) ? availIssue(p, d) + '\n' : '') + (setFor(p, d).parts.length < 3 ? `Works ${setFor(p, d).parts.map((x) => x.toUpperCase()).join(' / ')}\n` : '') + (setFor(p, d).from != null ? `Available ${clock(setFor(p, d).from)} – ${clock(setFor(p, d).to)}\n` : '') + `Usual ${isWkend(d) ? 'weekend' : 'weekday'} shift ${clock(setFor(p, d).start)} – ${clock(setFor(p, d).end)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}`, onclick: () => addShift(d, p.id) },
           `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${hrs(wh)} h`));
       })) : h('p', { class: 'hint', style: { padding: '10px 0 0' } }, plan.staff.length ? 'Everyone is scheduled.' : 'No staff yet. Add people on the Staff tab.'),
       h('div', { class: 'legend no-print', style: { marginTop: '8px' } }, 'Tips: drag a shift to move it · drag its left or right edge to change start or finish (15-minute steps) · click for notes · double-click to type exact times · right-click to edit, add notes or remove · Ctrl+Z undoes')));
@@ -933,46 +958,82 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
 
   // ---------- Staff ----------
+  let staffTab = 'wk';
+  try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const rows = sortStaff(plan.staff).map((p) => {
-      const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } });
-      name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); });
-      const a = timePicker(p.defStart ?? 540, 'Usual start'), b = timePicker(p.defEnd ?? 1020, 'Usual finish');
-      const saveTimes = () => { if (b.value > a.value) change(() => { p.defStart = Math.max(DAY_START, a.value); p.defEnd = Math.min(DAY_END, b.value); }); else toast('The usual finish must be after the start.'); };
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact', 'Email, phone number and notes']];
+    const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
+    const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
+    const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
+      h('button', { class: 'btn sm', title: 'Print this person’s schedule', onclick: () => printPeopleDialog(p.id) }, 'Print'), ' ',
+      h('button', { class: 'btn sm ghost danger-text', onclick: () => {
+        const n = shiftCount(p.id);
+        confirmBox(`Remove ${p.name}?`, n ? `${p.name} has ${n} shift${n === 1 ? '' : 's'} in this plan. They will be removed too. You can undo this.` : 'You can undo this.', 'Remove', () => change(() => {
+          plan.staff = plan.staff.filter((x) => x.id !== p.id);
+          Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((s) => s.staffId !== p.id); });
+        }));
+      } }, 'Remove'));
+    // Weekdays or weekend: usual shift, available hours, parts of the day, days off
+    const scheduleCells = (p, k) => {
+      const st = setOf(p, k);
+      const a = timePicker(st.start, 'Usual start'), b = timePicker(st.end, 'Usual finish');
+      const saveTimes = () => { if (b.value > a.value) change(() => setSet(p, k, { start: Math.max(DAY_START, a.value), end: Math.min(DAY_END, b.value) })); else toast('The usual finish must be after the start.'); };
       a.addEventListener('change', saveTimes); b.addEventListener('change', saveTimes);
-      const max = h('input', { class: 'input', type: 'number', min: 0, max: 80, value: p.maxHours || '', style: { width: '70px' }, 'aria-label': 'Max hours per week' });
-      max.addEventListener('change', () => change(() => { p.maxHours = +max.value || 0; }));
-      const notes = h('input', { class: 'input', value: p.notes || '', placeholder: 'e.g. no Sundays', 'aria-label': 'Notes', style: { width: '100%' } });
-      notes.addEventListener('change', () => change(() => { p.notes = notes.value; }));
-      return h('tr', { style: { opacity: p.active ? 1 : 0.55 } },
-        h('td', { style: { minWidth: '170px' } }, name),
-        h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; }))),
+      const any = st.from == null || st.to == null;
+      const fa = timePicker(any ? DAY_START : st.from, 'Available from'), fb = timePicker(any ? DAY_END : st.to, 'Available until');
+      [fa, fb].forEach((tp) => tp.querySelectorAll('select').forEach((x) => { x.disabled = any; }));
+      // if one end passes the other, the other moves along by an hour (no error to fix first)
+      const saveWin = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => setSet(p, k, { from: f, to: t })); };
+      fa.addEventListener('change', () => saveWin('from')); fb.addEventListener('change', () => saveWin('to'));
+      const anyBox = h('input', { type: 'checkbox', checked: any, onchange: (e) => change(() => setSet(p, k, e.target.checked ? { from: null, to: null } : { from: Math.max(DAY_START, st.start - 60), to: Math.min(DAY_END, st.end + 60) })) });
+      const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
+      return [
         h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b)),
-        h('td', null, max),
-        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.active, 'aria-label': 'Active', onchange: (e) => change(() => { p.active = e.target.checked; }) })),
-        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days not available' }, WEEKDAYS.map((wd, i) => {
-          const on = !!(p.off && p.off[i]);
+        h('td', null, h('label', { class: 'check small', style: { marginBottom: any ? 0 : '4px' }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), any ? null : h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb)),
+        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([pk, l]) => {
+          const on = st.parts.includes(pk);
+          return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${pk === 'am' ? 'opening to ' + clock(plan.midStart) : pk === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to closing'} on ${partWord(k)} (click to change)`,
+            onclick: () => change(() => { const next = on ? st.parts.filter((x) => x !== pk) : [...st.parts, pk]; setSet(p, k, { parts: next.length ? next : st.parts }); }) }, l);
+        }))),
+        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days not available' }, dayIdx.map((i) => {
+          const on = !!(p.off && p.off[i]), wd = WEEKDAYS[i];
           return h('button', { type: 'button', class: 'dt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Not available' : 'Available'} on ${wd}s (click to change)`,
-            onclick: () => change(() => { p.off = Array.from({ length: 7 }, (_, k) => !!(p.off && p.off[k])); p.off[i] = !p.off[i]; }) }, wd[0]);
+            onclick: () => change(() => { p.off = Array.from({ length: 7 }, (_, x) => !!(p.off && p.off[x])); p.off[i] = !p.off[i]; }) }, k === 'we' ? wd.slice(0, 3) : wd[0]);
         }))),
-        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([k, l]) => {
-          const on = partsOf(p).includes(k);
-          return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${k === 'am' ? 'opening to ' + clock(plan.midStart) : k === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to close'}`,
-            onclick: () => change(() => { const cur = partsOf(p); const next = on ? cur.filter((x) => x !== k) : [...cur, k]; p.parts = next.length ? next : cur; }) }, l);
-        }))),
-        h('td', { style: { minWidth: '140px' } }, notes),
-        h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
-          h('button', { class: 'btn sm', title: 'Print this person’s schedule', onclick: () => printPeopleDialog(p.id) }, 'Print'), ' ',
-          h('button', { class: 'btn sm ghost danger-text', onclick: () => {
-          const n = shiftCount(p.id);
-          confirmBox(`Remove ${p.name}?`, n ? `${p.name} has ${n} shift${n === 1 ? '' : 's'} in this plan. They will be removed too. You can undo this.` : 'You can undo this.', 'Remove', () => change(() => {
-            plan.staff = plan.staff.filter((x) => x.id !== p.id);
-            Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((s) => s.staffId !== p.id); });
-          }));
-        } }, 'Remove')));
-    });
+      ];
+    };
+    let head, rows;
+    const people = sortStaff(plan.staff);
+    if (staffTab === 'contact') {
+      head = ['Name', 'Role', 'Email', 'Phone number', 'Notes', ''];
+      rows = people.map((p) => {
+        const email = h('input', { class: 'input', type: 'email', value: p.email || '', placeholder: 'name@example.com', 'aria-label': 'Email', style: { width: '100%' } });
+        email.addEventListener('change', () => change(() => { p.email = email.value.trim(); }));
+        const notes = h('input', { class: 'input', value: p.notes || '', placeholder: 'e.g. school until June', 'aria-label': 'Notes', style: { width: '100%' } });
+        notes.addEventListener('change', () => change(() => { p.notes = notes.value; }));
+        const phone = h('input', { class: 'input', type: 'tel', value: p.phone || '', placeholder: '(555) 010-0100', 'aria-label': 'Phone number', style: { width: '100%' } });
+        phone.addEventListener('change', () => change(() => { p.phone = phone.value.trim(); }));
+        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p),
+          h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
+          h('td', { style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
+          h('td', { style: { minWidth: '160px' } }, notes),
+          actions(p));
+      });
+    } else {
+      const k = staffTab;
+      head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift`, 'Hours they can work', 'Can work', 'Not available', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
+      rows = people.map((p) => {
+        const extra = [];
+        if (k === 'wk') {
+          const max = h('input', { class: 'input', type: 'number', min: 0, max: 80, value: p.maxHours || '', style: { width: '70px' }, 'aria-label': 'Max hours per week (the whole week)' });
+          max.addEventListener('change', () => change(() => { p.maxHours = +max.value || 0; }));
+          extra.push(h('td', null, max), h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.active, 'aria-label': 'Active', onchange: (e) => change(() => { p.active = e.target.checked; }) })));
+        }
+        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), ...scheduleCells(p, k), ...extra, actions(p));
+      });
+    }
     const newName = h('input', { class: 'input', placeholder: 'Full name', 'aria-label': 'New person name', style: { width: '100%' } });
     let newRole = 'TM';
     const addPerson = () => {
@@ -983,16 +1044,20 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     };
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
+    const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
+      we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
+      contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). More details will come here later.' }[staffTab];
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
         h('button', { class: 'btn sm', onclick: () => openFile() }, 'Load team…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.length, onclick: () => confirmBox('Clear the staff list?', 'Everyone is removed, along with all their shifts in this plan. Save the list first if you want to keep it. You can undo this.', 'Clear list', () => change(() => { plan.staff = []; plan.shifts = {}; plan.example = false; })) }, 'Clear list')),
-      h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'The usual shift is what a person gets when you click their name under Unscheduled. Untick Active for people who are away. Not available: click the days someone can’t work (red). Can work: AM, MID and PM (green); ShiftCraft warns you when a shift falls outside them.'),
+      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, l))),
+      h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, hint),
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['Name', 'Role', 'Usual shift', 'Max h/wk', 'Active', 'Not available', 'Can work', 'Notes', ''].map((x) => h('th', null, x)))),
-        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 9, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
-        h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: 7 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
+        h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))),
+        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
+        h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
   }
 
   // ===================================================================
