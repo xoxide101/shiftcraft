@@ -54,10 +54,12 @@ It is one HTML file. No install, no account, no server: open `index.html` in Chr
 - **Hours by section**: each person's hours today, week so far and week total, with day and week totals for every group.
 
 ### Staff
-The Staff tab has three sections:
+The Staff tab has four sections:
 - **1 · Weekdays** (Monday to Friday): usual weekday shift, the **hours they can work** (any time, or from–until), **AM / MID / PM**, the weekdays they are **not available**, max hours per week, and active or not.
 - **2 · Weekend** (Saturday and Sunday), kept apart because many people can work any time at the weekend but not on weekdays: their own **usual weekend shift**, hours they can work, AM / MID / PM, and Saturday or Sunday off. Clicking a name under Unscheduled uses the weekday or weekend usual shift to suit the day.
 - **3 · Contact & training:** **email** (✉ writes one), **phone number** (☎ calls) and notes, and **Trained in**: a grid with everyone down the side and the location's positions across the top (names written upwards). Click a box for **Yes** (trained) or **No**; click a position's name to mark everyone, or a person's count to mark every position for them. Totals show how many people are trained in each position.
+- **4 · Day by day:** each day of the week on its own, as on the printed availability list. Click a day for **Any**, **Off**, **Hours** or **A note** (Mornings, Afternoons, Evenings, Emergency, If you ask, or your own words). Hours are ranges: **+ Can work** and **+ Can't work** (e.g. *Open – Close, not 12pm – 1pm*); where they overlap, can't wins. **Highlight** marks a day orange. **From usual** fills the week from the weekday and weekend settings, then you change the odd day. Also **Validated** (availability checked with them) and **Pending training**.
+- **Print & share › Availability list** prints the *Schedule Availability and Contact Information* sheet (landscape): Managers, Supervisors and Team Members with phone numbers, positions trained in, Monday to Sunday (green = hours, black = off, orange = highlighted) and Validated; people pending training are listed last in yellow. It carries a version stamp with the date and time.
 - Name and role on every section. Shifts outside someone's availability for that day (days off, hours, AM / MID / PM) are flagged on the schedule and in Check schedule.
 - **Tasks and training** per person with dates, plus an editable **new-hire checklist**.
 - Save, load or clear the team list.

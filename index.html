@@ -108,6 +108,13 @@ table.trained .tbox { width: 26px; height: 26px; border: 1px solid var(--line); 
 table.trained .tbox.on { background: var(--good); border-color: var(--good); }
 table.trained .tbox:hover { border-color: var(--accent); }
 table.trained tbody tr:hover td { background: var(--accent-soft); }
+/* day-by-day availability cells (the same colours as the printed list) */
+.avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
+.avcell.none { background: var(--panel); color: var(--muted); }
+.avcell.on { background: #e2f0d9; color: #1c2330; }
+.avcell.off { background: #111; color: #fff; }
+.avcell.hl { background: #ffc000; color: #1c2330; }
+.avcell:hover { outline: 2px solid var(--accent); }
 .staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 /* the staff table: compact time pickers so every column fits */
 table.t .timepick { gap: 1px; flex-wrap: nowrap; }
@@ -469,7 +476,34 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const PARTS = [['am', 'AM'], ['mid', 'MID'], ['pm', 'PM']];
   const partsOf = (p) => (Array.isArray(p.parts) && p.parts.length ? p.parts : ['am', 'mid', 'pm']);
-  const offOn = (p, d) => !!(p.off && p.off[(parseIso(d).getDay() + 6) % 7]);
+  // Day-by-day availability (the availability and contact list): p.avail[0–6] (Monday first) is null (not given: the
+  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note', note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
+  // In 'times', '+' ranges are when they can work and '-' ranges when they can't; where they overlap, can't wins.
+  // With no '+' range, they can work any time apart from the '-' ranges. OPEN and CLOSE stand for the opening and closing time.
+  const OPEN = -1, CLOSE = 9999;
+  const AV_NOTES = ['Mornings', 'Afternoons', 'Evenings', 'Emergency', 'If you ask'];
+  const avDay = (d) => (parseIso(d).getDay() + 6) % 7;
+  const avOf = (p, i) => (Array.isArray(p.avail) && p.avail[i]) || null;
+  const offOn = (p, d) => { const a = avOf(p, avDay(d)); return a ? a.k === 'off' : !!(p.off && p.off[avDay(d)]); };
+  const clockShort = (m) => { const h24 = Math.floor(m / 60) % 24, mm = m % 60; return `${h24 % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${h24 < 12 ? 'am' : 'pm'}`; };
+  const endWord = (m) => (m === OPEN ? 'Open' : m === CLOSE ? 'Close' : clockShort(m));
+  const realMin = (m, close) => (m === OPEN ? DAY_START : m === CLOSE ? DAY_END : m);
+  function avText(a) {
+    if (!a) return '';
+    if (a.k === 'any') return 'Any'; if (a.k === 'off') return 'Off'; if (a.k === 'note') return a.note || '';
+    const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+    const word = (x) => `${endWord(x[0])} - ${endWord(x[1])}`;
+    return (plus.length ? plus.map(word).join(' / ') : 'Any') + (minus.length ? ` (not ${minus.map(word).join(', ')})` : '');
+  }
+  // the usual weekday / weekend settings, as a day-by-day entry (to start the list from)
+  function avFromSets(p, i) {
+    if (p.off && p.off[i]) return { k: 'off' };
+    const st = setOf(p, i >= 5 ? 'we' : 'wk');
+    if (st.from != null && st.to != null) return { k: 'times', r: [[st.from, st.to, '+']] };
+    if (st.parts.length === 3) return { k: 'any' };
+    const names = { am: 'Mornings', mid: 'Afternoons', pm: 'Evenings' };
+    return st.parts.length === 1 ? { k: 'note', note: names[st.parts[0]] } : { k: 'any' };
+  }
   // Weekdays (Mon–Fri) and the weekend (Sat–Sun) each have their own usual shift, available hours and parts of the day.
   // The weekday set is p.defStart, p.defEnd, p.parts, p.from, p.to; the weekend set is p.we (missing parts = same as weekdays).
   const isWkend = (d) => { const g = parseIso(d).getDay(); return g === 0 || g === 6; };
@@ -490,6 +524,19 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const first = p.name.split(' ')[0];
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
+    const a = avOf(p, avDay(d));
+    if (a) {
+      if (a.k === 'any') return '';
+      if (a.k === 'note') {
+        if (/emergenc/i.test(a.note || '')) return `${first} is only available for emergencies on ${dayName(d)}s`;
+        const win = { Mornings: [DAY_START, plan.midStart], Afternoons: [plan.midStart, plan.pmStart], Evenings: [plan.pmStart, DAY_END] }[a.note];
+        return win && (s.start < win[0] - 60 || s.end > win[1] + 60) ? `${first} prefers ${a.note.toLowerCase()} on ${dayName(d)}s` : '';
+      }
+      const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+      const inPlus = !plus.length || plus.some((x) => s.start >= realMin(x[0]) && s.end <= realMin(x[1]));
+      const hitMinus = minus.some((x) => s.start < realMin(x[1]) && s.end > realMin(x[0]));
+      return inPlus && !hitMinus ? '' : `${first} is available ${avText(a)} on ${dayName(d)}s`;
+    }
     const st = setFor(p, d), parts = st.parts;
     if (st.from != null && st.to != null && (s.start < st.from || s.end > st.to)) return `${first} is only available ${clock(st.from)} – ${clock(st.to)} on ${partWord(isWkend(d) ? 'we' : 'wk')}`;
     if (parts.length === 3) return '';
@@ -980,7 +1027,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in']];
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
@@ -1023,7 +1070,15 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     };
     let head, rows;
     const people = sortStaff(plan.staff);
-    if (staffTab === 'contact') {
+    if (staffTab === 'avail') {
+      head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
+      rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { class: 'nowrap small', style: { whiteSpace: 'nowrap', minWidth: '96px' } }, p.phone || h('span', { class: 'muted' }, '—')),
+        WEEKDAYS.map((w, i) => { const a = avOf(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a), title: `${w}: ${a ? avText(a) : 'not given (the weekday / weekend settings apply)'}. Click to change.`, onclick: () => availEditor(p, i) }, a ? avText(a) : '·')); }),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
+        h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Fill the week from this person’s weekday and weekend settings', onclick: () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); }) }, 'From usual'), ' ',
+          h('button', { class: 'btn sm ghost', title: 'Clear the day-by-day availability', disabled: !Array.isArray(p.avail), onclick: () => change(() => { delete p.avail; }) }, 'Clear'))));
+    } else if (staffTab === 'contact') {
       head = ['Name', 'Role', 'Email', 'Phone number', 'Notes', ''];
       rows = people.map((p) => {
         const email = h('input', { class: 'input', type: 'email', value: p.email || '', placeholder: 'name@example.com', 'aria-label': 'Email', style: { width: '100%' } });
@@ -1063,6 +1118,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
     const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
+      avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day left empty uses those settings.',
       contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
@@ -1076,6 +1132,97 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
         h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
     if (staffTab === 'contact') main.append(trainedGrid());
+  }
+  const avClass = (a) => (!a ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|morning|afternoon|evening/i.test(a.note || '')) ? 'hl' : 'on');
+  // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
+  function availEditor(p, i) {
+    const cur = JSON.parse(JSON.stringify(avOf(p, i) || avFromSets(p, i)));
+    let kind = cur.k, note = cur.note || 'Mornings', ranges = cur.r && cur.r.length ? cur.r : [[OPEN, CLOSE, '+']];
+    const times = [[OPEN, 'Open'], ...Array.from({ length: (DAY_END - DAY_START) / 15 + 1 }, (_, k) => DAY_START + k * 15).map((m) => [m, clockShort(m)]), [CLOSE, 'Close']];
+    const timeSel = (v, on) => h('select', { class: 'input', style: { width: 'auto' }, onchange: (e) => on(+e.target.value) }, times.map(([m, l]) => h('option', { value: m, selected: m === v }, l)));
+    const box = h('div', { class: 'grid', style: { gap: '10px' } });
+    const hl = h('input', { type: 'checkbox', checked: !!cur.hl });
+    const draw = () => {
+      box.replaceChildren(...[
+        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
+        kind === 'note' ? h('div', { class: 'inline' }, AV_NOTES.map((n) => h('button', { type: 'button', class: 'btn sm' + (note === n ? ' primary' : ''), onclick: () => { note = n; draw(); } }, n)),
+          h('input', { class: 'input', value: AV_NOTES.includes(note) ? '' : note, placeholder: 'or your own words', style: { width: '160px' }, oninput: (e) => { if (e.target.value.trim()) note = e.target.value.trim(); } })) : null,
+        kind === 'times' ? h('div', { class: 'grid', style: { gap: '6px' } },
+          ranges.map((r, j) => h('div', { class: 'inline' },
+            h('select', { class: 'input', style: { width: 'auto' }, onchange: (e) => { r[2] = e.target.value; } }, h('option', { value: '+', selected: r[2] !== '-' }, 'Can work'), h('option', { value: '-', selected: r[2] === '-' }, 'Can’t work')),
+            timeSel(r[0], (v) => { r[0] = v; }), h('span', null, 'to'), timeSel(r[1], (v) => { r[1] = v; }),
+            h('button', { type: 'button', class: 'btn sm ghost', title: 'Take this range away', disabled: ranges.length < 2, onclick: () => { ranges.splice(j, 1); draw(); } }, '×'))),
+          h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([OPEN, CLOSE, '+']); draw(); } }, '+ Can work'), h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([720, 780, '-']); draw(); } }, '+ Can’t work')),
+          h('p', { class: 'hint' }, 'Where a can’t-work range overlaps a can-work range, can’t wins. With no can-work range, they can work any time apart from the can’t-work ranges.')) : null,
+        h('label', { class: 'check' }, hl, ' Highlight this day (orange on the list)')].filter(Boolean));
+    };
+    draw();
+    const entry = () => (kind === 'times' ? { k: 'times', r: ranges.map((r) => [r[0], r[1], r[2] === '-' ? '-' : '+']) } : kind === 'note' ? { k: 'note', note } : { k: kind });
+    const save = (days) => change(() => { if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map((_, k) => avFromSets(p, k)); days.forEach((k) => { p.avail[k] = { ...entry(), ...(hl.checked ? { hl: true } : {}) }; }); });
+    modal({ title: `${p.name} · ${WEEKDAYS[i]}`, body: box, wide: true, actions: [
+      { label: 'Not given', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
+      { label: i >= 5 ? 'Same for the weekend' : 'Same for weekdays', onClick: () => save(i >= 5 ? [5, 6] : [0, 1, 2, 3, 4]) },
+      { label: 'Same every day', onClick: () => save([0, 1, 2, 3, 4, 5, 6]) },
+      { label: 'Save', primary: true, onClick: () => save([i]) }] });
+  }
+
+  // ---- the availability and contact list (a printout for the wall or the office)
+  function printAvailability() {
+    if (blockedHere()) return;
+    const area = $('#print-area'), now = new Date(), pad = (n) => String(n).padStart(2, '0');
+    const version = `${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${now.getFullYear()}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
+    const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
+    const sections = [['mgr', PLURAL.mgr], ['sup', PLURAL.sup], ['tm', PLURAL.tm]];
+    const groupOf = (p) => (ROLES[p.role].group === 'trn' || p.pending ? 'tm' : ROLES[p.role].group);
+    const tick = (on) => h('span', { class: 'al-box' + (on ? ' on' : '') }, on ? '✔' : '');
+    const row = (p) => {
+      const pend = p.pending || ROLES[p.role].group === 'trn';
+      return h('tr', null,
+        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : '')),
+        h('td', { class: 'al-phone' }, p.phone || ''),
+        h('td', { class: 'al-ticks' }, positions.map((pos) => tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))),
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i); return h('td', { class: 'al-day ' + avClass(a) }, a ? avText(a) : ''); }),
+        h('td', { class: 'al-val' }, tick(!!p.validated)));
+    };
+    const sheet = h('div', { class: 'person-sheet al-sheet' },
+      h('style', null, `
+        .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
+        .al-sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+        .al-sheet th, .al-sheet td { font-size: 9pt; padding: 1px 3px; }
+        .al-title { text-align: left; vertical-align: top; width: 170px; }
+        .al-title b { display: block; text-decoration: underline; font-size: 11pt; text-align: center; margin-bottom: 8px; }
+        .al-up { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-weight: 400; font-size: 9pt; }
+        .al-headpos { width: 14px; vertical-align: bottom; }
+        .al-dayhead { border: 1px solid #000; background: #d9d9d9; height: 120px; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 10pt; }
+        .al-section td { padding-top: 12px; font-weight: 700; font-size: 12pt; text-decoration: underline; text-align: center; }
+        .al-name { font-weight: 700; white-space: nowrap; overflow: hidden; }
+        .al-name.pend { background: #ffff00; }
+        .al-phone { font-weight: 700; white-space: nowrap; text-align: right; }
+        .al-ticks { white-space: nowrap; }
+        .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
+        .al-box.on { background: #000; color: #fff; }
+        .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
+        .al-day.off { background: #000; color: #fff; }
+        .al-day.hl { background: #ffc000; }
+        .al-val { text-align: center; }
+      `),
+      h('table', null,
+        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), h('col', { style: { width: `${positions.length * 16 + 6}px` } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '22px' } })),
+        h('thead', null, h('tr', null,
+          h('th', { class: 'al-title' }, h('b', null, 'Schedule Availability and Contact Information'), plan.company || plan.location ? h('b', { style: { textDecoration: 'none', fontSize: '9pt' } }, [plan.company, plan.location].filter(Boolean).join(' · ')) : null, h('b', null, 'Version ' + version)),
+          h('th', { class: 'al-headpos', style: { textAlign: 'right' } }, h('span', { class: 'al-up' }, 'Phone Numbers')),
+          h('th', { style: { verticalAlign: 'bottom', textAlign: 'left' } }, h('div', { style: { display: 'flex' } }, positions.map((pos) => h('div', { style: { width: '16px', display: 'flex', justifyContent: 'center' } }, h('span', { class: 'al-up' }, pos.name))))),
+          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)),
+          h('th', { class: 'al-headpos' }, h('span', { class: 'al-up' }, 'Validated')))),
+        h('tbody', null, sections.flatMap(([g, title]) => {
+          const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
+          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: 10 })), ...list.map(row)] : [];
+        }))));
+    area.replaceChildren(sheet);
+    document.body.classList.add('print-people');
+    const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => window.print(), 60);
   }
   // Trained in: a grid of people (rows) and the location's positions (columns, titles written upwards). Click a box: Yes / No.
   // Stored as p.trained = [position ids]. Positions not in use at the location are left out.
@@ -2689,6 +2836,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       { label: 'Print or save calendar…', run: () => exportImageDialog({ layout: 'calendar' }) },
       { label: 'Save as text or CSV…', run: exportTextDialog },
       { label: 'Print schedule for a person or group…', run: () => printPeopleDialog() },
+      { label: 'Print availability and contact list', run: () => printAvailability() },
       { label: 'Print screen (what you see)…', key: 'Ctrl+Shift+P', run: printScreenDialog },
       { label: 'Print…', key: 'Ctrl+P', run: () => { if (inFrame) blockedHere(); else window.print(); } },
       '-',
@@ -3380,7 +3528,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
           ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
         ] },
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
-          ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
+          ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
           ['Save', [C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save month', 'Save month', I.save), C('Save location', 'Save everything', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
         ] },

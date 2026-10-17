@@ -127,3 +127,11 @@ All built on 2026-10-13.
 
 `p.trained = [position ids]`. `trainedGrid()` (below the Contact table on the Staff tab's third section) shows positions that are In use, in the location's order, with vertical headers (`writing-mode: vertical-rl` turned 180°). Removing a position from the location leaves its id in people's lists harmlessly (it simply is not shown).
 
+
+## Day by day availability and the availability list (v1.4)
+
+- `p.avail[0..6]` (Monday first): `null` (not given) or `{ k: 'any' | 'off' | 'times' | 'note', note, hl, r: [[from, to, '+' | '-'], …] }`. Times are minutes; `OPEN = -1` and `CLOSE = 9999` stand for the location's opening and closing.
+- `availIssue` uses the day's entry when there is one: off = not available; Emergency = warning; Mornings / Afternoons / Evenings = a loose window; times = the shift must sit inside a `+` range (any time if there are none) and must not touch a `-` range. Without an entry, the weekday / weekend sets work as before. `avFromSets(p, i)` turns those sets into an entry ("From usual").
+- `p.validated` (+ `p.validatedOn`) and `p.pending` (pending training; NH counts as pending on the list).
+- `printAvailability()` builds the landscape sheet in `#print-area`: sections by role group (mgr / sup / tm), rotated headers for phone, positions and Validated, version stamp `MM.DD.YYYY.HH.MM`.
+- Tested with made-up people only.
