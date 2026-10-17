@@ -100,7 +100,7 @@ The Staff tab has four sections:
 
 | Action | Keys |
 | --- | --- |
-| Save week | Ctrl+S |
+| Save everything (team, availability, schedules, settings) | Ctrl+S |
 | Save… (choose what) | Ctrl+Shift+S |
 | Open | Ctrl+O |
 | Print | Ctrl+P |

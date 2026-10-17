@@ -1629,7 +1629,21 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     weeks: { label: 'Weeks only', desc: 'the schedule (shifts, notes and forecasts) for the weeks you pick; people are matched by name when it is opened' },
   };
   const fileStem = (...extra) => [plan.company, plan.location].map(safe).filter(Boolean).concat(extra).join(' - ') || 'ShiftCraft';
-  const teamOnly = () => ({ app: 'ShiftCraft', kind: 'team', version: 4, company: plan.company, location: plan.location, checklist: plan.checklist || null, staff: plan.staff });
+  const teamOnly = () => ({ app: 'ShiftCraft', kind: 'team', version: 5, company: plan.company, location: plan.location, checklist: plan.checklist || null, positions: plan.positions || [], staff: plan.staff });
+  // Positions have their own ids in each browser, so a person's "trained in" list from a file is matched by the
+  // position's name; positions the location doesn't have yet are added to it.
+  function remapTrained(staff, filePositions) {
+    if (!Array.isArray(filePositions) || !filePositions.length) return staff;
+    plan.positions = plan.positions || [];
+    const idOf = {};
+    filePositions.forEach((fp) => {
+      const nm = String(fp.name || '').trim(); if (!nm) return;
+      let here = plan.positions.find((x) => x.id === fp.id) || plan.positions.find((x) => x.name.toLowerCase() === nm.toLowerCase());
+      if (!here) { here = { id: uid(), name: nm, active: fp.active !== false }; plan.positions.push(here); }
+      idOf[fp.id] = here.id;
+    });
+    return staff.map((p) => (Array.isArray(p.trained) ? { ...p, trained: [...new Set(p.trained.map((id) => idOf[id] || id))] } : p));
+  }
   const weeksOnly = (first, count) => scheduleRange(weekDays(first)[0], count * 7, first === 0 && count === plan.weeks ? plan.month : null);
   const locationAll = () => ({ ...plan, app: 'ShiftCraft', kind: 'location', version: 4 });
 
@@ -1710,15 +1724,22 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         const remap = {};
         data.staff.forEach((p) => { const old = byName.get(String(p.name).toLowerCase()); if (old && old !== p.id) remap[old] = p.id; });
         Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].map((s) => ({ ...s, staffId: remap[s.staffId] || s.staffId })); });
-        plan.staff = data.staff.map((p) => ({ active: true, maxHours: 0, notes: '', defStart: 540, defEnd: 1020, tasks: [], ...p }));
+        plan.staff = remapTrained(data.staff, data.positions).map((p) => ({ active: true, maxHours: 0, notes: '', defStart: 540, defEnd: 1020, tasks: [], ...p }));
         if (data.checklist && data.checklist.length) plan.checklist = data.checklist;
       });
       toast(`Team loaded: ${data.staff.length} people from ${name}`);
     };
     const merge = () => {
       let before = plan.staff.length;
-      change(() => { dropExample(); before = plan.staff.length; mergeStaff(data.staff); });
-      toast(`Added ${plan.staff.length - before} new ${plan.staff.length - before === 1 ? 'person' : 'people'} from ${name}`);
+      let updated = 0;
+      change(() => {
+        dropExample(); before = plan.staff.length;
+        const list = remapTrained(data.staff, data.positions);
+        // people already on the team take the file's details (phone, availability, training…), keeping their own id
+        list.forEach((fp) => { const same = plan.staff.find((x) => x.id === fp.id) || plan.staff.find((x) => x.name.toLowerCase() === String(fp.name).toLowerCase()); if (same) { const { id, ...rest } = fp; Object.assign(same, rest); updated++; } });
+        mergeStaff(list);
+      });
+      toast(`From ${name}: ${plan.staff.length - before} new, ${updated} updated`);
     };
     if (!plan.staff.length || plan.example) { replace(); return; }
     modal({ title: `Load team from ${name}?`, body: [h('p', null, `The file has ${data.staff.length} people. Your team has ${plan.staff.length}.`),
@@ -1737,6 +1758,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const known = people.filter((p) => plan.staff.some((x) => x.id === p.id || x.name.toLowerCase() === String(p.name).toLowerCase())).length;
     modal({ title: `Open ${count} week${count > 1 ? 's' : ''}: ${shortDate(fileDays[0])} – ${shortDate(fileDays[fileDays.length - 1])}`, body: [
       h('p', { class: 'muted' }, `From ${name}${data.company || data.location ? ` (${[data.company, data.location].filter(Boolean).join(' · ')})` : ''}. ${people.length} people: ${plan.example ? 'they become your team' : `${known} already on your team${people.length - known ? `, ${people.length - known} will be added` : ''}`}.`),
+      h('p', { class: 'hint' }, 'This is a schedule file: shifts, notes and forecasts, with only names and roles for people. Phone numbers, availability and training travel in a team file or a whole-location file (Save, Ctrl+S).'),
       h('label', { class: 'field' }, h('span', null, 'Put the weeks into'), sel),
       h('p', { class: 'hint' }, 'Shifts keep their weekdays and times. You can undo this.')],
     actions: [{ label: 'Cancel' }, { label: 'Open', primary: true, onClick: () => {
@@ -1952,7 +1974,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
   // The one Save dialog: what, then (for schedules) how much.
   function saveAsDialog(preset = {}) {
-    const c = { what: preset.what || 'schedule', range: preset.range || 'week' };
+    const c = { what: preset.what || 'all', range: preset.range || 'week' };
     const wkFrom = h('select', { class: 'input' }, Array.from({ length: plan.weeks }, (_, k) => h('option', { value: k, selected: k === weekOf(ui.day) }, `Week ${k + 1} (${shortDate(weekDays(k)[0])})`)));
     const wkCount = h('select', { class: 'input' }, Array.from({ length: plan.weeks }, (_, k) => h('option', { value: k + 1, selected: k === 1 }, `${k + 1} week${k ? 's' : ''}`)));
     const custom = h('div', { class: 'inline', hidden: c.range !== 'weeks' }, h('label', { class: 'field' }, h('span', null, 'Starting'), wkFrom), h('label', { class: 'field' }, h('span', null, 'How many'), wkCount));
@@ -2834,7 +2856,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       { label: 'Open… (location, team or weeks)', key: 'Ctrl+O', run: () => openFile() },
       '-',
       { label: 'Save day', run: () => saveFile('day', { as: true }) },
-      { label: 'Save week', key: 'Ctrl+S', run: () => saveWeek(false) },
+      { label: 'Save (everything: team, schedules and settings)', key: 'Ctrl+S', run: () => saveFile('location') },
+      { label: 'Save this week’s schedule only', run: () => saveWeek(false) },
       { label: 'Save month (all weeks)', run: () => saveMonth(false) },
       { label: 'Save team only…', run: saveStaff },
       { label: 'Save location (everything)…', run: () => saveFile('location', { as: true }) },
@@ -2927,7 +2950,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     if ($('.backdrop')) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveWeek(false); return; }
+    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveFile('location'); return; }
     if (mod && k === 'o') { e.preventDefault(); openFile(); return; }
     if (mod && k === 'p' && e.shiftKey) { e.preventDefault(); printScreenDialog(); return; }
     if (mod && k === 'p') { e.preventDefault(); if (inFrame) blockedHere(); else window.print(); return; }
@@ -3521,7 +3544,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true }), C('Undo', 'Undo', I.undo, { big: true })]],
         ] },
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
-          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save week', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
+          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save this week’s schedule only', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
         ] },
         { id: 'forecast', label: 'Forecast', hue: '#e09f1f', onSelect: view('forecast'), groups: [
@@ -3552,7 +3575,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       appName: 'ShiftCraft', storageKey: 'shiftcraft', colors: ['#2f6fdd', '#1e9e8a'],
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
-        { icon: 'save', title: 'Save week', key: 'Ctrl+S', run: () => saveWeek(false) },
+        { icon: 'save', title: 'Save everything (team, availability, schedules and settings)', key: 'Ctrl+S', run: () => saveFile('location') },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save the week table', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },

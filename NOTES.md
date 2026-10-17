@@ -137,3 +137,11 @@ All built on 2026-10-13.
 - Days not set on their own are filled from the weekday / weekend settings, on the list and (lighter, italic) in Day by day. Each position is its own table column on the list, so every name sits over its box.
 - Phone numbers have to be listed: Day by day has a phone box (red outline when empty), and printing names anyone without one first (Add numbers, or Print anyway with a line to write it in).
 - Tested with made-up people only.
+
+## Saving everything, and team files across browsers (v1.4.3)
+
+- **Save (Ctrl+S, the disk button)** now saves the whole location (`saveFile('location')`, remembering the file), like saving a Word document. It used to save only the current week's schedule, whose file has people as name and role only, so phone numbers, availability and training were left out. "Save this week's schedule only" is still on the File menu and the Print & share ribbon; the Save… dialog starts on Everything.
+- Team files (version 5) carry `positions`. Position ids are made per browser, so `remapTrained()` matches a person's trained list by position name when a team file is opened (adding positions the location lacks). Older team files without positions keep their ids as they are.
+- Load team › Add now also updates people already on the team with the file's details (phone, availability, training…), not only adds new people.
+- Opening a schedule file says that it carries only names and roles.
+- Tested: save in one browser, open in a fresh one (different position ids): phones, availability, trained and validated all arrive, for both the location file and the team file.
