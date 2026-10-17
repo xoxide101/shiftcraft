@@ -109,6 +109,7 @@ table.trained .tbox.on { background: var(--good); border-color: var(--good); }
 table.trained .tbox:hover { border-color: var(--accent); }
 table.trained tbody tr:hover td { background: var(--accent-soft); }
 /* day-by-day availability cells (the same colours as the printed list) */
+.input.need { border-color: var(--danger, #e03131); box-shadow: 0 0 0 1px var(--danger, #e03131) inset; }
 .avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
 .avcell.none { background: var(--panel); color: var(--muted); }
 .avcell.on { background: #e2f0d9; color: #1c2330; }
@@ -1072,7 +1073,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const people = sortStaff(plan.staff);
     if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
-      rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { class: 'nowrap small', style: { whiteSpace: 'nowrap', minWidth: '96px' } }, p.phone || h('span', { class: 'muted' }, '—')),
+      rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
         WEEKDAYS.map((w, i) => { const a = avOf(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a), title: `${w}: ${a ? avText(a) : 'not given (the weekday / weekend settings apply)'}. Click to change.`, onclick: () => availEditor(p, i) }, a ? avText(a) : '·')); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
@@ -1167,10 +1168,18 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
 
   // ---- the availability and contact list (a printout for the wall or the office)
-  function printAvailability() {
+  function printAvailability(anyway) {
     if (blockedHere()) return;
+    // phone numbers have to be on the list: name anyone without one first
+    const noPhone = sortStaff(plan.staff.filter((p) => p.active && !(p.phone || '').trim()));
+    if (noPhone.length && !anyway) {
+      modal({ title: 'Phone numbers missing', body: h('div', null, h('p', null, `${noPhone.length === 1 ? 'This person has' : 'These people have'} no phone number yet:`), h('ul', null, noPhone.map((p) => h('li', null, p.name))), h('p', { class: 'hint' }, 'Add them on Staff › Day by day (or Contact & training). Printing anyway leaves a line to write the number in.')),
+        actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true)); } }, { label: 'Cancel' },
+          { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
+      return;
+    }
     const area = $('#print-area'), now = new Date(), pad = (n) => String(n).padStart(2, '0');
-    const version = `${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${now.getFullYear()}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
+    const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
     const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
     const sections = [['mgr', PLURAL.mgr], ['sup', PLURAL.sup], ['tm', PLURAL.tm]];
     const groupOf = (p) => (ROLES[p.role].group === 'trn' || p.pending ? 'tm' : ROLES[p.role].group);
@@ -1179,7 +1188,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       const pend = p.pending || ROLES[p.role].group === 'trn';
       return h('tr', null,
         h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : '')),
-        h('td', { class: 'al-phone' }, p.phone || ''),
+        h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         h('td', { class: 'al-ticks' }, positions.map((pos) => tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))),
         WEEKDAYS.map((_, i) => { const a = avOf(p, i); return h('td', { class: 'al-day ' + avClass(a) }, a ? avText(a) : ''); }),
         h('td', { class: 'al-val' }, tick(!!p.validated)));
@@ -1198,6 +1207,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         .al-name { font-weight: 700; white-space: nowrap; overflow: hidden; }
         .al-name.pend { background: #ffff00; }
         .al-phone { font-weight: 700; white-space: nowrap; text-align: right; }
+        .al-blank { display: inline-block; width: 92px; border-bottom: 1px solid #000; height: 12px; }
         .al-ticks { white-space: nowrap; }
         .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
         .al-box.on { background: #000; color: #fff; }

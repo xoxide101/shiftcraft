@@ -133,5 +133,6 @@ All built on 2026-10-13.
 - `p.avail[0..6]` (Monday first): `null` (not given) or `{ k: 'any' | 'off' | 'times' | 'note', note, hl, r: [[from, to, '+' | '-'], …] }`. Times are minutes; `OPEN = -1` and `CLOSE = 9999` stand for the location's opening and closing.
 - `availIssue` uses the day's entry when there is one: off = not available; Emergency = warning; Mornings / Afternoons / Evenings = a loose window; times = the shift must sit inside a `+` range (any time if there are none) and must not touch a `-` range. Without an entry, the weekday / weekend sets work as before. `avFromSets(p, i)` turns those sets into an entry ("From usual").
 - `p.validated` (+ `p.validatedOn`) and `p.pending` (pending training; NH counts as pending on the list).
-- `printAvailability()` builds the landscape sheet in `#print-area`: sections by role group (mgr / sup / tm), rotated headers for phone, positions and Validated, version stamp `MM.DD.YYYY.HH.MM`.
+- `printAvailability()` builds the landscape sheet in `#print-area`: sections by role group (mgr / sup / tm), rotated headers for phone, positions and Validated, version stamp `YYYY.MM.DD.HH.MM` (24-hour).
+- Phone numbers have to be listed: Day by day has a phone box (red outline when empty), and printing names anyone without one first (Add numbers, or Print anyway with a line to write it in).
 - Tested with made-up people only.
