@@ -145,3 +145,4 @@ All built on 2026-10-13.
 - Load team › Add now also updates people already on the team with the file's details (phone, availability, training…), not only adds new people.
 - Opening a schedule file says that it carries only names and roles.
 - Tested: save in one browser, open in a fresh one (different position ids): phones, availability, trained and validated all arrive, for both the location file and the team file.
+- Tabs stay in step: a `storage` listener takes the plan another ShiftCraft tab saved (closing any open dialog), so a tab left open never saves or writes back older information. The Save message counts people, phone numbers, day-by-day availability and training, so you can see what went into the file.

@@ -447,6 +447,12 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
   // Call before changing the plan; persists afterwards.
   function change(fn, { keepUndo = false } = {}) { if (!keepUndo) snapshot(); fn(); persist(); render(); }
+  // Another ShiftCraft tab or window changed the plan: take its version, so an older tab never saves or
+  // writes back out-of-date information.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY || !e.newValue) return;
+    try { const np = JSON.parse(e.newValue); normalize(np); plan = np; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); render(); toast('Updated with changes made in another ShiftCraft tab'); } catch (err) { /* ignore */ }
+  });
   let storageWarned = false;
   function persist() {
     try { localStorage.setItem(KEY, JSON.stringify(plan)); localStorage.setItem(KEY + '-ui', JSON.stringify({ tab: ui.tab, day: ui.day })); storageWarned = false; }
@@ -1658,7 +1664,12 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       data = weeksOnly(first, count); name = fileStem(fileDate(a), fileDate(b)) + '.json'; key = `weeks:${a}:${count}`;
     }
     const saved = await saveBlob(name, jsonBlob(data), JSON_TYPE, as ? null : key);
-    if (saved) { ui.fileName = saved; render(); toast(`Saved (${FILE_KINDS[kind].label.toLowerCase()}) as ${saved}`); }
+    if (saved) {
+      ui.fileName = saved; render();
+      const st = data.staff || [], n = (f) => st.filter(f).length;
+      const what = data.staff ? ` · ${st.length} people, ${n((x) => (x.phone || '').trim())} with a phone number, ${n((x) => Array.isArray(x.avail) && x.avail.some(Boolean))} with day-by-day availability, ${n((x) => (x.trained || []).length)} with training` : '';
+      toast(`Saved (${FILE_KINDS[kind].label.toLowerCase()}) as ${saved}${what}`);
+    }
   }
   const saveWeek = (as) => saveFile('weeks', { first: weekOf(ui.day), count: 1, as });
   const saveMonth = (as) => saveFile('weeks', { first: 0, count: plan.weeks, as });
