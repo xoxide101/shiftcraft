@@ -1242,7 +1242,9 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       return;
     }
     const area = $('#print-area'), sheet = availabilitySheet();
-    area.replaceChildren(sheet);
+    // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
+    // the sheet has its title and version already; the space round it is put back inside the page
+    area.replaceChildren(h('style', null, '@page { size: letter landscape; margin: 0; } #print-area .al-sheet { padding: 0.4in; box-sizing: border-box; }'), sheet);
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
