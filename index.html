@@ -1271,10 +1271,33 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // to fill it (by whichever of width or height runs out first, so it stays one page)
   const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b); return { key: k, W, H, zoom: Math.min((W - 0.8) / 10.2, (H - 0.8) / 7.7) }; };
   let availPaperPref = 'letter'; try { availPaperPref = localStorage.getItem(KEY + '-avail-paper') || 'letter'; } catch (e) { /* ignore */ }
+  // Fitting the sheet to its page: it is measured off screen and enlarged until it fills the page's height (the width
+  // always fits: the table spreads across it), at most half as big again; then, if the page is still taller, the rows
+  // are stretched to use the rest, so the sheet fills the paper top to bottom. Returns the zoom (set on the sheet).
+  function fitAvailability(sh, pg) {
+    const innerW = (pg.W - 0.8) * 96, innerH = (pg.H - 0.8) * 96 - 2;
+    const holder = h('div', { style: { position: 'fixed', left: '-100000px', top: '0', width: innerW + 'px', visibility: 'hidden', background: '#fff' } }, sh);
+    document.body.append(holder);
+    const heightAt = (z) => { sh.style.zoom = z; sh.style.width = innerW / z + 'px'; return sh.getBoundingClientRect().height; };
+    // it fits when it is no taller than the page and no day name or entry spills out of its box (the day columns get
+    // narrower as everything else grows)
+    const cells = [...sh.querySelectorAll('.al-day, .al-dayhead')];
+    const fits = (z) => heightAt(z) <= innerH && cells.every((c) => c.scrollWidth <= c.clientWidth + 1);
+    let lo = 0.3, hi = 1.5 * Math.max(1, pg.zoom);
+    if (fits(hi)) lo = hi;
+    else for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+    const z = lo, used = heightAt(z), rows = [...sh.querySelectorAll('tbody tr')].filter((r) => r.querySelector('.al-day'));
+    if (rows.length && used < innerH - 4) {
+      const extra = (innerH - used) / z / rows.length;
+      rows.forEach((r) => { r.style.height = r.getBoundingClientRect().height / z + extra + 'px'; });
+    }
+    holder.remove(); sh.style.width = '';
+    return z;
+  }
   // The availability sheet as a picture at a resolution: the page (paper size, landscape) drawn through SVG, as Print
   // screen does; dpi 96 = the screen's size
   async function availabilityCanvas(paper, dpi) {
-    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = availabilitySheet(); sh.style.zoom = pg.zoom.toFixed(3);
+    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
     const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
     const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
@@ -1330,7 +1353,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
     // the sheet has its title and version already; the space round it is put back inside the page
     const pg = availPaper(availPaperPref);
-    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area .al-sheet { padding: 0.4in; box-sizing: border-box; zoom: ${pg.zoom.toFixed(3)}; }`), sheet);
+    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: 0.4in; box-sizing: border-box; }`), sheet);
+    fitAvailability(sheet, pg); $('#print-area').append(sheet);
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
@@ -2601,7 +2625,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
-      const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); sh.style.zoom = pg.zoom.toFixed(3);
+      const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
       const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: '38px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
