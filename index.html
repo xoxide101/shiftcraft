@@ -1175,17 +1175,9 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
 
   // ---- the availability and contact list (a printout for the wall or the office)
-  function printAvailability(anyway) {
-    if (blockedHere()) return;
-    // phone numbers have to be on the list: name anyone without one first
-    const noPhone = sortStaff(plan.staff.filter((p) => p.active && !(p.phone || '').trim()));
-    if (noPhone.length && !anyway) {
-      modal({ title: 'Phone numbers missing', body: h('div', null, h('p', null, `${noPhone.length === 1 ? 'This person has' : 'These people have'} no phone number yet:`), h('ul', null, noPhone.map((p) => h('li', null, p.name))), h('p', { class: 'hint' }, 'Add them on Staff › Day by day (or Contact & training). Printing anyway leaves a line to write the number in.')),
-        actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true)); } }, { label: 'Cancel' },
-          { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
-      return;
-    }
-    const area = $('#print-area'), now = new Date(), pad = (n) => String(n).padStart(2, '0');
+  // The availability and contact sheet itself, used by the printout and by the preview in the Print or save window
+  function availabilitySheet() {
+    const now = new Date(), pad = (n) => String(n).padStart(2, '0');
     const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
     const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
     const sections = [['mgr', PLURAL.mgr], ['sup', PLURAL.sup], ['tm', PLURAL.tm]];
@@ -1235,6 +1227,19 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 10 })), ...list.map(row)] : [];
         }))));
+    return sheet;
+  }
+  function printAvailability(anyway) {
+    if (blockedHere()) return;
+    // phone numbers have to be on the list: name anyone without one first
+    const noPhone = sortStaff(plan.staff.filter((p) => p.active && !(p.phone || '').trim()));
+    if (noPhone.length && !anyway) {
+      modal({ title: 'Phone numbers missing', body: h('div', null, h('p', null, `${noPhone.length === 1 ? 'This person has' : 'These people have'} no phone number yet:`), h('ul', null, noPhone.map((p) => h('li', null, p.name))), h('p', { class: 'hint' }, 'Add them on Staff › Day by day (or Contact & training). Printing anyway leaves a line to write the number in.')),
+        actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true)); } }, { label: 'Cancel' },
+          { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
+      return;
+    }
+    const area = $('#print-area'), sheet = availabilitySheet();
     area.replaceChildren(sheet);
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
@@ -2503,6 +2508,13 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const box = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } });
     const size = h('p', { class: 'hint' });
     const preview = h('img', { alt: 'Preview', style: { width: '100%', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff' } });
+    // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
+    const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
+    const showPage = () => {
+      const PW = 1056, PH = 816, inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', minHeight: PH + 'px', padding: '38px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0' } }, availabilitySheet());
+      pagePrev.replaceChildren(inner);
+      requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = Math.max(PH, inner.scrollHeight) * k + 'px'; });
+    };
     const checks = h('div', { class: 'inline' });
     const curWeek = () => weekDays(weekOf(ui.day))[0];
     const items = () => {
@@ -2540,8 +2552,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     const update = () => {
-      preview.style.display = o.layout === 'avail' ? 'none' : '';
-      if (o.layout === 'avail') { size.className = 'hint'; size.textContent = 'Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in, Monday to Sunday and Validated, on one landscape page (light colours). Print, or choose “Save as PDF” in the print window to keep a copy.'; return; }
+      preview.style.display = o.layout === 'avail' ? 'none' : ''; pagePrev.style.display = o.layout === 'avail' ? '' : 'none';
+      if (o.layout === 'avail') { showPage(); size.className = 'hint'; size.textContent = 'Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in, Monday to Sunday and Validated, on one landscape page (light colours). Print, or choose “Save as PDF” in the print window to keep a copy.'; return; }
       const [pw, ph] = pageSize();
       const n = items().length, W = Math.round(pw * o.dpi), H = Math.round(ph * o.dpi);
       const big = o.format !== 'svg' && tooBig(W, H);
@@ -2555,7 +2567,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       preview.src = draw(items()[0], { ...o, dpi: 60, vector: false }).toDataURL();
     };
     build();
-    modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview],
+    modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview, pagePrev],
       actions: [{ label: 'Cancel' },
         { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability()); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
         { label: 'Save', primary: true, onClick: () => {
