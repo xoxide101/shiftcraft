@@ -1267,20 +1267,70 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         }))));
     return sheet;
   }
-  function printAvailability(anyway) {
+  // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
+  // to fill it (by whichever of width or height runs out first, so it stays one page)
+  const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b); return { key: k, W, H, zoom: Math.min((W - 0.8) / 10.2, (H - 0.8) / 7.7) }; };
+  let availPaperPref = 'letter'; try { availPaperPref = localStorage.getItem(KEY + '-avail-paper') || 'letter'; } catch (e) { /* ignore */ }
+  // The availability sheet as a picture at a resolution: the page (paper size, landscape) drawn through SVG, as Print
+  // screen does; dpi 96 = the screen's size
+  async function availabilityCanvas(paper, dpi) {
+    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = availabilitySheet(); sh.style.zoom = pg.zoom.toFixed(3);
+    const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
+    const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
+    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
+    const g = c.getContext('2d'); if (!g) throw new Error('too big');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    return { canvas: c, svg, pg };
+  }
+  // A one-page PDF holding a JPEG picture of the page, wIn × hIn inches: written by hand (header, catalogue, page, image,
+  // drawing, cross-reference table), so no library is needed
+  async function pdfFromCanvas(c, wIn, hIn) {
+    const jpg = new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))).arrayBuffer());
+    const W = (wIn * 72).toFixed(2), H = (hIn * 72).toFixed(2), enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+    const put = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+    const obj = (n, body) => { offs[n] = len; put(`${n} 0 obj\n`); body(); put('\nendobj\n'); };
+    const draw = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    put('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    obj(1, () => put('<< /Type /Catalog /Pages 2 0 R >>'));
+    obj(2, () => put('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
+    obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
+    obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); put(jpg); put('\nendstream'); });
+    obj(5, () => put(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+    const xref = len;
+    put(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => String(offs[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+  async function saveAvailability(o) {
+    const fmt = o.availFormat || 'pdf', dpi = +o.dpi || 300, pg = availPaper(o.availPaper);
+    const big = tooBig(Math.round(pg.W * dpi), Math.round(pg.H * dpi)), useDpi = big ? 300 : dpi;
+    toast('Making the availability list…');
+    try {
+      const { canvas } = await availabilityCanvas(o.availPaper, useDpi);
+      const name = `${fileStem('availability and contact list')}.${fmt}`;
+      const blob = fmt === 'pdf' ? await pdfFromCanvas(canvas, pg.W, pg.H) : await canvasBlob(canvas, { format: fmt, dpi: useDpi });
+      const type = fmt === 'pdf' ? { description: 'PDF document', accept: { 'application/pdf': ['.pdf'] } } : { description: fmt.toUpperCase() + ' image', accept: { [fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt]: ['.' + fmt] } };
+      const n = await saveMany([{ name, blob, type }]);
+      if (n) toast(`Saved ${name}${big ? ` (at 300 DPI: ${dpi} DPI on this paper is more than a browser can draw)` : ''}`);
+    } catch (e) { toast('That could not be made: ' + e.message); }
+  }
+  function printAvailability(anyway, paper) {
     if (blockedHere()) return;
+    if (paper) { availPaperPref = paper; try { localStorage.setItem(KEY + '-avail-paper', paper); } catch (e) { /* ignore */ } }
     // phone numbers have to be on the list: name anyone without one first
     const noPhone = sortStaff(plan.staff.filter((p) => p.active && !(p.phone || '').trim()));
     if (noPhone.length && !anyway) {
       modal({ title: 'Phone numbers missing', body: h('div', null, h('p', null, `${noPhone.length === 1 ? 'This person has' : 'These people have'} no phone number yet:`), h('ul', null, noPhone.map((p) => h('li', null, p.name))), h('p', { class: 'hint' }, 'Add them on Staff › Day by day (or Contact & training). Printing anyway leaves a line to write the number in.')),
-        actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true)); } }, { label: 'Cancel' },
+        actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true, paper)); } }, { label: 'Cancel' },
           { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
       return;
     }
     const area = $('#print-area'), sheet = availabilitySheet();
     // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
     // the sheet has its title and version already; the space round it is put back inside the page
-    area.replaceChildren(h('style', null, '@page { size: letter landscape; margin: 0; } #print-area .al-sheet { padding: 0.4in; box-sizing: border-box; }'), sheet);
+    const pg = availPaper(availPaperPref);
+    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area .al-sheet { padding: 0.4in; box-sizing: border-box; zoom: ${pg.zoom.toFixed(3)}; }`), sheet);
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
@@ -2551,9 +2601,10 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
-      const PW = 1056, PH = 816, inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', minHeight: PH + 'px', padding: '38px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0' } }, availabilitySheet());
+      const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); sh.style.zoom = pg.zoom.toFixed(3);
+      const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: '38px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
       pagePrev.replaceChildren(inner);
-      requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = Math.max(PH, inner.scrollHeight) * k + 'px'; });
+      requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
     const checks = h('div', { class: 'inline' });
     const curWeek = () => weekDays(weekOf(ui.day))[0];
@@ -2578,7 +2629,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     function build() {
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)']], 'Layout')); checks.replaceChildren(); return; }
+      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(); return; }
       box.replaceChildren(
         sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
@@ -2593,7 +2644,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     const update = () => {
       preview.style.display = o.layout === 'avail' ? 'none' : ''; pagePrev.style.display = o.layout === 'avail' ? '' : 'none';
-      if (o.layout === 'avail') { showPage(); size.className = 'hint'; size.textContent = 'Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in, Monday to Sunday and Validated, on one landscape page (light colours). Print, or choose “Save as PDF” in the print window to keep a copy.'; return; }
+      if (o.layout === 'avail') { showPage(); size.className = 'hint'; size.textContent = `Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in and Monday to Sunday, on one ${PAPERS[o.availPaper || 'letter'][2].replace(/ in$/, ' in')} landscape page (bigger paper, bigger print). Print sends it straight to the printer (choose the same paper there); Save makes a ${(o.availFormat || 'pdf').toUpperCase()} at ${o.dpi} DPI.`; return; }
       const [pw, ph] = pageSize();
       const n = items().length, W = Math.round(pw * o.dpi), H = Math.round(ph * o.dpi);
       const big = o.format !== 'svg' && tooBig(W, H);
@@ -2609,10 +2660,10 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     build();
     modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview, pagePrev],
       actions: [{ label: 'Cancel' },
-        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability()); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
+        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
         { label: 'Save', primary: true, onClick: () => {
           remember();
-          if (o.layout === 'avail') { toast('The availability list is saved from the print window: choose “Save as PDF” there.'); setTimeout(() => printAvailability()); return; }
+          if (o.layout === 'avail') { saveAvailability(o); return; }
           (async () => {
             const list = items();
             toast(`Making ${list.length} file${list.length > 1 ? 's' : ''}…`);
