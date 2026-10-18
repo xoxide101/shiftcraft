@@ -1739,6 +1739,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         if (data.checklist && data.checklist.length) plan.checklist = data.checklist;
       });
       toast(`Team loaded: ${data.staff.length} people from ${name}`);
+      matchOldTraining();
     };
     const merge = () => {
       let before = plan.staff.length;
@@ -1751,11 +1752,38 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         mergeStaff(list);
       });
       toast(`From ${name}: ${plan.staff.length - before} new, ${updated} updated`);
+      matchOldTraining();
     };
     if (!plan.staff.length || plan.example) { replace(); return; }
     modal({ title: `Load team from ${name}?`, body: [h('p', null, `The file has ${data.staff.length} people. Your team has ${plan.staff.length}.`),
       h('p', { class: 'hint' }, 'Replace: the file becomes your team (shifts stay with people whose names match). Add: keeps your team and only adds people who aren’t on it yet. You can undo either.')],
     actions: [{ label: 'Cancel' }, { label: 'Add new people only', onClick: merge }, { label: 'Replace team', primary: true, onClick: replace }] });
+  }
+  // Older team files (before version 5) did not carry the positions, and each browser gives positions its own ids, so
+  // their "trained in" ticks match nothing here. This asks which position each of the file's ids is: one row per id,
+  // with how many people are trained in it, filled in with a guess (the order of the person trained in the most, which
+  // is the location's order where the file came from), so usually only a few need changing.
+  function matchOldTraining() {
+    const here = new Set((plan.positions || []).map((x) => x.id));
+    const unknown = [], count = {};
+    const byMost = [...plan.staff].sort((a, b) => (b.trained || []).length - (a.trained || []).length);
+    byMost.forEach((p) => (p.trained || []).forEach((t) => { if (here.has(t)) return; if (!(t in count)) { count[t] = 0; unknown.push(t); } count[t]++; }));
+    if (!unknown.length) return;
+    const inUse = (plan.positions || []).filter((x) => x.active), sels = {};
+    const rows = unknown.map((t, i) => {
+      const sel = h('select', { class: 'input' }, h('option', { value: '' }, '(leave out)'), (plan.positions || []).map((pos) => h('option', { value: pos.id, selected: inUse[i] && inUse[i].id === pos.id }, pos.name)));
+      sels[t] = sel;
+      return h('tr', null, h('td', null, `Position ${i + 1} in the file`), h('td', { class: 'num' }, `${count[t]} trained`), h('td', null, sel));
+    });
+    modal({ title: 'Match the training from the file', wide: true, body: [
+      h('p', null, `This team file was saved by an older ShiftCraft, so its “trained in” ticks (${unknown.length} positions) do not match the positions here yet. Choose which position each one is. They are filled in with a guess in your location's order; the number trained helps tell them apart.`),
+      h('div', { class: 'table-wrap' }, h('table', { class: 't' }, h('tbody', null, rows))),
+      h('p', { class: 'hint' }, 'Files saved from now on carry the positions, so this is only needed once. You can undo it.')],
+      actions: [{ label: 'Not now' }, { label: 'Match them', primary: true, onClick: () => {
+        const map = {}; unknown.forEach((t) => { map[t] = sels[t].value || null; });
+        change(() => { plan.staff.forEach((p) => { if (!Array.isArray(p.trained)) return; p.trained = [...new Set(p.trained.map((t) => (t in map ? map[t] : t)).filter(Boolean))]; }); });
+        toast('Training matched to this location’s positions.');
+      } }] });
   }
   // A weeks file can go into any weeks of the open month, or open on its own dates.
   function placeWeeksDialog(data, name, handle) {
@@ -2485,6 +2513,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const draw = (item, opts) => (o.layout === 'timeline' ? drawDaySheet(item, opts) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
     const nameOf = (item) => (o.layout === 'timeline' ? `${baseName(item, item)} timeline` : o.layout === 'calendar' ? `${baseName(item.start, addDays(item.start, item.weeks * 7 - 1))} calendar` : baseName(...weekRange(item)));
     const RANGES = {
+      avail: () => [['all', 'Everyone: one landscape page']],
       table: () => [['week', `This week (week ${weekOf(ui.day) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
       timeline: () => [['day', `This day (${dayName(ui.day, 'short')} ${shortDate(ui.day)})`], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
@@ -2497,8 +2526,9 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     function build() {
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
+      if (o.layout === 'avail') { box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)']], 'Layout')); checks.replaceChildren(); return; }
       box.replaceChildren(
-        sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)']], 'Layout'),
+        sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
         sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
         sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
@@ -2510,6 +2540,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     const update = () => {
+      preview.style.display = o.layout === 'avail' ? 'none' : '';
+      if (o.layout === 'avail') { size.className = 'hint'; size.textContent = 'Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in, Monday to Sunday and Validated, on one landscape page (light colours). Print, or choose “Save as PDF” in the print window to keep a copy.'; return; }
       const [pw, ph] = pageSize();
       const n = items().length, W = Math.round(pw * o.dpi), H = Math.round(ph * o.dpi);
       const big = o.format !== 'svg' && tooBig(W, H);
@@ -2525,9 +2557,10 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     build();
     modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview],
       actions: [{ label: 'Cancel' },
-        { label: 'Print', onClick: () => { remember(); printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
+        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability()); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
         { label: 'Save', primary: true, onClick: () => {
           remember();
+          if (o.layout === 'avail') { toast('The availability list is saved from the print window: choose “Save as PDF” there.'); setTimeout(() => printAvailability()); return; }
           (async () => {
             const list = items();
             toast(`Making ${list.length} file${list.length > 1 ? 's' : ''}…`);
@@ -3588,7 +3621,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       quick: [
         { icon: 'save', title: 'Save everything (team, availability, schedules and settings)', key: 'Ctrl+S', run: () => saveFile('location') },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
-        { icon: 'print', title: 'Print or save the week table', run: () => exportImageDialog({ layout: 'table' }) },
+        { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },
         { icon: 'check', title: 'Check the schedule', run: checkDialog },
       ],
