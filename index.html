@@ -1040,6 +1040,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
       h('button', { class: 'btn sm', title: 'Print this person’s schedule', onclick: () => printPeopleDialog(p.id) }, 'Print'), ' ',
+      h('button', { class: 'btn sm', title: 'Resigned, terminated or left: they come off the schedule and lists, and everything about them is kept under Former staff', onclick: () => leftDialog(p) }, 'Left…'), ' ',
       h('button', { class: 'btn sm ghost danger-text', onclick: () => {
         const n = shiftCount(p.id);
         confirmBox(`Remove ${p.name}?`, n ? `${p.name} has ${n} shift${n === 1 ? '' : 's'} in this plan. They will be removed too. You can undo this.` : 'You can undo this.', 'Remove', () => change(() => {
@@ -1077,7 +1078,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       ];
     };
     let head, rows;
-    const people = sortStaff(plan.staff);
+    const people = sortStaff(plan.staff.filter((p) => !p.left));
     if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
@@ -1129,7 +1130,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
       contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
+      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.filter((p) => !p.left).length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
         h('button', { class: 'btn sm', onclick: () => openFile() }, 'Load team…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.length, onclick: () => confirmBox('Clear the staff list?', 'Everyone is removed, along with all their shifts in this plan. Save the list first if you want to keep it. You can undo this.', 'Clear list', () => change(() => { plan.staff = []; plan.shifts = {}; plan.example = false; })) }, 'Clear list')),
@@ -1140,6 +1141,44 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
         h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
     if (staffTab === 'contact') main.append(trainedGrid());
+    // people who have left: everything about them is kept here, and Rehire brings them back as they were
+    const former = sortStaff(plan.staff.filter((p) => p.left));
+    if (former.length) main.append(h('div', { class: 'card' },
+      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Former staff · ${former.length}`), h('span', { class: 'muted small' }, 'Kept with all their details; not on the schedule or lists.')),
+      h('div', { class: 'table-wrap' }, h('table', { class: 't' },
+        h('thead', null, h('tr', null, ['Name', 'Role', 'Phone', 'Email', 'Left', 'Last day', 'Note', ''].map((x) => h('th', null, x)))),
+        h('tbody', null, former.map((p) => h('tr', null,
+          h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label), h('td', { class: 'nowrap' }, p.phone || ''), h('td', null, p.email || ''),
+          h('td', null, LEFT_WHY[p.left.why] || p.left.why), h('td', { class: 'nowrap' }, p.left.on ? shortDate(p.left.on) : ''), h('td', { class: 'small' }, p.left.note || ''),
+          h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Edit the reason, date or note', onclick: () => leftDialog(p) }, 'Edit…'), ' ',
+            h('button', { class: 'btn sm primary', title: 'Back on the team with everything as it was', onclick: () => change(() => { delete p.left; p.active = true; }) }, 'Rehire'), ' ',
+            h('button', { class: 'btn sm ghost danger-text', title: 'Delete them and their details for good', onclick: () => confirmBox(`Delete ${p.name} for good?`, 'Their details are removed from this plan (shifts already worked are removed too). You can undo this.', 'Delete', () => change(() => { plan.staff = plan.staff.filter((x) => x !== p); Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((x) => x.staffId !== p.id); }); })) }, 'Delete')))))))));
+  }
+  const LEFT_WHY = { resigned: 'Resigned', terminated: 'Terminated', other: 'Left' };
+  // Someone leaving: why, their last day and a note; shifts after the last day can come off the schedule
+  function leftDialog(p) {
+    const cur = p.left || { why: 'resigned', on: iso(new Date()), note: '' };
+    let why = cur.why;
+    const seg = h('div', { class: 'seg', role: 'group' }, Object.entries(LEFT_WHY).map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(why === k), onclick: (e) => { why = k; seg.querySelectorAll('.btn').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); } }, k === 'other' ? 'Other' : l)));
+    const on = h('input', { class: 'input', type: 'date', value: cur.on || iso(new Date()) });
+    const note = h('input', { class: 'input', value: cur.note || '', placeholder: 'Optional, e.g. moved away; would rehire', maxLength: 300 });
+    const after = () => Object.keys(plan.shifts).filter((d) => d > on.value).reduce((n, d) => n + plan.shifts[d].filter((s) => s.staffId === p.id).length, 0);
+    const drop = h('input', { type: 'checkbox', checked: true }), dropLbl = h('span');
+    const sync = () => { const n = after(); dropLbl.textContent = n ? ` Take them off ${n} shift${n === 1 ? '' : 's'} after their last day` : ' No shifts after their last day'; drop.disabled = !n; };
+    on.addEventListener('input', sync); sync();
+    modal({ title: `${p.name} has left`, body: [
+      h('div', { class: 'field' }, h('span', null, 'Why'), seg),
+      h('label', { class: 'field' }, h('span', null, 'Last day'), on),
+      h('label', { class: 'field' }, h('span', null, 'Note'), note),
+      h('label', { class: 'check' }, drop, dropLbl),
+      h('p', { class: 'hint' }, 'Everything about them (phone, email, availability, training, tasks and past shifts) is kept under Former staff on the Staff tab. Rehire brings them back as they were. You can undo this.')],
+      actions: [{ label: 'Cancel' }, { label: p.left ? 'Save' : 'Mark as left', primary: true, onClick: () => {
+        change(() => {
+          p.left = { why, on: on.value || iso(new Date()), note: note.value.trim() }; p.active = false;
+          if (drop.checked && !drop.disabled) Object.keys(plan.shifts).forEach((d) => { if (d > p.left.on) plan.shifts[d] = plan.shifts[d].filter((s) => s.staffId !== p.id); });
+        });
+        toast(`${p.name} is under Former staff. Their details are kept.`);
+      } }] });
   }
   const avClass = (a) => (!a ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|morning|afternoon|evening/i.test(a.note || '')) ? 'hl' : 'on');
   // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
@@ -1189,8 +1228,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : '')),
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avText(a)); }),
-        h('td', { class: 'al-val' }, tick(!!p.validated)));
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avText(a)); }));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
@@ -1215,16 +1253,14 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
         .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffc000; }
-        .al-val { text-align: center; }
       `),
       h('table', null,
-        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '22px' } })),
+        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null))),
         h('thead', null, h('tr', null,
           h('th', { class: 'al-title' }, h('b', null, 'Schedule Availability and Contact Information'), plan.company || plan.location ? h('b', { style: { textDecoration: 'none', fontSize: '9pt' } }, [plan.company, plan.location].filter(Boolean).join(' · ')) : null, h('b', null, 'Version ' + version)),
           h('th', { class: 'al-headpos', style: { textAlign: 'right' } }, h('span', { class: 'al-up' }, 'Phone Numbers')),
           positions.map((pos) => h('th', { class: 'al-headpos al-postop' }, h('span', { class: 'al-up' }, pos.name))), h('th'),
-          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)),
-          h('th', { class: 'al-headpos' }, h('span', { class: 'al-up' }, 'Validated')))),
+          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)))),
         h('tbody', null, sections.flatMap(([g, title]) => {
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 10 })), ...list.map(row)] : [];
@@ -1254,7 +1290,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // Stored as p.trained = [position ids]. Positions not in use at the location are left out.
   function trainedGrid() {
     const positions = (plan.positions || []).filter((x) => x.active);
-    const people = sortStaff(plan.staff);
+    const people = sortStaff(plan.staff.filter((p) => !p.left));
     const isOn = (p, pos) => Array.isArray(p.trained) && p.trained.includes(pos.id);
     const toggle = (p, pos) => change(() => { const t = new Set(p.trained || []); t.has(pos.id) ? t.delete(pos.id) : t.add(pos.id); p.trained = [...t]; });
     const setColumn = (pos, on) => change(() => { people.forEach((p) => { const t = new Set(p.trained || []); on ? t.add(pos.id) : t.delete(pos.id); p.trained = [...t]; }); });
@@ -1507,7 +1543,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   function printPeopleDialog(presetId) {
     const who = h('select', { class: 'input' },
       h('optgroup', { label: 'Groups' }, h('option', { value: 'all' }, 'Everyone (one page each)'), GROUPS.map(([g]) => h('option', { value: 'g:' + g }, `All ${PLURAL[g]}`))),
-      h('optgroup', { label: 'One person' }, sortStaff(plan.staff).map((p) => h('option', { value: 'p:' + p.id, selected: p.id === presetId }, `${p.name} (${ROLES[p.role].short})`))));
+      h('optgroup', { label: 'One person' }, sortStaff(plan.staff.filter((p) => !p.left)).map((p) => h('option', { value: 'p:' + p.id, selected: p.id === presetId }, `${p.name} (${ROLES[p.role].short})`))));
     const range = h('select', { class: 'input' }, h('option', { value: 'week' }, `This week (week ${weekOf(ui.day) + 1})`), h('option', { value: 'all' }, `All ${plan.weeks} weeks`));
     const tasks = h('input', { type: 'checkbox', checked: true });
     const onlyScheduled = h('input', { type: 'checkbox', checked: true });
