@@ -1195,6 +1195,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
         .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
+        /* printers leave out background colours unless told to keep them: the black Off boxes, green days and yellow rows need them */
+        .al-sheet, .al-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .al-sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .al-sheet th, .al-sheet td { font-size: 9pt; padding: 1px 3px; }
         .al-title { text-align: left; vertical-align: top; width: 170px; }
@@ -1211,7 +1213,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
         .al-box.on { background: #000; color: #fff; }
         .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
-        .al-day.off { background: #000; color: #fff; }
+        .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffc000; }
         .al-val { text-align: center; }
       `),
