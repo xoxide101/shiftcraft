@@ -161,3 +161,7 @@ All built on 2026-10-13.
 ## Start (wizard)
 
 The wand in the title bar's quick buttons and the Start button, first on the Schedule tab, open “What do you want to do?”: schedule, week, staff, availability, forecast, print or share, check, company, open, carry on. It shows when ShiftCraft opens; the tick box turns that off (localStorage `shiftcraft-start-show`).
+
+## AI settings (shared)
+
+- js/craft-keys.js (the same file in every Craft app; ShiftCraft and LabelCraft have it inline): where AI runs (local only / both / cloud, localStorage craft-ai-mode) and the cloud keys (craft-ai-keys), shared by every Craft app opened from files; a switch with computer, computer + cloud, cloud, key and bug icons put before the title bar search box and at the end of the status bar by itself. Keys can be saved to craft-ai-keys.json (locked with a password: AES-GCM, PBKDF2 250k) and loaded back. The bug opens Activity (local AI, cloud AI, debug: errors and warnings caught for the session, keys masked).
