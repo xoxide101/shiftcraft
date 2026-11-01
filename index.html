@@ -296,9 +296,27 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   .days { grid-template-columns: repeat(7, minmax(44px, 1fr)); }
   .day small { display: none; }
 }
+/* Start: what do you want to do? */
+.sc-start { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 24px; overflow: auto; background: color-mix(in srgb, var(--bg) 90%, transparent); }
+.sc-start[hidden] { display: none; }
+.sc-start-in { width: min(900px, 100%); display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.25); color: var(--fg); }
+.sc-start h2 { margin: 0; font-size: 22px; }
+.sc-start .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.sc-start .tiles button { display: grid; gap: 4px; padding: 14px; text-align: left; border: 2px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); cursor: pointer; font: inherit; }
+.sc-start .tiles button:hover { border-color: var(--accent); }
+.sc-start .tiles b { font-size: 15px; }
+.sc-start .tiles small { color: var(--muted); line-height: 1.35; }
+.sc-start .foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.sc-start .foot .grow { flex: 1; }
+.sc-start .foot button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
 </style>
 </head>
 <body>
+<div class="sc-start no-print" id="sc-start" hidden role="dialog" aria-label="What do you want to do?"><div class="sc-start-in">
+  <h2>What do you want to do?</h2>
+  <div class="tiles" id="sc-start-tiles"></div>
+  <div class="foot"><label><input type="checkbox" id="sc-start-show"> Show this when ShiftCraft opens</label><span class="grow"></span><button type="button" id="sc-start-close">Close</button></div>
+</div></div>
 <header class="bar">
   <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>ShiftCraft</div>
   <nav class="menubar" id="menubar" aria-label="Main menu"></nav>
@@ -3191,6 +3209,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7Z"/>',
       preview: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       export: '<path d="M12 3v12M7 8l5-5 5 5"/><path d="M4 15v5h16v-5"/>',
+      wand: '<path d="m4 20 11-11"/><path d="m13 7 2-2 4 4-2 2Z" class="fill"/><path d="M19 3v3M17.5 4.5h3M7 4v2M6 5h2M19 15v2M18 16h2"/>',
       help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h.01"/>',
       search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
       check: '<path d="m5 12 4 4 10-10"/>',
@@ -3744,10 +3763,37 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
     const VIEWS = ['schedule', 'week', 'forecast', 'handoff', 'staff', 'company'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
+    // Start (the wizard): what do you want to do? Each tile goes to the place (or the window) for that job.
+    const go = (start) => () => { const it = item(start); if (it.run) it.run(); };
+    const START = [
+      { title: 'Make the schedule', what: 'Shifts day by day, on the Schedule', run: view('schedule') },
+      { title: 'This week at a glance', what: 'The whole week as a table', run: view('week') },
+      { title: 'Staff', what: 'Add people, phone, email, positions, training', run: view('staff') },
+      { title: 'Availability', what: 'Who can work when (on each person’s Staff card)', run: view('staff') },
+      { title: 'Forecast and labour', what: 'Sales, labour hours, AM / MID / PM', run: view('forecast') },
+      { title: 'Print or share', what: 'Week table, timeline, calendar, availability list, email', run: go('Print or save week table') },
+      { title: 'Check the schedule', what: 'Gaps, overlaps, availability and hours', run: go('Check schedule') },
+      { title: 'Company and location', what: 'Name, address, opening hours, positions', run: view('company') },
+      { title: 'Open a saved file…', what: 'A location, team or weeks file', run: () => openFile() },
+      { title: 'Carry on', what: 'Back to where you were', run: () => {} },
+    ];
+    const START_KEY = 'shiftcraft-start-show';
+    function showStart() {
+      document.getElementById('sc-start-tiles').innerHTML = START.map((t, i) => `<button type="button" data-start="${i}"><b>${t.title}</b><small>${t.what}</small></button>`).join('');
+      let on = true; try { on = localStorage.getItem(START_KEY) !== '0'; } catch (e) { /* blocked */ }
+      document.getElementById('sc-start-show').checked = on; document.getElementById('sc-start').hidden = false;
+    }
+    const closeStart = () => { document.getElementById('sc-start').hidden = true; };
+    document.getElementById('sc-start-tiles').onclick = (e) => { const b = e.target.closest('[data-start]'); if (!b) return; closeStart(); START[+b.dataset.start].run(); };
+    document.getElementById('sc-start-close').onclick = closeStart;
+    document.getElementById('sc-start').onclick = (e) => { if (e.target.id === 'sc-start') closeStart(); };
+    document.getElementById('sc-start').onkeydown = (e) => { if (e.key === 'Escape') closeStart(); };
+    document.getElementById('sc-start-show').onchange = (e) => { try { localStorage.setItem(START_KEY, e.target.checked ? '1' : '0'); } catch (err) { /* blocked */ } };
     const ribbon = window.CraftRibbon({
       mount: document.body, storageKey: 'shiftcraft', start: VIEWS.includes(ui.tab) ? ui.tab : 'schedule',
       tabs: [
         { id: 'schedule', label: 'Schedule', hue: '#2f6fdd', onSelect: view('schedule'), groups: [
+          ['Start', [{ label: 'Start', icon: I.wand, big: true, title: 'What do you want to do? Schedule, staff, availability, forecast, print or share…', run: showStart }]],
           ['Day', [C('Copy a day', 'Copy day…', I.copy, { big: true }), { col: [C('Copy this day to several', 'Copy to several days…', I.severalDays), C('Clear day', 'Clear day', I.clear)] }]],
           ['Week', [{ col: [C('Previous week', 'Previous week', I.prev), C('Next week', 'Next week', I.next), C('Move week', 'Move week…', I.move)] }, { col: [C('Copy a week', 'Copy week…', I.copy), C('Clear week', 'Clear week', I.clear)] }]],
           ['Month', [{ el: document.querySelector('.month-pick') }, { col: [C('Copy a month', 'Copy month…', I.copy), C('Clear month', 'Clear month', I.clear), C('Move whole plan', 'Move plan…', I.move)] }]],
@@ -3785,6 +3831,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       appName: 'ShiftCraft', storageKey: 'shiftcraft', colors: ['#2f6fdd', '#1e9e8a'],
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
+        { icon: 'wand', title: 'Start (wizard)', run: showStart },
         { icon: 'save', title: 'Save everything (team, availability, schedules and settings)', key: 'Ctrl+S', run: () => saveFile('location') },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
@@ -3803,6 +3850,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const ic = document.createElement('link'); ic.rel = 'icon';
     ic.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
     document.head.append(ic);
+    try { if (localStorage.getItem(START_KEY) !== '0') showStart(); } catch (e) { showStart(); }
   }
 
   render();
