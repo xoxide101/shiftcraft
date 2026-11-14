@@ -309,6 +309,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
 .sc-start .foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .sc-start .foot .grow { flex: 1; }
 .sc-start .foot button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }
+.availline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 5px; border: 1px dashed var(--line); border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -507,6 +509,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // In 'times', '+' ranges are when they can work and '-' ranges when they can't; where they overlap, can't wins.
   // With no '+' range, they can work any time apart from the '-' ranges. OPEN and CLOSE stand for the opening and closing time.
   const OPEN = -1, CLOSE = 9999;
+  const shiftsOf = (p, d) => shiftsOn(d).filter((x) => x.staffId === p.id).sort((a, b) => a.start - b.start);
   const AV_NOTES = ['Mornings', 'Afternoons', 'Evenings', 'Emergency', 'If you ask'];
   const avDay = (d) => (parseIso(d).getDay() + 6) % 7;
   const avOf = (p, i) => (Array.isArray(p.avail) && p.avail[i]) || null;
@@ -521,9 +524,14 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const word = (x) => `${endWord(x[0])} - ${endWord(x[1])}`;
     return (plus.length ? plus.map(word).join(' / ') : 'Any') + (minus.length ? ` (not ${minus.map(word).join(', ')})` : '');
   }
+  // Hours on some days (split shifts): p.lines = [{ tab: 'wk' | 'we', days: [0–6, Monday first], from, to }], made on the
+  // Weekdays or Weekend tab. On a day that has lines, they are the hours the person can work (each line one stretch, so
+  // 7am–11am and 4pm–9pm is a split day) in place of the tab's usual available hours; the day-by-day list still wins.
+  const linesOn = (p, i) => (Array.isArray(p.lines) ? p.lines.filter((l) => Array.isArray(l.days) && l.days.includes(i) && l.to > l.from) : []).sort((a, b) => a.from - b.from);
   // the usual weekday / weekend settings, as a day-by-day entry (to start the list from)
   function avFromSets(p, i) {
     if (p.off && p.off[i]) return { k: 'off' };
+    const L = linesOn(p, i); if (L.length) return { k: 'times', r: L.map((l) => [l.from, l.to, '+']) };
     const st = setOf(p, i >= 5 ? 'we' : 'wk');
     if (st.from != null && st.to != null) return { k: 'times', r: [[st.from, st.to, '+']] };
     if (st.parts.length === 3) return { k: 'any' };
@@ -563,6 +571,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       const hitMinus = minus.some((x) => s.start < realMin(x[1]) && s.end > realMin(x[0]));
       return inPlus && !hitMinus ? '' : `${first} is available ${avText(a)} on ${dayName(d)}s`;
     }
+    const L = linesOn(p, avDay(d));
+    if (L.length) return L.some((l) => s.start >= l.from && s.end <= l.to) ? '' : `${first} is available ${L.map((l) => `${clock(l.from)} – ${clock(l.to)}`).join(' and ')} on ${dayName(d)}s`;
     const st = setFor(p, d), parts = st.parts;
     if (st.from != null && st.to != null && (s.start < st.from || s.end > st.to)) return `${first} is only available ${clock(st.from)} – ${clock(st.to)} on ${partWord(isWkend(d) ? 'we' : 'wk')}`;
     if (parts.length === 3) return '';
@@ -901,7 +911,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       const total = personWeekHours(p.id, w);
       const over = p.maxHours && total > p.maxHours;
       rows.push(h('tr', null, h('td', null, h('b', null, p.name), h('span', { class: 'muted small' }, ` ${ROLES[p.role].short}`)),
-        days.map((d) => { const s = shiftsOn(d).find((x) => x.staffId === p.id); const iss = availIssue(p, d, s); return h('td', { class: 'cellbtn c' + (s && iss ? ' bad' : !s && offOn(p, d) ? ' muted' : ''), title: [iss, s && s.note ? 'Note: ' + s.note : '', 'Open this day'].filter(Boolean).join('\n'), onclick: () => { ui.day = d; ui.tab = 'schedule'; persist(); render(); } }, s ? [`${clock(s.start, true)}–${clock(s.end, true)}${iss ? ' !' : ''}`, s.note ? h('div', { class: 'cell-note' }, s.note) : null] : offOn(p, d) ? 'n/a' : ''); }),
+        days.map((d) => { const ss = shiftsOf(p, d), s = ss[0], iss = ss.map((x) => availIssue(p, d, x)).filter(Boolean)[0] || (s ? '' : availIssue(p, d, null)); return h('td', { class: 'cellbtn c' + (s && iss ? ' bad' : !s && offOn(p, d) ? ' muted' : ''), title: [iss, ...ss.filter((x) => x.note).map((x) => 'Note: ' + x.note), 'Open this day'].filter(Boolean).join('\n'), onclick: () => { ui.day = d; ui.tab = 'schedule'; persist(); render(); } }, s ? ss.map((x, j) => [j ? h('br') : null, `${clock(x.start, true)}–${clock(x.end, true)}${availIssue(p, d, x) ? ' !' : ''}`, x.note ? h('div', { class: 'cell-note' }, x.note) : null]) : offOn(p, d) ? 'n/a' : ''); }),
         h('td', { class: 'num ' + (over ? 'bad' : '') }, hrs(total), over ? ` (max ${p.maxHours})` : '')));
     });
     const foot = (label, fn, cls) => h('tr', null, h('td', null, label), days.map((d) => { const v = fn(d); return h('td', { class: 'num ' + (cls ? cls(d) : '') }, v); }), h('td', null, ''));
@@ -1082,7 +1092,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
       return [
         h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b)),
-        h('td', null, h('label', { class: 'check small', style: { marginBottom: any ? 0 : '4px' }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), any ? null : h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb)),
+        h('td', null, h('label', { class: 'check small', style: { marginBottom: any ? 0 : '4px' }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), any ? null : h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb), linesBox(p, k, dayIdx)),
         h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([pk, l]) => {
           const on = st.parts.includes(pk);
           return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${pk === 'am' ? 'opening to ' + clock(plan.midStart) : pk === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to closing'} on ${partWord(k)} (click to change)`,
@@ -1094,6 +1104,23 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
             onclick: () => change(() => { p.off = Array.from({ length: 7 }, (_, x) => !!(p.off && p.off[x])); p.off[i] = !p.off[i]; }) }, k === 'we' ? wd.slice(0, 3) : wd[0]);
         }))),
       ];
+    };
+    // hours on some days (split shifts): each line its own days and hours; + adds another
+    const linesBox = (p, k, dayIdx) => {
+      const mine = (p.lines || []).filter((l) => (l.tab || (l.days.some((x) => x >= 5) ? 'we' : 'wk')) === k);
+      const row = (l) => {
+        const fa = timePicker(l.from, 'From'), fb = timePicker(l.to, 'Until');
+        const save = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => { l.from = f; l.to = t; }); };
+        fa.addEventListener('change', () => save('from')); fb.addEventListener('change', () => save('to'));
+        return h('div', { class: 'availline', title: 'On the days picked, they can work these hours (add another line for a split day)' },
+          h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
+            return h('button', { type: 'button', class: 'dt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Uses' : 'Does not use'} these hours on ${wd}s (click to change)`, onclick: () => change(() => { l.days = on ? l.days.filter((x) => x !== i) : [...l.days, i].sort(); }) }, k === 'we' ? wd.slice(0, 3) : wd[0]); })),
+          h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb),
+          h('button', { type: 'button', class: 'btn sm ghost', title: 'Take these hours away', onclick: () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }) }, '×'));
+      };
+      const st = setOf(p, k);
+      return h('div', { class: 'availlines' }, mine.map(row),
+        h('button', { type: 'button', class: 'btn sm', title: 'Hours on some days only: pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', onclick: () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }) }, '+ Hours on some days'));
     };
     let head, rows;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
@@ -1668,11 +1695,11 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     const rows = [];
     weeks.forEach((w) => {
       weekDays(w).forEach((d) => {
-        const s = shiftsOn(d).find((x) => x.staffId === p.id);
+        const ss = shiftsOf(p, d);
         const tk = withTasks ? tasksOn(p, d) : [];
-        rows.push(h('tr', { class: s ? '' : 'off' }, h('td', null, dayName(d)), h('td', null, usDate(d)),
+        (ss.length ? ss : [null]).forEach((s, j) => rows.push(h('tr', { class: s ? '' : 'off' }, h('td', null, j ? '' : dayName(d)), h('td', null, j ? '' : usDate(d)),
           h('td', null, s ? clock(s.start) : 'Off'), h('td', null, s ? clock(s.end) : ''), h('td', { class: 'num' }, s ? hrs(len(s)) : ''),
-          h('td', { class: 'small' }, [s && s.note ? 'Note: ' + s.note : null, ...tk.map((t) => (t.done ? '☑ ' : '☐ ') + t.text)].filter(Boolean).join('\n'))));
+          h('td', { class: 'small' }, [s && s.note ? 'Note: ' + s.note : null, ...(j ? [] : tk.map((t) => (t.done ? '☑ ' : '☐ ') + t.text))].filter(Boolean).join('\n')))));
       });
       if (weeks.length > 1) rows.push(h('tr', { class: 'wk' }, h('td', { colspan: 4 }, `Week ${w + 1} total`), h('td', { class: 'num' }, hrs(personWeekHours(p.id, w))), h('td', null, '')));
     });
@@ -2015,6 +2042,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {
       const q = { ...x, name: String(x.name).trim() };
       if (!ROLES[q.role]) { q.role = 'TM'; fixes++; }
+      if (q.lines !== undefined) { q.lines = Array.isArray(q.lines) ? q.lines.filter((l) => l && Array.isArray(l.days) && Number.isFinite(l.from) && Number.isFinite(l.to)) : []; if (!q.lines.length) delete q.lines; }
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }
       ids.add(q.id);
       return q;
@@ -2284,8 +2312,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         text(`${p.name}`, M + pt(5), mid(rowH), 'left', cellPt, '700', '#000', nameW - pt(5) - cellPt / 72 * dpi * 2.4);
         text(ROLES[p.role].short, M + nameW - pt(6), mid(rowH), 'right', cellPt - 1.5, '400', '#555');
         days.forEach((d, i) => {
-          const s = shiftsOn(d).find((x) => x.staffId === p.id);
-          if (s) text(`${clock(s.start, true)}–${clock(s.end, true)}${s.note ? ' *' : ''}`, colX(i) + dayW / 2, mid(rowH), 'center', cellPt, '400', '#000', dayW - pt(4));
+          const ss = shiftsOf(p, d), k = ss.length;
+          ss.forEach((s, j) => text(`${clock(s.start, true)}–${clock(s.end, true)}${s.note ? ' *' : ''}`, colX(i) + dayW / 2, k === 1 ? mid(rowH) : y + rowH * (j + 0.8) / k, 'center', k === 1 ? cellPt : Math.max(5, cellPt * 0.78), '400', '#000', dayW - pt(4)));
         });
         text(hrs(total) + (over ? ' !' : ''), M + CW - pt(6), mid(rowH), 'right', cellPt, over ? '700' : '400', over ? '#b00' : '#000');
       }
@@ -2370,7 +2398,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // everyone working this week gets a number (in the app's groups, then by name); the tiles show the numbers and the
     // legend in the spare space says who is who, so the tiles stay uncluttered
     const ids = new Set(days.flatMap((d) => shiftsOn(d).map((s) => s.staffId)));
-    const people = GROUPS.flatMap(([gk]) => sortStaff(plan.staff.filter((p) => ids.has(p.id) && ROLES[p.role].group === gk)));
+    const people = Object.keys(ROLES).flatMap((rk) => plan.staff.filter((p) => ids.has(p.id) && p.role === rk).sort((a, b) => a.name.localeCompare(b.name)));
     const numbers = new Map(people.map((p, i) => [p.id, i + 1]));
     days.forEach((d, i) => {
       const tile = drawDaySheet(d, { ...o, pageIn: [7, 5], dpi: (tw / 7), vector: false, coverage: o.coverage, notes: false, numbers });
@@ -2381,12 +2409,18 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // the legend: in the two spare tiles at the bottom right, in columns
     const lx = M + (tw + GAP), ly = M + TOP + 2 * (th + GAP), lw = 2 * tw + GAP, lh = th;
     g.strokeStyle = '#999'; g.strokeRect(lx, ly, lw, lh);
-    const fs = Math.min((10 / 72) * dpi, lh / (Math.ceil(people.length / 3) + 2.2)), perCol = Math.max(1, Math.ceil(people.length / 3)), colW = lw / 3;
+    // the list in GM / AGM / SM / TM / NH, each under its own heading (a heading never sits alone at the foot of a column)
+    const lines = []; Object.entries(ROLES).forEach(([rk, r]) => { const list = people.filter((p) => p.role === rk); if (list.length) { lines.push({ head: `${r.short} · ${r.label}${list.length > 1 ? 's' : ''}` }); list.forEach((p) => lines.push({ p })); } });
+    const perCol = Math.max(2, Math.ceil(lines.length / 3) + 1), fs = Math.min((10 / 72) * dpi, lh / (perCol + 2.2)), colW = lw / 3;
     g.fillStyle = '#000'; g.font = `700 ${fs}px Arial, Helvetica, sans-serif`; g.fillText('Who is who', lx + fs * 0.8, ly + fs * 1.4);
-    people.forEach((p, i) => {
-      const cx = lx + fs * 0.8 + Math.floor(i / perCol) * colW, cy = ly + fs * 2.9 + (i % perCol) * fs * 1.25;
-      g.font = `700 ${fs}px Arial, Helvetica, sans-serif`; g.fillStyle = '#000'; g.textAlign = 'right'; g.fillText(String(i + 1), cx + fs * 1.4, cy); g.textAlign = 'left';
-      g.font = `400 ${fs}px Arial, Helvetica, sans-serif`; let nm = `${p.name} (${ROLES[p.role].short})`; while (nm.length > 3 && g.measureText(nm).width > colW - fs * 2.6) nm = nm.slice(0, -2) + '…';
+    let col = 0, rowN = 0;
+    lines.forEach((ln) => {
+      if (rowN >= perCol || (ln.head && rowN >= perCol - 1)) { col++; rowN = 0; }
+      const cx = lx + fs * 0.8 + col * colW, cy = ly + fs * 2.9 + rowN * fs * 1.25; rowN++;
+      if (ln.head) { g.font = `700 ${fs * 0.92}px Arial, Helvetica, sans-serif`; g.fillStyle = '#444'; g.fillText(ln.head, cx, cy); g.fillStyle = '#000'; return; }
+      const p = ln.p;
+      g.font = `700 ${fs}px Arial, Helvetica, sans-serif`; g.fillStyle = '#000'; g.textAlign = 'right'; g.fillText(String(numbers.get(p.id)), cx + fs * 1.4, cy); g.textAlign = 'left';
+      g.font = `400 ${fs}px Arial, Helvetica, sans-serif`; let nm = p.name; while (nm.length > 3 && g.measureText(nm).width > colW - fs * 2.6) nm = nm.slice(0, -2) + '…';
       g.fillText(nm, cx + fs * 1.9, cy);
     });
     if (!people.length) { g.font = `400 ${fs}px Arial, Helvetica, sans-serif`; g.fillText('No one is scheduled this week.', lx + fs * 0.8, ly + fs * 2.9); }
@@ -2426,9 +2460,10 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
     // Who is working, grouped like the app
     const rows = [];
     GROUPS.forEach(([gk, label]) => {
-      const list = shiftsOn(d).map((s) => ({ s, p: staffById(s.staffId) })).filter((x) => ROLES[x.p.role].group === gk).sort((a, b) => a.s.start - b.s.start || a.p.name.localeCompare(b.p.name));
+      const by = new Map(); shiftsOn(d).forEach((s) => { const p = staffById(s.staffId); if (p && ROLES[p.role].group === gk) { if (!by.has(p.id)) by.set(p.id, { p, ss: [] }); by.get(p.id).ss.push(s); } });
+      const list = [...by.values()].map((x) => ({ ...x, ss: x.ss.sort((a, b) => a.start - b.start), s: x.ss[0] })).sort((a, b) => a.s.start - b.s.start || a.p.name.localeCompare(b.p.name));
       if (!list.length) return;
-      rows.push({ t: 'g', label, n: list.length, h: list.reduce((a, x) => a + len(x.s), 0) });
+      rows.push({ t: 'g', label, n: list.length, h: list.reduce((a, x) => a + x.ss.reduce((t, s) => t + len(s), 0), 0) });
       list.forEach((x) => rows.push({ t: 'p', ...x, gk }));
     });
     const nameW = CW * (o.numbers ? 0.07 : 0.17), x0 = M + nameW, x1 = M + CW;
@@ -2455,13 +2490,14 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       } else {
         if (o.numbers) text(String(o.numbers.get(r.p.id) || '?'), x0 - pt(5), y + rowH * 0.66, 'right', barPt, '700', '#000');
         else { text(r.p.name, M + pt(5), y + rowH * 0.66, 'left', barPt, '700', '#000', nameW - pt(26)); text(ROLES[r.p.role].short, x0 - pt(4), y + rowH * 0.66, 'right', barPt - 1.5, '400', '#555'); }
-        const bx = xAt(r.s.start), bw = xAt(r.s.end) - bx, by = y + rowH * 0.14, bh = rowH * 0.72;
-        g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
-        g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
-        const label = `${clock(r.s.start, true)}–${clock(r.s.end, true)}  ${hrs(len(r.s))} h${r.s.note ? '   Note: ' + r.s.note : ''}`;
-        text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
-        const issue = availIssue(r.p, d, r.s);
-        if (issue) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
+        r.ss.forEach((sh) => {
+          const bx = xAt(sh.start), bw = xAt(sh.end) - bx, by = y + rowH * 0.14, bh = rowH * 0.72;
+          g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
+          g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
+          const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${sh.note ? '   Note: ' + sh.note : ''}`;
+          text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
+          if (availIssue(r.p, d, sh)) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
+        });
       }
       y += rowH;
       line(M, y, x1, y, 0.4, '#bbb');
@@ -2674,7 +2710,11 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   }
   const DPI_OPTIONS = [[300, '300 DPI – print quality (default)'], [600, '600 DPI'], [1200, '1200 DPI – very large files'], [2400, '2400 DPI – saved as SVG vector'], [4800, '4800 DPI – saved as SVG vector'], [200, '200 DPI'], [150, '150 DPI – smaller files']];
   function exportImageDialog(preset = {}) {
+    // printing always starts at this week (today's, when it is in the plan) on one page, whatever was printed last time
+    const today = iso(new Date()), PD = planDays().includes(today) ? today : PD;
+    const ONE = { table: 'week', timeline: 'weektile', calendar: 'week', avail: 'all' };
     const o = { layout: 'table', range: 'week', format: 'png', paper: 'letter', orient: 'landscape', dpi: 300, notes: true, coverage: true, ...imgPrefs, ...preset };
+    o.range = preset.range || ONE[o.layout] || 'week';
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
     const box = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } });
     const size = h('p', { class: 'hint' });
@@ -2688,22 +2728,22 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
     const checks = h('div', { class: 'inline' });
-    const curWeek = () => weekDays(weekOf(ui.day))[0];
+    const curWeek = () => weekDays(weekOf(PD))[0];
     const items = () => {
-      if (o.layout === 'timeline') return o.range === 'day' ? [ui.day] : o.range === 'weektile' ? [weekDays(weekOf(ui.day))[0]] : o.range === 'week' ? weekDays(weekOf(ui.day)) : planDays();
+      if (o.layout === 'timeline') return o.range === 'day' ? [PD] : o.range === 'weektile' ? [weekDays(weekOf(PD))[0]] : o.range === 'week' ? weekDays(weekOf(PD)) : planDays();
       if (o.layout === 'calendar') return [o.range === 'all' ? { start: plan.startDate, weeks: plan.weeks } : { start: curWeek(), weeks: { week: 1, two: 2, month: 4 }[o.range] || 1 }];
-      return o.range === 'all' ? Array.from({ length: plan.weeks }, (_, k) => k) : [weekOf(ui.day)];
+      return o.range === 'all' ? Array.from({ length: plan.weeks }, (_, k) => k) : [weekOf(PD)];
     };
     const draw = (item, opts) => (o.layout === 'timeline' ? (o.range === 'weektile' ? drawWeekTiles(item, opts) : drawDaySheet(item, opts)) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
     const nameOf = (item) => (o.layout === 'timeline' ? (o.range === 'weektile' ? `${baseName(item, addDays(item, 6))} week timeline` : `${baseName(item, item)} timeline`) : o.layout === 'calendar' ? `${baseName(item.start, addDays(item.start, item.weeks * 7 - 1))} calendar` : baseName(...weekRange(item)));
     const RANGES = {
       avail: () => [['all', 'Everyone: one landscape page']],
-      table: () => [['week', `This week (week ${weekOf(ui.day) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
-      timeline: () => [['day', `This day (${dayName(ui.day, 'short')} ${shortDate(ui.day)})`], ['weektile', 'This week on 1 page (7 small tiles)'], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
+      table: () => [['week', `This week (week ${weekOf(PD) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
+      timeline: () => [['day', `This day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', 'This week on 1 page (7 small tiles)'], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
     };
     const sel = (key, options, label) => {
-      const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = RANGES[o.layout]()[0][0]; build(); } update(); } },
+      const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
       return h('label', { class: 'field' }, h('span', null, label), s);
     };
