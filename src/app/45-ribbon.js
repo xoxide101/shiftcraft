@@ -66,13 +66,13 @@
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
         { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [
-          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' })]],
+          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
           ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
         ] },
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
-          ['Save', [C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save month', 'Save month', I.save), C('Save location', 'Save everything', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
+          ['Save and open', [C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save month', 'Save month', I.save), C('Save location', 'Save everything', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
         ] },
       ],
     });
@@ -84,7 +84,8 @@
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
         { icon: 'wand', title: 'Start (wizard)', run: showStart },
-        { icon: 'save', title: 'Save everything (team, availability, schedules and settings)', key: 'Ctrl+S', run: () => saveFile('location') },
+        { icon: 'save', title: 'Save everything (team, availability, schedules, time off and all settings)', key: 'Ctrl+S', run: () => saveFile('location') },
+        { icon: 'open', title: 'Open (load) a saved file: Save everything brings back the team, schedules, time off and all settings', key: 'Ctrl+O', run: () => openFile() },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },

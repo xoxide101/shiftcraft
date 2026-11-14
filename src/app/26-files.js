@@ -24,7 +24,29 @@
     return staff.map((p) => (Array.isArray(p.trained) ? { ...p, trained: [...new Set(p.trained.map((id) => idOf[id] || id))] } : p));
   }
   const weeksOnly = (first, count) => scheduleRange(weekDays(first)[0], count * 7, first === 0 && count === plan.weeks ? plan.month : null);
-  const locationAll = () => ({ ...plan, app: 'ShiftCraft', kind: 'location', version: 4 });
+  const locationAll = () => ({ ...plan, app: 'ShiftCraft', kind: 'location', version: 4, prefs: prefsNow() });
+  // This browser's own choices go inside Save everything too, so opening the file (on this or another computer) brings
+  // them back: theme, picture and print choices, the availability list paper, the quick access bar, the ribbon, the
+  // Staff section and the Start window. Not the plan itself (that is the file), the account link, the emailable files
+  // already seen, or the company profile (offerFilePlace asks about that one).
+  const PREF_SKIP = [KEY, KEY + '-ui', KEY + '-account', KEY + '-seen', KEY + '-place'];
+  function prefsNow() {
+    const o = {};
+    try { Object.keys(localStorage).filter((k) => k.startsWith('shiftcraft') && !PREF_SKIP.includes(k)).forEach((k) => { o[k] = localStorage.getItem(k); }); } catch (e) { /* blocked */ }
+    return o;
+  }
+  // puts a file's choices back; returns how many differed from what this browser had
+  function prefsBack(o) {
+    if (!o || typeof o !== 'object') return 0;
+    let n = 0;
+    Object.entries(o).forEach(([k, v]) => {
+      if (!k.startsWith('shiftcraft') || PREF_SKIP.includes(k) || typeof v !== 'string') return;
+      try { if (localStorage.getItem(k) !== v) { localStorage.setItem(k, v); n++; } } catch (e) { /* blocked */ }
+    });
+    const t = o[KEY + '-theme']; if (typeof t === 'string') { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+    if (o['shiftcraft-staff-tab']) staffTab = o['shiftcraft-staff-tab'];
+    return n;
+  }
 
   async function saveFile(kind, { first = 0, count = 1, as = false } = {}) {
     let data, name, key;
@@ -90,9 +112,13 @@
   function openLocation(data, name, handle) {
     const replace = () => {
       snapshot();
+      const prefs = data.prefs; delete data.prefs;
       plan = data; delete plan.kind; normalize(plan); ui.day = plan.startDate; ui.fileName = name;
       if (handle) ui.handles.location = handle;
-      persist(); render(); toast(`Opened location file ${name}`);
+      const n = prefsBack(prefs);
+      persist(); render();
+      // the ribbon, the quick access bar and the picture choices are read when ShiftCraft starts
+      toast(`Opened ${name}: team, schedules, time off and settings${n ? `, and ${n} of your choices (theme, print, ribbon…)` : ''}.`, n ? { label: 'Restart to use them all', fn: () => location.reload() } : undefined);
       offerFilePlace(data);
     };
     if (plan.example || !Object.values(plan.shifts).some((l) => l.length)) { replace(); return; }
