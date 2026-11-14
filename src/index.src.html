@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShiftCraft</title>
+<style>
+<!--@include css/shiftcraft.css-->
+</style>
+</head>
+<body>
+<div class="sc-start no-print" id="sc-start" hidden role="dialog" aria-label="What do you want to do?"><div class="sc-start-in">
+  <h2>What do you want to do?</h2>
+  <div class="tiles" id="sc-start-tiles"></div>
+  <div class="foot"><label><input type="checkbox" id="sc-start-show"> Show this when ShiftCraft opens</label><span class="grow"></span><button type="button" id="sc-start-close">Close</button></div>
+</div></div>
+<header class="bar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>ShiftCraft</div>
+  <nav class="menubar" id="menubar" aria-label="Main menu"></nav>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <label class="month-pick" title="Plan a whole month: the weeks whose Monday falls in that month (4 or 5 weeks)">Month <select class="input" id="month-sel" aria-label="Month"></select></label>
+  <span class="spacer"></span>
+  <span class="docname muted small" id="doc-name"></span>
+  <span class="store" id="store-name"></span>
+  <button class="btn icon theme-btn" id="theme-btn" type="button" aria-label="Switch between light and dark"></button>
+</header>
+<main class="main" id="main"></main>
+<input type="file" id="file-in" accept=".json,application/json" hidden>
+<div id="print-area"></div>
+
+<script>
+<!--@include lib/qrcode-generator.js-->
+</script>
+<script>
+<!--@include lib/craft-crypto.js-->
+</script>
+<script>
+<!--@include lib/craft-account.js-->
+</script>
+<script>
+<!--@app-->
+</script>
+<script>
+<!--@include lib/craft-keys.js-->
+</script>
+</body>
+</html>
