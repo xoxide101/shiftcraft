@@ -15,7 +15,9 @@
         const ok = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
         q.timeOff = Array.isArray(q.timeOff) ? q.timeOff.filter((t) => t && ok(t.from)).map((t) => ({ id: t.id || uid(), from: t.from, to: ok(t.to) && t.to >= t.from ? t.to : t.from,
           hours: Array.isArray(t.hours) && Number.isFinite(t.hours[0]) && Number.isFinite(t.hours[1]) && t.hours[1] > t.hours[0] ? [t.hours[0], t.hours[1]] : null,
-          why: TIME_OFF_WHY[t.why] ? t.why : 'other', status: TIME_OFF_STATUS[t.status] ? t.status : 'requested', note: String(t.note || '').slice(0, 300), added: ok(t.added) ? t.added : t.from })) : [];
+          why: TIME_OFF_WHY[t.why] ? t.why : 'other', status: TIME_OFF_STATUS[t.status] ? t.status : 'requested', note: String(t.note || '').slice(0, 300), added: ok(t.added) ? t.added : t.from,
+          ...(ok(t.asked) ? { asked: t.asked } : {}), ...(TIME_OFF_HOW[t.how] ? { how: t.how } : {}), ...(typeof t.cover === 'string' && t.cover ? { cover: t.cover } : {}),
+          ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}) })) : [];
         if (!q.timeOff.length) delete q.timeOff;
       }
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }

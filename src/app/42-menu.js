@@ -47,6 +47,10 @@
       '-',
       { label: 'New-hire checklist…', run: editChecklist },
       '-',
+      { label: 'Time off request…', run: () => timeOffRequest(false) },
+      { label: 'Not available some hours (appointment)…', run: () => timeOffRequest(true) },
+      { label: 'Time off list', run: timeOffList },
+      '-',
       { label: 'Check schedule…', run: checkDialog },
     ]],
     ['View', [

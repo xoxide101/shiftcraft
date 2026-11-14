@@ -69,6 +69,7 @@
       tl.append(h('div', { class: 'tl-row' }, h('div', { class: 'tl-label' }, label, h('small', null, `${shifts.length} · ${hrs(hoursG)} h`)), lanes));
     });
 
+    const offToday = timeOffToday(d); if (offToday) main.append(offToday);
     const scheduled = new Set(shiftsOn(d).map((s) => s.staffId));
     const free = sortStaff(plan.staff.filter((p) => p.active && !scheduled.has(p.id)));
     main.append(h('div', { class: 'card' },
@@ -77,7 +78,7 @@
         const wh = personWeekHours(p.id, week);
         const away = timeOffOn(p, d), awayTxt = away.length ? timeOffIssue(p, d, null) || `${p.name.split(' ')[0]} has time off ${away.map((t) => `${clock(t.hours[0])} – ${clock(t.hours[1])} (${timeOffLabel(t)}${t.note ? ' – ' + t.note : ''})`).join(', ')}` : '';
         return h('button', { class: 'chip' + (offOn(p, d) || offAllDay(p, d) ? ' na' : ''), title: (awayTxt ? awayTxt + '\n' : offOn(p, d) ? availIssue(p, d) + '\n' : '') + (setFor(p, d).parts.length < 3 ? `Works ${setFor(p, d).parts.map((x) => x.toUpperCase()).join(' / ')}\n` : '') + (setFor(p, d).from != null ? `Available ${clock(setFor(p, d).from)} – ${clock(setFor(p, d).to)}\n` : '') + `Usual ${isWkend(d) ? 'weekend' : 'weekday'} shift ${clock(setFor(p, d).start)} – ${clock(setFor(p, d).end)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}\nRight-click for other times or a day off request`, onclick: () => addShift(d, p.id),
-          oncontextmenu: (e) => { e.preventDefault(); popMenu(e.clientX, e.clientY, `${p.name} · ${dayName(d)}`, [['Add with the usual shift', () => addShift(d, p.id)], ['Add at other times…', () => anotherShiftDialog(d, p.id)], ['Day off request…', () => dayOffRequest(p, d)], ['Time off…', () => timeOffDialog(p)]]); } },
+          oncontextmenu: (e) => { e.preventDefault(); popMenu(e.clientX, e.clientY, `${p.name} · ${dayName(d)}`, [['Add with the usual shift', () => addShift(d, p.id)], ['Add at other times…', () => anotherShiftDialog(d, p.id)], ['Day off request…', () => dayOffRequest(p, d)], ['Not available some hours (appointment)…', () => dayOffRequest(p, d, [540, 660])], ['Time off…', () => timeOffDialog(p)]]); } },
           `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${hrs(wh)} h${away.length ? ` · ${offAllDay(p, d) ? 'away' : 'off ' + away.filter((t) => t.hours).map((t) => `${clock(t.hours[0], true)}–${clock(t.hours[1], true)}`).join(', ')}` : ''}`));
       })) : h('p', { class: 'hint', style: { padding: '10px 0 0' } }, plan.staff.length ? 'Everyone is scheduled.' : 'No staff yet. Add people on the Staff tab.'),
       h('div', { class: 'legend no-print', style: { marginTop: '8px' } }, 'Tips: drag a shift to move it · drag its left or right edge to change start or finish (15-minute steps) · click for notes · double-click to type exact times · right-click to edit, split, add another shift that day, a day off request, or remove · Ctrl+Z undoes')));

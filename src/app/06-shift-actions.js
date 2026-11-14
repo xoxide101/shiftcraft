@@ -76,6 +76,7 @@
       item('Split into two (a break in the middle)…', () => splitShiftDialog(d, id)),
       item(`Add another shift for ${p.name.split(' ')[0]} today…`, () => anotherShiftDialog(d, p.id)),
       item('Day off request…', () => dayOffRequest(p, d)),
+      item('Not available some hours (appointment)…', () => dayOffRequest(p, d, [s.start, Math.min(s.end, s.start + 120)])),
       item('Tasks and training…', () => tasksDialog(p)),
       item('Remove from schedule', () => removeShift(d, id), 'danger'));
     document.body.append(menu);

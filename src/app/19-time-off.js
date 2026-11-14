@@ -27,42 +27,58 @@
   // shifts already on the schedule inside a stretch of time off
   const timeOffClashes = (p, t) => Object.keys(plan.shifts).filter((d) => d >= t.from && d <= t.to).flatMap((d) => plan.shifts[d].filter((s) => s.staffId === p.id && (!t.hours || (s.start < t.hours[1] && s.end > t.hours[0]))).map((s) => ({ d, s })));
 
-  // preset (for a new one): e.g. { from, to, status: 'requested', why } for a day off request
+  // preset (for a new one): e.g. { from, to, status: 'requested', why } for a day off request, plus hours: [start, end]
+  // for an appointment. Each entry also keeps who asked how and when, who covers, paid or unpaid, and when it was decided:
+  //   asked: 'YYYY-MM-DD', how: TIME_OFF_HOW key, cover: person id, paid: '' | 'paid' | 'unpaid', decided: 'YYYY-MM-DD'
   function timeOffDialog(p, t, preset) {
-    const today = iso(new Date()), cur = t || { from: today, to: today, hours: null, why: 'vacation', status: 'approved', note: '', ...(preset || {}) };
+    const today = iso(new Date()), cur = t || { from: today, to: today, hours: null, why: 'vacation', status: 'approved', note: '', asked: today, how: 'person', ...(preset || {}) };
     let who = p ? p.id : (sortStaff(plan.staff.filter((x) => !x.left))[0] || {}).id;
     const people = sortStaff(plan.staff.filter((x) => !x.left || (p && x.id === p.id)));
     const whoSel = h('select', { class: 'input', disabled: !!t, onchange: (e) => { who = e.target.value; sync(); } }, people.map((x) => h('option', { value: x.id, selected: x.id === who }, `${x.name} (${ROLES[x.role].short})`)));
     const from = h('input', { class: 'input', type: 'date', value: cur.from }), to = h('input', { class: 'input', type: 'date', value: cur.to });
-    const allDay = h('input', { type: 'checkbox', checked: !cur.hours });
-    const ta = timePicker(cur.hours ? cur.hours[0] : 540, 'Off from'), tb = timePicker(cur.hours ? cur.hours[1] : 780, 'Off until');
-    const hoursRow = h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, ta, '–', tb);
+    // how long: all day (one day or many), or some hours (an appointment), the same hours on each day of the range
+    let allDay = !cur.hours;
+    const longSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'How long' }, [[true, 'All day'], [false, 'Some hours (e.g. an appointment)']].map(([v, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(allDay === v), onclick: (e) => { allDay = v; longSeg.querySelectorAll('.btn').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); sync(); } }, l)));
+    const ta = timePicker(cur.hours ? cur.hours[0] : 540, 'Off from'), tb = timePicker(cur.hours ? cur.hours[1] : 660, 'Off until');
+    const hoursRow = h('div', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, h('label', { class: 'field' }, h('span', null, 'Not available from'), ta), h('label', { class: 'field' }, h('span', null, 'until'), tb)),
+      h('p', { class: 'hint', style: { margin: '0 0 6px' } }, 'Two separate times on one day (say 9–10 and 3–4)? Add each one on its own.'));
     const why = h('select', { class: 'input' }, Object.entries(TIME_OFF_WHY).map(([k, l]) => h('option', { value: k, selected: k === cur.why }, l)));
+    const paid = h('select', { class: 'input' }, [['', 'Not said'], ['paid', 'Paid'], ['unpaid', 'Unpaid']].map(([k, l]) => h('option', { value: k, selected: k === (cur.paid || '') }, l)));
     let status = cur.status;
     const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Status' }, Object.entries(TIME_OFF_STATUS).map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(status === k), onclick: (e) => { status = k; seg.querySelectorAll('.btn').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); sync(); } }, l)));
-    const note = h('input', { class: 'input', value: cur.note || '', placeholder: 'Optional, e.g. family wedding out of town; covered by Sam', maxLength: 300 });
+    const asked = h('input', { class: 'input', type: 'date', value: cur.asked || cur.added || today });
+    const how = h('select', { class: 'input' }, h('option', { value: '' }, 'Not said'), Object.entries(TIME_OFF_HOW).map(([k, l]) => h('option', { value: k, selected: k === cur.how }, l)));
+    const cover = h('select', { class: 'input' });
+    const note = h('textarea', { class: 'input', rows: 2, placeholder: 'Optional, e.g. dentist across town, back by 11:30 · family wedding out of town', maxLength: 300 }, cur.note || '');
     const drop = h('input', { type: 'checkbox', checked: cur.status !== 'requested' }), dropLbl = h('span'), info = h('p', { class: 'hint', style: { margin: 0 } });
-    const read = () => ({ from: from.value, to: to.value < from.value ? from.value : to.value, hours: allDay.checked ? null : [ta.value, tb.value] });
+    const read = () => ({ from: from.value, to: to.value < from.value ? from.value : to.value, hours: allDay ? null : [ta.value, tb.value] });
     const sync = () => {
-      hoursRow.style.display = allDay.checked ? 'none' : '';
+      hoursRow.style.display = allDay ? 'none' : '';
       if (to.value && from.value && to.value < from.value) to.value = from.value;
       const x = read(), person = staffById(who); if (!person || !x.from) return;
+      const keep = cover.value || cur.cover || '';
+      cover.replaceChildren(h('option', { value: '' }, 'Nobody yet'), ...sortStaff(plan.staff.filter((y) => !y.left && y.id !== who)).map((y) => h('option', { value: y.id, selected: y.id === keep }, `${y.name} (${ROLES[y.role].short})`)));
       const n = status === 'denied' ? 0 : timeOffClashes(person, x).length;
-      dropLbl.textContent = n ? ` Take ${person.name.split(' ')[0]} off ${n} shift${n === 1 ? '' : 's'} already scheduled in this time` : ' No shifts scheduled in this time';
+      dropLbl.textContent = n ? ` Take ${person.name.split(' ')[0]} off ${n} shift${n === 1 ? '' : 's'} already scheduled in this time${status === 'requested' ? ' (or leave them until it is approved)' : ''}` : ' No shifts scheduled in this time';
       drop.disabled = !n;
       const days = timeOffDays(x);
-      info.textContent = `${days} day${days === 1 ? '' : 's'}${x.hours ? `, ${clock(x.hours[0])} – ${clock(x.hours[1])} each day` : ', all day'}.`;
+      info.textContent = x.hours ? (x.hours[1] <= x.hours[0] ? 'The time off must end after it starts.' : `${clock(x.hours[0])} – ${clock(x.hours[1])} (${hrs((x.hours[1] - x.hours[0]) / 60)} h)${days > 1 ? ` on each of ${days} days` : ` on ${dayName(x.from)} ${shortDate(x.from)}`}.`)
+        : `${days} day${days === 1 ? '' : 's'}, all day.`;
     };
-    [from, to].forEach((e) => e.addEventListener('input', sync)); allDay.addEventListener('change', sync);
+    [from, to].forEach((e) => e.addEventListener('input', sync));
     [ta, tb].forEach((tp) => tp.addEventListener('change', sync));
     sync();
     const actions = [{ label: 'Cancel' }];
     if (t) actions.unshift({ label: 'Delete', danger: true, left: true, onClick: () => { change(() => { p.timeOff = p.timeOff.filter((x) => x.id !== t.id); if (!p.timeOff.length) delete p.timeOff; }); toast('Time off deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
-    actions.push({ label: t ? 'Save' : cur.status === 'requested' ? 'Add request' : 'Add time off', primary: true, onClick: () => {
+    actions.push({ label: t ? 'Save' : status === 'requested' ? 'Add request' : 'Add time off', primary: true, onClick: () => {
       const person = staffById(who); if (!person) return;
       const x = read(); if (!x.from) { toast('Pick the first day off.'); return false; }
       if (x.hours && x.hours[1] <= x.hours[0]) { toast('The time off must end after it starts.'); return false; }
-      const entry = { id: t ? t.id : uid(), ...x, why: why.value, status, note: note.value.trim(), added: t ? t.added : iso(new Date()) };
+      const entry = { id: t ? t.id : uid(), ...x, why: why.value, status, note: note.value.trim(), added: t ? t.added : today, asked: asked.value || today };
+      if (how.value) entry.how = how.value;
+      if (cover.value) entry.cover = cover.value;
+      if (paid.value) entry.paid = paid.value;
+      if (status !== 'requested') entry.decided = t && t.status === status && t.decided ? t.decided : today;
       const clash = !drop.disabled && drop.checked ? timeOffClashes(person, entry) : [];
       change(() => {
         person.timeOff = (person.timeOff || []).filter((y) => y.id !== entry.id).concat(entry).sort((a, b) => a.from.localeCompare(b.from));
@@ -70,25 +86,51 @@
       });
       toast(`${person.name}: ${timeOffLabel(entry)}, ${timeOffWhen(entry)}${clash.length ? ` · taken off ${clash.length} shift${clash.length === 1 ? '' : 's'}` : ''}.`);
     } });
-    modal({ title: t ? `Time off · ${p.name}` : cur.status === 'requested' ? 'Day off request' : 'Add time off', body: [
+    const pair = (a, b) => h('div', { class: 'inline', style: { alignItems: 'flex-end' } }, a, b);
+    modal({ title: t ? `Time off · ${p.name}` : cur.status === 'requested' ? (cur.hours ? 'Time off request · some hours' : 'Time off request') : 'Add time off', body: [
       h('label', { class: 'field' }, h('span', null, 'Who'), whoSel),
-      h('div', { class: 'inline' }, h('label', { class: 'field' }, h('span', null, 'First day off'), from), h('label', { class: 'field' }, h('span', null, 'Last day off'), to)),
-      h('label', { class: 'check' }, allDay, ' All day (untick for just a few hours)'), hoursRow, info,
-      h('label', { class: 'field' }, h('span', null, 'Reason'), why),
+      h('div', { class: 'field' }, h('span', null, 'How long'), longSeg),
+      pair(h('label', { class: 'field' }, h('span', null, 'First day'), from), h('label', { class: 'field' }, h('span', null, 'Last day (the same for one day)'), to)),
+      hoursRow, info,
+      pair(h('label', { class: 'field' }, h('span', null, 'Reason'), why), h('label', { class: 'field' }, h('span', null, 'Paid or unpaid'), paid)),
       h('div', { class: 'field' }, h('span', null, 'Status'), seg),
+      t && t.decided && t.status !== 'requested' ? h('p', { class: 'hint', style: { margin: '-4px 0 6px' } }, `${TIME_OFF_STATUS[t.status]} on ${dayName(t.decided, 'short')} ${shortDate(t.decided)}.`) : null,
+      pair(h('label', { class: 'field' }, h('span', null, 'Asked on'), asked), h('label', { class: 'field' }, h('span', null, 'How they asked'), how)),
+      h('label', { class: 'field' }, h('span', null, 'Covered by'), cover),
       h('label', { class: 'field' }, h('span', null, 'Note'), note),
       h('label', { class: 'check' }, drop, dropLbl),
-      h('p', { class: 'hint' }, 'Requested and approved time off shows on the schedule: a shift on it gets the N/A mark, and the person shows as away under Unscheduled. Denied is kept only as a record.')],
+      h('p', { class: 'hint' }, 'Requested and approved time off shows on the schedule: a shift in that time gets the ! mark, the person shows as away (or off those hours) under Unscheduled, and the day lists it under Time off today. Denied is kept only as a record.')],
       actions });
+  }
+
+  // menu and ribbon: a request for anyone, or some hours off (an appointment) on the day being looked at
+  const timeOffRequest = (hours) => timeOffDialog(null, null, { from: ui.day, to: ui.day, status: 'requested', why: hours ? 'appointment' : 'personal', ...(hours ? { hours: [540, 660] } : {}) });
+  const timeOffList = () => { staffTab = 'timeoff'; try { localStorage.setItem('shiftcraft-staff-tab', 'timeoff'); } catch (e) { /* blocked */ } ui.tab = 'staff'; persist(); render(); };
+
+  // the Schedule's "Time off today": everyone with time off on the day, with Approve / Deny for requests
+  function timeOffToday(d) {
+    const list = sortStaff(plan.staff.filter((p) => !p.left)).flatMap((p) => (p.timeOff || []).filter((t) => t.from <= d && d <= t.to).map((t) => ({ p, t })));
+    if (!list.length) return null;
+    return h('div', { class: 'card' },
+      h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, `Time off today · ${list.filter(({ t }) => t.status !== 'denied').length}`), h('span', { class: 'muted small' }, 'Click a line to see or change it.'), h('span', { class: 'spacer' }),
+        h('button', { class: 'btn sm', onclick: () => timeOffRequest(false) }, '+ Time off request'), h('button', { class: 'btn sm', onclick: () => timeOffRequest(true) }, '+ Some hours (appointment)')),
+      h('ul', { class: 'timeoff-today', style: { margin: '8px 0 0', paddingLeft: '18px' } }, list.map(({ p, t }) => h('li', { style: { margin: '4px 0', opacity: t.status === 'denied' ? 0.55 : 1 } },
+        h('a', { href: '#', onclick: (e) => { e.preventDefault(); timeOffDialog(p, t); } }, h('b', null, p.name)),
+        ` · ${t.hours ? `${clock(t.hours[0])} – ${clock(t.hours[1])}` : 'all day'} · ${TIME_OFF_WHY[t.why] || 'Time off'}${t.paid ? ` (${t.paid})` : ''} · `,
+        h('span', { class: t.status === 'requested' ? 'warn' : t.status === 'denied' ? 'muted' : 'good' }, TIME_OFF_STATUS[t.status]),
+        t.cover && staffById(t.cover) ? ` · covered by ${staffById(t.cover).name}` : '', t.note ? h('span', { class: 'muted' }, ` — ${t.note}`) : null,
+        t.status === 'requested' ? [' ', h('button', { class: 'btn sm primary', onclick: () => approveTimeOff(p, t) }, 'Approve'), ' ', h('button', { class: 'btn sm', onclick: () => denyTimeOff(t) }, 'Deny')] : null))));
   }
 
   // Approve a request; shifts already scheduled in that time can then be taken off with one click.
   function approveTimeOff(p, t) {
-    change(() => { t.status = 'approved'; });
+    change(() => { t.status = 'approved'; t.decided = iso(new Date()); });
     const c = timeOffClashes(p, t);
     toast(c.length ? `Approved. ${p.name.split(' ')[0]} still has ${c.length} shift${c.length === 1 ? '' : 's'} in that time.` : `Approved: ${p.name}, ${timeOffWhen(t)}.`,
       c.length ? { label: c.length === 1 ? 'Take it off' : 'Take them off', fn: () => change(() => c.forEach(({ d, s }) => { plan.shifts[d] = plan.shifts[d].filter((y) => y.id !== s.id); })) } : undefined);
   }
+
+  const denyTimeOff = (t) => change(() => { t.status = 'denied'; t.decided = iso(new Date()); });
 
   // the Staff › Time off section: everyone's time off in date order
   function timeOffRows() {
@@ -96,19 +138,23 @@
     const all = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).map((t) => ({ p, t })))
       .filter(({ t }) => timeOffShow === 'all' || (timeOffShow === 'past' ? t.to < today : t.to >= today))
       .sort((a, b) => (timeOffShow === 'past' ? b.t.from.localeCompare(a.t.from) : a.t.from.localeCompare(b.t.from)) || a.p.name.localeCompare(b.p.name));
-    const head = ['Name', 'Role', 'When', 'Days', 'Reason', 'Status', 'Note', ''];
+    const head = ['Name', 'Role', 'When', 'Days', 'Reason', 'Status', 'Asked', 'Covered by', 'Note', ''];
     const rows = all.map(({ p, t }) => h('tr', { style: { opacity: t.status === 'denied' ? 0.55 : 1 } },
       h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label),
       h('td', { class: 'nowrap' }, timeOffWhen(t), t.from <= today && t.to >= today ? h('span', { class: 'small', style: { marginLeft: '6px', fontWeight: 700 } }, 'now') : null),
       h('td', { class: 'num' }, t.hours ? `${timeOffDays(t)} × ${hrs((t.hours[1] - t.hours[0]) / 60)} h` : timeOffDays(t)),
-      h('td', null, TIME_OFF_WHY[t.why] || t.why), h('td', { class: t.status === 'requested' ? 'warn' : '' }, TIME_OFF_STATUS[t.status] || t.status),
+      h('td', null, (TIME_OFF_WHY[t.why] || t.why) + (t.paid ? ` (${t.paid})` : '')),
+      h('td', { class: 'nowrap ' + (t.status === 'requested' ? 'warn' : '') }, TIME_OFF_STATUS[t.status] || t.status, t.decided && t.status !== 'requested' ? h('span', { class: 'small muted' }, ` ${shortDate(t.decided)}`) : null),
+      h('td', { class: 'small nowrap' }, t.asked ? `${shortDate(t.asked)}${t.how && TIME_OFF_HOW[t.how] ? ' · ' + TIME_OFF_HOW[t.how].toLowerCase() : ''}` : ''),
+      h('td', { class: 'small' }, t.cover && staffById(t.cover) ? staffById(t.cover).name : ''),
       h('td', { class: 'small' }, t.note || ''),
       h('td', { class: 'nowrap' }, t.status === 'requested' ? [h('button', { class: 'btn sm primary', title: 'Approve this time off', onclick: () => approveTimeOff(p, t) }, 'Approve'), ' ',
-        h('button', { class: 'btn sm', title: 'Deny it (kept as a record)', onclick: () => change(() => { t.status = 'denied'; }) }, 'Deny'), ' '] : null,
+        h('button', { class: 'btn sm', title: 'Deny it (kept as a record)', onclick: () => denyTimeOff(t) }, 'Deny'), ' '] : null,
         h('button', { class: 'btn sm', onclick: () => timeOffDialog(p, t) }, 'Edit…'))));
     const show = h('div', { class: 'seg', role: 'group', 'aria-label': 'Which time off' }, [['upcoming', 'Now and coming up'], ['past', 'Past'], ['all', 'All']].map(([k, l]) => h('button', { type: 'button', class: 'btn sm', 'aria-pressed': String(timeOffShow === k), onclick: () => { timeOffShow = k; render(); } }, l)));
     const foot = h('tr', null, h('td', { colspan: head.length }, h('div', { class: 'inline' }, h('button', { class: 'btn primary', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null) }, '+ Add time off'),
-      h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Someone asks for a day (or days, or a few hours) off: kept as Requested until you approve it', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Day off request'), h('span', { class: 'spacer' }), show)));
+      h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Someone asks for a day (or days, or a few hours) off: kept as Requested until you approve it', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Time off request'),
+      h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Not available for a few hours on a day: a doctor or dentist appointment, school, a meeting', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'appointment', hours: [540, 660] }) }, '+ Some hours (appointment)'), h('span', { class: 'spacer' }), show)));
     const asked = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today).length), 0);
     return { head, rows, foot, empty: timeOffShow === 'past' ? 'No past time off.' : 'No time off coming up. Add it with + Add time off, or Time off… on a person.', asked };
   }

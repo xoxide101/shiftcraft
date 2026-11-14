@@ -68,7 +68,7 @@
   }
 
   // A day off request from the schedule: the time off window, set to Requested for that day.
-  const dayOffRequest = (p, d) => timeOffDialog(p, null, { from: d, to: d, status: 'requested', why: 'personal' });
+  const dayOffRequest = (p, d, hours) => timeOffDialog(p, null, { from: d, to: d, status: 'requested', why: hours ? 'appointment' : 'personal', ...(hours ? { hours } : {}) });
 
   // A small right-click menu (used for the names under Unscheduled; shifts have their own in shiftMenu).
   function popMenu(x, y, head, items) {

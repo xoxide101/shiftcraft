@@ -47,6 +47,7 @@
           ['Day', [C('Copy a day', 'Copy day…', I.copy, { big: true }), { col: [C('Copy this day to several', 'Copy to several days…', I.severalDays), C('Clear day', 'Clear day', I.clear)] }]],
           ['Week', [{ col: [C('Previous week', 'Previous week', I.prev), C('Next week', 'Next week', I.next), C('Move week', 'Move week…', I.move)] }, { col: [C('Copy a week', 'Copy week…', I.copy), C('Clear week', 'Clear week', I.clear)] }]],
           ['Month', [{ el: document.querySelector('.month-pick') }, { col: [C('Copy a month', 'Copy month…', I.copy), C('Clear month', 'Clear month', I.clear), C('Move whole plan', 'Move plan…', I.move)] }]],
+          ['Time off', [C('Time off request', 'Time off request…', I.calendar, { big: true }), { col: [C('Not available some hours', 'Appointment…', I.clock), C('Time off list', 'Time off list', I.list)] }]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true }), C('Undo', 'Undo', I.undo, { big: true })]],
         ] },
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
@@ -61,6 +62,7 @@
         ] },
         { id: 'staff', label: 'Staff', hue: '#d1408a', onSelect: view('staff'), groups: [
           ['Team', [C('Save team only', 'Save team', I.save, { big: true }), C('Open', 'Open a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
+          ['Time off', [C('Time off request', 'Time off request…', I.calendar, { big: true }), { col: [C('Not available some hours', 'Appointment…', I.clock), C('Time off list', 'Time off list', I.list)] }]],
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
         { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [

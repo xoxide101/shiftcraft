@@ -65,3 +65,4 @@
   // Time off reasons and states (used when a plan loads and by the Time off part, 19-time-off.js)
   const TIME_OFF_WHY = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', appointment: 'Appointment', family: 'Family', school: 'School', bereavement: 'Bereavement', jury: 'Jury duty', other: 'Other' };
   const TIME_OFF_STATUS = { requested: 'Requested', approved: 'Approved', denied: 'Denied' };
+  const TIME_OFF_HOW = { person: 'In person', phone: 'Phone call', text: 'Text message', email: 'Email', form: 'Request form', other: 'Other' };
