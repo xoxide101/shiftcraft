@@ -590,7 +590,8 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   // on opening: is the login still good (ended elsewhere, or switched off)? then your shared settings
   if (user()) refresh().then((r) => { if (r) pullShared(); });
 
-  window.CraftAccount = { user, server, pageUrl, button, loginDialog, api, login, signup, logout, changePassword, refresh, get, put, all, remove, lockKeys, unlockKeys, localKeys, useKeys, hasCrypto };
+  const allowed = (app) => { const u = user(); return !u || !Array.isArray(u.apps) || u.apps.includes(app); };   // (an app not given to this user keeps nothing in the account)
+  window.CraftAccount = { user, server, pageUrl, button, loginDialog, api, allowed, login, signup, logout, changePassword, refresh, get, put, all, remove, lockKeys, unlockKeys, localKeys, useKeys, hasCrypto };
 })();
 </script>
 <script>
@@ -754,7 +755,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
   const accState = () => { try { return JSON.parse(localStorage.getItem(ACC)) || {}; } catch (e) { return {}; } };
   const setAcc = (o) => { try { localStorage.setItem(ACC, JSON.stringify({ ...accState(), ...o })); } catch (e) { /* blocked */ } };
   const accKey = () => ('plan ' + (placeName().replace(/[^\w.\- ]+/g, ' ').replace(/\s+/g, ' ').trim() || 'My store')).slice(0, 100);
-  const CA = () => (window.CraftAccount && CraftAccount.user() ? CraftAccount : null);
+  const CA = () => (window.CraftAccount && CraftAccount.user() && (!CraftAccount.allowed || CraftAccount.allowed('shiftcraft')) ? CraftAccount : null);
   let accT = 0, accBusy = false, accLast = '', accQuiet = false, accSeen = 0;
   function accountSoon(txt) {
     if (txt === accLast) return; accLast = txt;
@@ -779,7 +780,7 @@ td.fc { background: color-mix(in srgb, var(--unsched) 60%, transparent); }
         actions: [{ label: 'Keep this browser’s', onClick: () => { accountSend(); } }, { label: 'Open the account’s', primary: true, onClick: take }] });
     } catch (e) { /* not reachable now: tried again later */ } finally { accBusy = false; }
   }
-  window.addEventListener('craft-account', () => { accountCheck(); if (started) render(); });
+  window.addEventListener('craft-account', () => { if (window.CraftAccount && CraftAccount.user() && CraftAccount.allowed && !CraftAccount.allowed('shiftcraft')) toast('Your account is not set up for ShiftCraft (ask the admin): it saves in this browser only.'); accountCheck(); if (started) render(); });
   window.addEventListener('focus', () => { if (Date.now() - accSeen > 60000) accountCheck(); });
 
   // ===================================================================
