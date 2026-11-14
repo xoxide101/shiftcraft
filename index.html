@@ -1586,6 +1586,20 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     g.fillStyle = '#fff'; g.fillRect(x, y, size, size); g.fillStyle = '#000';
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(x + (c + 4) * m, y + (r + 4) * m, m + 0.02 * m, m + 0.02 * m);
   }
+  // Push the contact QR codes into the shared Craft barcode library (localStorage 'craft-barcodes', the same list
+  // BarcodeCraft, LabelCraft and PressCraft use; logged in: your account's 'craft'/'barcodes' too), so any app can put
+  // a person's contact code on a sheet. One entry per person (id 'sc-' + their id): sending again updates them.
+  async function cardsToLibrary(people) {
+    const LIB = 'craft-barcodes', now = new Date().toISOString(), where = plan.location || plan.company || 'Team';
+    const mine = people.map((p) => ({ id: 'sc-' + p.id, name: `${p.name} (${where} contact)`, type: 'QRCODE', value: vcardOf(p), wmm: 30, hmm: 30, ecc: 'M', saved: now, from: 'ShiftCraft' }));
+    const merge = (...lists) => { const all = new Map(); lists.flat().forEach((x) => { const o = all.get(x.id); if (!o || (x.saved || '') >= (o.saved || '')) all.set(x.id, x); }); return [...all.values()].sort((a, b) => (b.saved || '').localeCompare(a.saved || '')); };
+    let local = []; try { local = JSON.parse(localStorage.getItem(LIB) || '[]') || []; } catch (e) { /* none */ }
+    const list = merge(local, mine);
+    try { localStorage.setItem(LIB, JSON.stringify(list)); } catch (e) { return toast('The barcode library is full in this browser.'); }
+    const A = CA(); let acct = '';
+    if (A) { try { const got = (await A.get('craft', 'barcodes')) || []; await A.put('craft', 'barcodes', merge(got, list)); acct = ' and your account'; } catch (e) { acct = ' (your account could not be reached; it is kept in this browser)'; } }
+    toast(`${mine.length} contact QR code${mine.length === 1 ? '' : 's'} added to the barcode library in this browser${acct}. Use Insert › Barcode in LabelCraft or PressCraft, or BarcodeCraft, to put them on a sheet.`);
+  }
   const cardPeople = (range) => sortStaff(plan.staff.filter((p) => p.active && !p.left && (range !== 'phones' || p.phone)));
   // how many cards fit a page: cards about 2.6 × 2 in (portrait Letter: 3 × 5)
   const cardGrid = (pw, ph) => [Math.max(1, Math.floor((pw - 0.6) / 2.55)), Math.max(1, Math.floor((ph - 1.1) / 2.0))];
@@ -3114,7 +3128,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         sel('dpi', DPI_OPTIONS, 'Resolution (for saving)'));
       checks.replaceChildren(
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
-        o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null);
+        o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
+        o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null);
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     const update = () => {
