@@ -26,7 +26,7 @@
     const saveDefault = h('input', { type: 'checkbox' });
     const note = h('textarea', { class: 'input', rows: 3, placeholder: 'e.g. Leave at 2 for school pickup · Train on register', 'aria-label': 'Notes for this day' }, s.note || '');
     modal({ title: `${p.name} · ${dayName(d)}`, body: [
-      h('p', { class: 'muted' }, ROLES[p.role].label),
+      h('p', { class: 'muted' }, ROLES[p.role].label, othersToday(d, s).length ? ` · also working ${othersToday(d, s).map((x) => `${clock(x.start)} – ${clock(x.end)}`).join(' and ')} today (a split shift)` : ''),
       h('label', { class: 'field' }, h('span', null, 'Start'), a),
       h('label', { class: 'field' }, h('span', null, 'Finish'), b),
       info,
@@ -73,6 +73,9 @@
       h('div', { class: 'ctx-head' }, `${p.name} · ${clock(s.start)}–${clock(s.end)}`),
       item('Edit shift…', () => editShift(d, id)),
       item(s.note ? 'Edit note…' : 'Add a note…', () => noteDialog(d, id)),
+      item('Split into two (a break in the middle)…', () => splitShiftDialog(d, id)),
+      item(`Add another shift for ${p.name.split(' ')[0]} today…`, () => anotherShiftDialog(d, p.id)),
+      item('Day off request…', () => dayOffRequest(p, d)),
       item('Tasks and training…', () => tasksDialog(p)),
       item('Remove from schedule', () => removeShift(d, id), 'danger'));
     document.body.append(menu);

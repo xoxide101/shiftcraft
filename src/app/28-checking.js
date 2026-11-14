@@ -45,8 +45,10 @@
       const seen = {};
       list.forEach((s) => {
         const p = staffById(s.staffId);
-        if (seen[p.id]) add(d, `${p.name} is scheduled twice (${clock(seen[p.id].start)}–${clock(seen[p.id].end)} and ${clock(s.start)}–${clock(s.end)}).`, 'bad');
-        seen[p.id] = s;
+        // more than one shift on a day is fine (a split shift); only parts that overlap are a problem
+        const twin = (seen[p.id] || []).find((x) => x.start < s.end && s.start < x.end);
+        if (twin) add(d, `${p.name} has shifts that overlap (${clock(twin.start)}–${clock(twin.end)} and ${clock(s.start)}–${clock(s.end)}).`, 'bad');
+        seen[p.id] = (seen[p.id] || []).concat(s);
         if (!p.active) add(d, `${p.name} is scheduled but marked not active on the Staff tab.`, 'warn');
         const iss = availIssue(p, d, s);
         if (iss) add(d, iss + '.', 'warn');
@@ -88,7 +90,7 @@
     };
     range.addEventListener('change', draw); draw();
     modal({ title: 'Check schedule', wide: true, body: [h('label', { class: 'field' }, h('span', null, 'Check'), range), list,
-      h('p', { class: 'hint' }, 'Looks for people scheduled twice, shifts outside availability, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
+      h('p', { class: 'hint' }, 'Looks for shifts of one person that overlap (split shifts are fine), shifts outside availability, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
     actions: [{ label: 'Close', primary: true }] });
   }
 
