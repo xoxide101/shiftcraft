@@ -684,7 +684,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const len = (s) => (s.end - s.start) / 60;
   const snap = (m) => Math.round(m / STEP) * STEP;
   const clampShift = (s) => { s.start = Math.max(DAY_START, Math.min(DAY_END - STEP, s.start)); s.end = Math.max(s.start + STEP, Math.min(DAY_END, s.end)); return s; };
-
+  // Time off reasons and states (used when a plan loads and by the Time off part, 19-time-off.js)
+  const TIME_OFF_WHY = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', appointment: 'Appointment', family: 'Family', school: 'School', bereavement: 'Bereavement', jury: 'Jury duty', other: 'Other' };
+  const TIME_OFF_STATUS = { requested: 'Requested', approved: 'Approved', denied: 'Denied' };
   // ===================================================================
   // State
   // ===================================================================
@@ -861,6 +863,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const partWord = (k) => (k === 'we' ? 'weekends' : 'weekdays');
   function availIssue(p, d, s) {
     const first = p.name.split(' ')[0];
+    const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
     const a = avOf(p, avDay(d));
@@ -1133,8 +1136,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'Unscheduled'), h('span', { class: 'muted small' }, 'Click a name to add them with their usual shift.')),
       free.length ? h('div', { class: 'unsched' }, free.map((p) => {
         const wh = personWeekHours(p.id, week);
-        return h('button', { class: 'chip' + (offOn(p, d) ? ' na' : ''), title: (offOn(p, d) ? availIssue(p, d) + '\n' : '') + (setFor(p, d).parts.length < 3 ? `Works ${setFor(p, d).parts.map((x) => x.toUpperCase()).join(' / ')}\n` : '') + (setFor(p, d).from != null ? `Available ${clock(setFor(p, d).from)} – ${clock(setFor(p, d).to)}\n` : '') + `Usual ${isWkend(d) ? 'weekend' : 'weekday'} shift ${clock(setFor(p, d).start)} – ${clock(setFor(p, d).end)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}`, onclick: () => addShift(d, p.id) },
-          `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${hrs(wh)} h`));
+        const away = timeOffOn(p, d), awayTxt = away.length ? timeOffIssue(p, d, null) || `${p.name.split(' ')[0]} has time off ${away.map((t) => `${clock(t.hours[0])} – ${clock(t.hours[1])} (${timeOffLabel(t)}${t.note ? ' – ' + t.note : ''})`).join(', ')}` : '';
+        return h('button', { class: 'chip' + (offOn(p, d) || offAllDay(p, d) ? ' na' : ''), title: (awayTxt ? awayTxt + '\n' : offOn(p, d) ? availIssue(p, d) + '\n' : '') + (setFor(p, d).parts.length < 3 ? `Works ${setFor(p, d).parts.map((x) => x.toUpperCase()).join(' / ')}\n` : '') + (setFor(p, d).from != null ? `Available ${clock(setFor(p, d).from)} – ${clock(setFor(p, d).to)}\n` : '') + `Usual ${isWkend(d) ? 'weekend' : 'weekday'} shift ${clock(setFor(p, d).start)} – ${clock(setFor(p, d).end)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}`, onclick: () => addShift(d, p.id) },
+          `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${hrs(wh)} h${away.length ? ` · ${offAllDay(p, d) ? 'away' : 'off ' + away.filter((t) => t.hours).map((t) => `${clock(t.hours[0], true)}–${clock(t.hours[1], true)}`).join(', ')}` : ''}`));
       })) : h('p', { class: 'hint', style: { padding: '10px 0 0' } }, plan.staff.length ? 'Everyone is scheduled.' : 'No staff yet. Add people on the Staff tab.'),
       h('div', { class: 'legend no-print', style: { marginTop: '8px' } }, 'Tips: drag a shift to move it · drag its left or right edge to change start or finish (15-minute steps) · click for notes · double-click to type exact times · right-click to edit, add notes or remove · Ctrl+Z undoes')));
     main.append(hoursPanel(d));
@@ -1216,7 +1220,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const total = personWeekHours(p.id, w);
       const over = p.maxHours && total > p.maxHours;
       rows.push(h('tr', null, h('td', null, h('b', null, p.name), h('span', { class: 'muted small' }, ` ${ROLES[p.role].short}`)),
-        days.map((d) => { const ss = shiftsOf(p, d), s = ss[0], iss = ss.map((x) => availIssue(p, d, x)).filter(Boolean)[0] || (s ? '' : availIssue(p, d, null)); return h('td', { class: 'cellbtn c' + (s && iss ? ' bad' : !s && offOn(p, d) ? ' muted' : ''), title: [iss, ...ss.filter((x) => x.note).map((x) => 'Note: ' + x.note), 'Open this day'].filter(Boolean).join('\n'), onclick: () => { ui.day = d; ui.tab = 'schedule'; persist(); render(); } }, s ? ss.map((x, j) => [j ? h('br') : null, `${clock(x.start, true)}–${clock(x.end, true)}${availIssue(p, d, x) ? ' !' : ''}`, x.note ? h('div', { class: 'cell-note' }, x.note) : null]) : offOn(p, d) ? 'n/a' : ''); }),
+        days.map((d) => { const ss = shiftsOf(p, d), s = ss[0], iss = ss.map((x) => availIssue(p, d, x)).filter(Boolean)[0] || (s ? '' : availIssue(p, d, null)); return h('td', { class: 'cellbtn c' + (s && iss ? ' bad' : !s && (offOn(p, d) || offAllDay(p, d)) ? ' muted' : ''), title: [iss, ...ss.filter((x) => x.note).map((x) => 'Note: ' + x.note), 'Open this day'].filter(Boolean).join('\n'), onclick: () => { ui.day = d; ui.tab = 'schedule'; persist(); render(); } }, s ? ss.map((x, j) => [j ? h('br') : null, `${clock(x.start, true)}–${clock(x.end, true)}${availIssue(p, d, x) ? ' !' : ''}`, x.note ? h('div', { class: 'cell-note' }, x.note) : null]) : offAllDay(p, d) ? 'off: ' + (TIME_OFF_WHY[timeOffOn(p, d).find((t) => !t.hours).why] || 'time off').toLowerCase() : offOn(p, d) ? 'n/a' : ''); }),
         h('td', { class: 'num ' + (over ? 'bad' : '') }, hrs(total), over ? ` (max ${p.maxHours})` : '')));
     });
     const foot = (label, fn, cls) => h('tr', null, h('td', null, label), days.map((d) => { const v = fn(d); return h('td', { class: 'num ' + (cls ? cls(d) : '') }, v); }), h('td', null, ''));
@@ -1342,7 +1346,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       .sort((a, b) => GROUPS.findIndex((g) => g[0] === ROLES[a.p.role].group) - GROUPS.findIndex((g) => g[0] === ROLES[b.p.role].group) || a.s.start - b.s.start || a.p.name.localeCompare(b.p.name));
     const text = [`${placeName()} · ${longDate(d)}`, ''].concat(GROUPS.flatMap(([g, label]) => {
       const rows = list.filter((x) => ROLES[x.p.role].group === g);
-      return rows.length ? [label.toUpperCase(), ...rows.map((x) => `  ${x.p.name.padEnd(24)} ${clock(x.s.start).padStart(8)} - ${clock(x.s.end).padStart(8)}  (${hrs(len(x.s))} h)`), ''] : [];
+      return rows.length ? [label.toUpperCase(), ...rows.map((x) => `  ${`${x.p.empId ? x.p.empId + ' ' : ''}${x.p.name}${x.p.shiftCode ? ' [' + x.p.shiftCode + ']' : ''}`.padEnd(24)} ${clock(x.s.start).padStart(8)} - ${clock(x.s.end).padStart(8)}  (${hrs(len(x.s))} h)`), ''] : [];
     })).concat([`Total ${hrs(dayHours(d))} h · forecast ${money(forecastOf(d))}`]).join('\n');
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' },
@@ -1356,7 +1360,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, h('th', { class: 'no-print' }, '✓'), h('th', null, 'Job group'), h('th', null, 'Name'), h('th', null, 'Role'), h('th', null, 'Start'), h('th', null, 'Finish'), h('th', { class: 'num' }, 'Hours'))),
         h('tbody', null, list.length ? list.map((x) => h('tr', null, h('td', { class: 'no-print c' }, h('input', { type: 'checkbox', 'aria-label': 'Entered ' + x.p.name })),
-          h('td', null, GROUPS.find((g) => g[0] === ROLES[x.p.role].group)[1]), h('td', null, h('b', null, x.p.name), tasksOn(x.p, d).length ? h('div', { class: 'small muted' }, 'Tasks: ' + tasksOn(x.p, d).map((t) => t.text).join('; ')) : null, x.s.note ? h('div', { class: 'small' }, h('b', null, 'Note: '), x.s.note) : null), h('td', null, ROLES[x.p.role].label),
+          h('td', null, GROUPS.find((g) => g[0] === ROLES[x.p.role].group)[1]), h('td', null, h('b', null, x.p.name), x.p.empId || x.p.shiftCode ? h('div', { class: 'small muted' }, [x.p.empId ? 'ID ' + x.p.empId : '', x.p.shiftCode ? 'Shift code ' + x.p.shiftCode : ''].filter(Boolean).join(' · ')) : null, tasksOn(x.p, d).length ? h('div', { class: 'small muted' }, 'Tasks: ' + tasksOn(x.p, d).map((t) => t.text).join('; ')) : null, x.s.note ? h('div', { class: 'small' }, h('b', null, 'Note: '), x.s.note) : null), h('td', null, ROLES[x.p.role].label),
           h('td', null, clock(x.s.start)), h('td', null, clock(x.s.end)), h('td', { class: 'num' }, hrs(len(x.s))))) : h('tr', null, h('td', { colspan: 7, class: 'muted' }, 'Nobody is scheduled on this day.'))),
         h('tfoot', null, h('tr', null, h('td', { class: 'no-print' }, ''), h('td', { colspan: 5 }, `Total · forecast ${money(forecastOf(d))} · target ${targetHours(d) == null ? '—' : hrs(targetHours(d))} h`), h('td', { class: 'num' }, hrs(dayHours(d)))))))),
       h('details', { class: 'card no-print' }, h('summary', null, 'Plain text version'), h('pre', { class: 'handoff-text' }, text)));
@@ -1368,10 +1372,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training']];
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
+      h('button', { class: 'btn sm', title: 'Days, weeks or a few hours off, with a reason and notes', onclick: () => timeOffDialog(p) }, `Time off${(p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied') ? ' •' : ''}`), ' ',
       h('button', { class: 'btn sm', title: 'Print this person’s schedule', onclick: () => printPeopleDialog(p.id) }, 'Print'), ' ',
       h('button', { class: 'btn sm', title: 'Resigned, terminated or left: they come off the schedule and lists, and everything about them is kept under Former staff', onclick: () => leftDialog(p) }, 'Left…'), ' ',
       h('button', { class: 'btn sm ghost danger-text', onclick: () => {
@@ -1427,9 +1432,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       return h('div', { class: 'availlines' }, mine.map(row),
         h('button', { type: 'button', class: 'btn sm', title: 'Hours on some days only: pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', onclick: () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }) }, '+ Hours on some days'));
     };
-    let head, rows;
+    let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
-    if (staffTab === 'avail') {
+    if (staffTab === 'timeoff') {
+      ({ head, rows, foot, empty, asked } = timeOffRows());
+    } else if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
         WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avText(a))); }),
@@ -1438,15 +1445,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Fill the week from this person’s weekday and weekend settings', onclick: () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); }) }, 'From usual'), ' ',
           h('button', { class: 'btn sm ghost', title: 'Clear the day-by-day availability', disabled: !Array.isArray(p.avail), onclick: () => change(() => { delete p.avail; }) }, 'Clear'))));
     } else if (staffTab === 'contact') {
-      head = ['Name', 'Role', 'Email', 'Phone number', 'Notes', ''];
+      head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Email', 'Phone number', 'Notes', ''];
       rows = people.map((p) => {
         const email = h('input', { class: 'input', type: 'email', value: p.email || '', placeholder: 'name@example.com', 'aria-label': 'Email', style: { width: '100%' } });
         email.addEventListener('change', () => change(() => { p.email = email.value.trim(); }));
+        const idBox = (key, label, ph) => { const x = h('input', { class: 'input', value: p[key] || '', placeholder: ph, 'aria-label': label, maxLength: 40, style: { width: '100%' } }); x.addEventListener('change', () => change(() => { const v = x.value.trim(); if (v) p[key] = v; else delete p[key]; })); return h('td', { style: { minWidth: '100px' } }, x); };
         const notes = h('input', { class: 'input', value: p.notes || '', placeholder: 'e.g. school until June', 'aria-label': 'Notes', style: { width: '100%' } });
         notes.addEventListener('change', () => change(() => { p.notes = notes.value; }));
         const phone = h('input', { class: 'input', type: 'tel', value: p.phone || '', placeholder: '(555) 010-0100', 'aria-label': 'Phone number', style: { width: '100%' } });
         phone.addEventListener('change', () => change(() => { p.phone = phone.value.trim(); }));
-        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p),
+        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), idBox('empId', 'Employee ID', 'e.g. 10234'), idBox('shiftCode', 'Shift code', 'e.g. TM-07'),
           h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
           h('td', { style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
           h('td', { style: { minWidth: '160px' } }, notes),
@@ -1474,22 +1482,24 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       setTimeout(() => { const i = $('input[aria-label="New person name"]'); i && i.focus(); });
     };
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
+    const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
     const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
-      contact: 'How to reach each person, and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
+      timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
+      contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.filter((p) => !p.left).length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
         h('button', { class: 'btn sm', onclick: () => openFile() }, 'Load team…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.length, onclick: () => confirmBox('Clear the staff list?', 'Everyone is removed, along with all their shifts in this plan. Save the list first if you want to keep it. You can undo this.', 'Clear list', () => change(() => { plan.staff = []; plan.shifts = {}; plan.example = false; })) }, 'Clear list')),
-      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, l))),
+      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, k === 'timeoff' && waiting ? `${l} (${waiting} to approve)` : l))),
       h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, hint),
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))),
-        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, 'No one yet. Add your team below, or load a saved list.'))),
-        h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
+        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, empty || 'No one yet. Add your team below, or load a saved list.'))),
+        foot ? h('tfoot', null, foot) : h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
     if (staffTab === 'contact') main.append(trainedGrid());
     // people who have left: everything about them is kept here, and Rehire brings them back as they were
     const former = sortStaff(plan.staff.filter((p) => p.left));
@@ -1873,6 +1883,110 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position'))))))));
   }
 
+  // ---------- Time off ----------
+  // Days, weeks or a few hours off, with a reason, whether it is asked for or approved, and a note. Kept on the person
+  // (p.timeOff), so it goes with team files, the location file and your account like everything else about them:
+  //   { id, from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', hours: null (all day) | [start, end] (minutes, each day in the range),
+  //     why: TIME_OFF_WHY key, status: 'requested' | 'approved' | 'denied', note, added: 'YYYY-MM-DD' }
+  // Requested and approved time off count when checking the schedule (a shift on it gets the N/A mark); denied is kept
+  // only as a record. (TIME_OFF_WHY and TIME_OFF_STATUS are in 01-basics.js: loading a plan checks them first.)
+  let timeOffShow = 'upcoming';
+  const timeOffOn = (p, d) => (p.timeOff || []).filter((t) => t.status !== 'denied' && d >= t.from && d <= t.to);
+  const timeOffDays = (t) => Math.round((parseIso(t.to) - parseIso(t.from)) / 864e5) + 1;
+  const timeOffWhen = (t) => {
+    const y = (s) => parseIso(s).getFullYear(), yr = y(t.from) !== new Date().getFullYear() || y(t.to) !== y(t.from) ? `, ${y(t.to)}` : '';
+    const dates = t.from === t.to ? `${dayName(t.from, 'short')} ${shortDate(t.from)}${yr}` : `${dayName(t.from, 'short')} ${shortDate(t.from)} – ${dayName(t.to, 'short')} ${shortDate(t.to)}${yr}`;
+    return dates + (t.hours ? `, ${clock(t.hours[0])} – ${clock(t.hours[1])}` : '');
+  };
+  const timeOffLabel = (t) => `${TIME_OFF_WHY[t.why] || 'Time off'}${t.status === 'requested' ? ' (requested)' : ''}`;
+  // the reason a shift (or, with no shift, the whole day) clashes with time off; '' when it does not
+  function timeOffIssue(p, d, s) {
+    const first = p.name.split(' ')[0];
+    for (const t of timeOffOn(p, d)) {
+      if (!t.hours) return `${first} has time off on ${dayName(d)} ${shortDate(d)}: ${timeOffLabel(t)}${t.note ? ' – ' + t.note : ''}`;
+      if (s && s.start < t.hours[1] && s.end > t.hours[0]) return `${first} has time off ${clock(t.hours[0])} – ${clock(t.hours[1])} on ${dayName(d)} ${shortDate(d)}: ${timeOffLabel(t)}${t.note ? ' – ' + t.note : ''}`;
+    }
+    return '';
+  }
+  const offAllDay = (p, d) => timeOffOn(p, d).some((t) => !t.hours);
+  // shifts already on the schedule inside a stretch of time off
+  const timeOffClashes = (p, t) => Object.keys(plan.shifts).filter((d) => d >= t.from && d <= t.to).flatMap((d) => plan.shifts[d].filter((s) => s.staffId === p.id && (!t.hours || (s.start < t.hours[1] && s.end > t.hours[0]))).map((s) => ({ d, s })));
+
+  function timeOffDialog(p, t) {
+    const today = iso(new Date()), cur = t || { from: today, to: today, hours: null, why: 'vacation', status: 'approved', note: '' };
+    let who = p ? p.id : (sortStaff(plan.staff.filter((x) => !x.left))[0] || {}).id;
+    const people = sortStaff(plan.staff.filter((x) => !x.left || (p && x.id === p.id)));
+    const whoSel = h('select', { class: 'input', disabled: !!t, onchange: (e) => { who = e.target.value; sync(); } }, people.map((x) => h('option', { value: x.id, selected: x.id === who }, `${x.name} (${ROLES[x.role].short})`)));
+    const from = h('input', { class: 'input', type: 'date', value: cur.from }), to = h('input', { class: 'input', type: 'date', value: cur.to });
+    const allDay = h('input', { type: 'checkbox', checked: !cur.hours });
+    const ta = timePicker(cur.hours ? cur.hours[0] : 540, 'Off from'), tb = timePicker(cur.hours ? cur.hours[1] : 780, 'Off until');
+    const hoursRow = h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, ta, '–', tb);
+    const why = h('select', { class: 'input' }, Object.entries(TIME_OFF_WHY).map(([k, l]) => h('option', { value: k, selected: k === cur.why }, l)));
+    let status = cur.status;
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Status' }, Object.entries(TIME_OFF_STATUS).map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(status === k), onclick: (e) => { status = k; seg.querySelectorAll('.btn').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); sync(); } }, l)));
+    const note = h('input', { class: 'input', value: cur.note || '', placeholder: 'Optional, e.g. family wedding out of town; covered by Sam', maxLength: 300 });
+    const drop = h('input', { type: 'checkbox', checked: true }), dropLbl = h('span'), info = h('p', { class: 'hint', style: { margin: 0 } });
+    const read = () => ({ from: from.value, to: to.value < from.value ? from.value : to.value, hours: allDay.checked ? null : [ta.value, tb.value] });
+    const sync = () => {
+      hoursRow.style.display = allDay.checked ? 'none' : '';
+      if (to.value && from.value && to.value < from.value) to.value = from.value;
+      const x = read(), person = staffById(who); if (!person || !x.from) return;
+      const n = status === 'denied' ? 0 : timeOffClashes(person, x).length;
+      dropLbl.textContent = n ? ` Take ${person.name.split(' ')[0]} off ${n} shift${n === 1 ? '' : 's'} already scheduled in this time` : ' No shifts scheduled in this time';
+      drop.disabled = !n;
+      const days = timeOffDays(x);
+      info.textContent = `${days} day${days === 1 ? '' : 's'}${x.hours ? `, ${clock(x.hours[0])} – ${clock(x.hours[1])} each day` : ', all day'}.`;
+    };
+    [from, to].forEach((e) => e.addEventListener('input', sync)); allDay.addEventListener('change', sync);
+    [ta, tb].forEach((tp) => tp.addEventListener('change', sync));
+    sync();
+    const actions = [{ label: 'Cancel' }];
+    if (t) actions.unshift({ label: 'Delete', danger: true, left: true, onClick: () => { change(() => { p.timeOff = p.timeOff.filter((x) => x.id !== t.id); if (!p.timeOff.length) delete p.timeOff; }); toast('Time off deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
+    actions.push({ label: t ? 'Save' : 'Add time off', primary: true, onClick: () => {
+      const person = staffById(who); if (!person) return;
+      const x = read(); if (!x.from) { toast('Pick the first day off.'); return false; }
+      if (x.hours && x.hours[1] <= x.hours[0]) { toast('The time off must end after it starts.'); return false; }
+      const entry = { id: t ? t.id : uid(), ...x, why: why.value, status, note: note.value.trim(), added: t ? t.added : iso(new Date()) };
+      const clash = !drop.disabled && drop.checked ? timeOffClashes(person, entry) : [];
+      change(() => {
+        person.timeOff = (person.timeOff || []).filter((y) => y.id !== entry.id).concat(entry).sort((a, b) => a.from.localeCompare(b.from));
+        clash.forEach(({ d, s }) => { plan.shifts[d] = plan.shifts[d].filter((y) => y.id !== s.id); });
+      });
+      toast(`${person.name}: ${timeOffLabel(entry)}, ${timeOffWhen(entry)}${clash.length ? ` · taken off ${clash.length} shift${clash.length === 1 ? '' : 's'}` : ''}.`);
+    } });
+    modal({ title: t ? `Time off · ${p.name}` : 'Add time off', body: [
+      h('label', { class: 'field' }, h('span', null, 'Who'), whoSel),
+      h('div', { class: 'inline' }, h('label', { class: 'field' }, h('span', null, 'First day off'), from), h('label', { class: 'field' }, h('span', null, 'Last day off'), to)),
+      h('label', { class: 'check' }, allDay, ' All day (untick for just a few hours)'), hoursRow, info,
+      h('label', { class: 'field' }, h('span', null, 'Reason'), why),
+      h('div', { class: 'field' }, h('span', null, 'Status'), seg),
+      h('label', { class: 'field' }, h('span', null, 'Note'), note),
+      h('label', { class: 'check' }, drop, dropLbl),
+      h('p', { class: 'hint' }, 'Requested and approved time off shows on the schedule: a shift on it gets the N/A mark, and the person shows as away under Unscheduled. Denied is kept only as a record.')],
+      actions });
+  }
+
+  // the Staff › Time off section: everyone's time off in date order
+  function timeOffRows() {
+    const today = iso(new Date());
+    const all = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).map((t) => ({ p, t })))
+      .filter(({ t }) => timeOffShow === 'all' || (timeOffShow === 'past' ? t.to < today : t.to >= today))
+      .sort((a, b) => (timeOffShow === 'past' ? b.t.from.localeCompare(a.t.from) : a.t.from.localeCompare(b.t.from)) || a.p.name.localeCompare(b.p.name));
+    const head = ['Name', 'Role', 'When', 'Days', 'Reason', 'Status', 'Note', ''];
+    const rows = all.map(({ p, t }) => h('tr', { style: { opacity: t.status === 'denied' ? 0.55 : 1 } },
+      h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label),
+      h('td', { class: 'nowrap' }, timeOffWhen(t), t.from <= today && t.to >= today ? h('span', { class: 'small', style: { marginLeft: '6px', fontWeight: 700 } }, 'now') : null),
+      h('td', { class: 'num' }, t.hours ? `${timeOffDays(t)} × ${hrs((t.hours[1] - t.hours[0]) / 60)} h` : timeOffDays(t)),
+      h('td', null, TIME_OFF_WHY[t.why] || t.why), h('td', { class: t.status === 'requested' ? 'warn' : '' }, TIME_OFF_STATUS[t.status] || t.status),
+      h('td', { class: 'small' }, t.note || ''),
+      h('td', { class: 'nowrap' }, t.status === 'requested' ? [h('button', { class: 'btn sm primary', title: 'Approve this time off', onclick: () => change(() => { t.status = 'approved'; }) }, 'Approve'), ' ',
+        h('button', { class: 'btn sm', title: 'Deny it (kept as a record)', onclick: () => change(() => { t.status = 'denied'; }) }, 'Deny'), ' '] : null,
+        h('button', { class: 'btn sm', onclick: () => timeOffDialog(p, t) }, 'Edit…'))));
+    const show = h('div', { class: 'seg', role: 'group', 'aria-label': 'Which time off' }, [['upcoming', 'Now and coming up'], ['past', 'Past'], ['all', 'All']].map(([k, l]) => h('button', { type: 'button', class: 'btn sm', 'aria-pressed': String(timeOffShow === k), onclick: () => { timeOffShow = k; render(); } }, l)));
+    const foot = h('tr', null, h('td', { colspan: head.length }, h('div', { class: 'inline' }, h('button', { class: 'btn primary', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null) }, '+ Add time off'), h('span', { class: 'spacer' }), show)));
+    const asked = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today).length), 0);
+    return { head, rows, foot, empty: timeOffShow === 'past' ? 'No past time off.' : 'No time off coming up. Add it with + Add time off, or Time off… on a person.', asked };
+  }
   // ===================================================================
   // Hours by section, and day / week totals
   // ===================================================================
@@ -2409,6 +2523,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const q = { ...x, name: String(x.name).trim() };
       if (!ROLES[q.role]) { q.role = 'TM'; fixes++; }
       if (q.lines !== undefined) { q.lines = Array.isArray(q.lines) ? q.lines.filter((l) => l && Array.isArray(l.days) && Number.isFinite(l.from) && Number.isFinite(l.to)) : []; if (!q.lines.length) delete q.lines; }
+      if (q.timeOff !== undefined) {
+        const ok = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+        q.timeOff = Array.isArray(q.timeOff) ? q.timeOff.filter((t) => t && ok(t.from)).map((t) => ({ id: t.id || uid(), from: t.from, to: ok(t.to) && t.to >= t.from ? t.to : t.from,
+          hours: Array.isArray(t.hours) && Number.isFinite(t.hours[0]) && Number.isFinite(t.hours[1]) && t.hours[1] > t.hours[0] ? [t.hours[0], t.hours[1]] : null,
+          why: TIME_OFF_WHY[t.why] ? t.why : 'other', status: TIME_OFF_STATUS[t.status] ? t.status : 'requested', note: String(t.note || '').slice(0, 300), added: ok(t.added) ? t.added : t.from })) : [];
+        if (!q.timeOff.length) delete q.timeOff;
+      }
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }
       ids.add(q.id);
       return q;

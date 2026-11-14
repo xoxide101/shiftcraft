@@ -62,4 +62,6 @@
   const len = (s) => (s.end - s.start) / 60;
   const snap = (m) => Math.round(m / STEP) * STEP;
   const clampShift = (s) => { s.start = Math.max(DAY_START, Math.min(DAY_END - STEP, s.start)); s.end = Math.max(s.start + STEP, Math.min(DAY_END, s.end)); return s; };
-
+  // Time off reasons and states (used when a plan loads and by the Time off part, 19-time-off.js)
+  const TIME_OFF_WHY = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', appointment: 'Appointment', family: 'Family', school: 'School', bereavement: 'Bereavement', jury: 'Jury duty', other: 'Other' };
+  const TIME_OFF_STATUS = { requested: 'Requested', approved: 'Approved', denied: 'Denied' };

@@ -59,6 +59,8 @@ The Staff tab has four sections:
 - **2 · Weekend** (Saturday and Sunday), kept apart because many people can work any time at the weekend but not on weekdays: their own **usual weekend shift**, hours they can work, AM / MID / PM, and Saturday or Sunday off. Clicking a name under Unscheduled uses the weekday or weekend usual shift to suit the day.
 - **3 · Contact & training:** **email** (✉ writes one), **phone number** (☎ calls) and notes, and **Trained in**: a grid with everyone down the side and the location's positions across the top (names written upwards). Click a box for **Yes** (trained) or **No**; click a position's name to mark everyone, or a person's count to mark every position for them. Totals show how many people are trained in each position.
 - **4 · Day by day:** each day of the week on its own, as on the printed availability list. Click a day for **Any**, **Off**, **Hours** or **A note** (Mornings, Afternoons, Evenings, Emergency, If you ask, or your own words). Hours are ranges: **+ Can work** and **+ Can't work** (e.g. *Open – Close, not 12pm – 1pm*); where they overlap, can't wins. **Highlight** marks a day orange. **From usual** fills the week from the weekday and weekend settings, then you change the odd day. Also **Validated** (availability checked with them) and **Pending training**.
+- **5 · Time off:** days, weeks or just a few hours off for anyone, with a **reason** (vacation, sick, personal, appointment, family, school, bereavement, jury duty, other), **Requested / Approved / Denied** and a **note**. Adding it can take the person off shifts already scheduled in that time. A shift on someone's time off gets the **!** mark, they show as *away* under Unscheduled, and the week table says *off: vacation*. **Time off…** on any person's row adds it for them; requests waiting show on the tab.
+- **Employee ID** and **Shift code** for each person (3 · Contact & training), shown on the Hand-off page for typing into the company's own scheduler.
 - **Visual timeline › This week on 1 page:** the 7 days as small tiles on one page, for reviewing the week at a glance. Each person working that week has a number on their lines, and a **Who is who** legend in the spare space gives the names, so the tiles stay uncluttered.
 - **Print or save** (the printer button in the title bar) now also has **Layout › Availability and contact list**, next to the week table, timeline and calendar, with a **print preview** of the page as it will print, a choice of **paper** (Letter 8.5 × 11, Legal 8.5 × 14 or Tabloid 11 × 17, landscape; the sheet is fitted to the page: enlarged until it fills it, then the rows stretched to fill top to bottom, always one page), and **Save** as **PDF, PNG, JPG or BMP** at the resolution you choose (150 to 1200 DPI), or Print straight to the printer.
 - **Opening an older team file** (saved before positions were carried in the file): if its “trained in” ticks do not match this location's positions, ShiftCraft asks which position each one is, filled in with a guess in the location's order and showing how many are trained in each.
@@ -120,7 +122,8 @@ Chrome or Edge on Windows, macOS or Linux (recent versions). Firefox and Safari 
 
 | File | What it is |
 | --- | --- |
-| `index.html` | The whole app (HTML, CSS and JavaScript in one file, no libraries) |
+| `index.html` | The whole app (HTML, CSS and JavaScript in one file): this is the file you open |
+| `src/`, `build.py` | The source in parts; `python build.py` joins them into `index.html` (for people changing the app) |
 | `README.txt` | The same help in plain text, for people who download only the app |
 | `docs/` | Screenshots for this page |
 | `plans/`, `staff-lists/` | Suggested folders for your saved files (their contents are never uploaded to GitHub) |
@@ -134,7 +137,7 @@ It is a **genuine clean-room build**, not a decompiled or AI-rebuilt copy of any
 - No code, artwork, fonts, icons or data files from any original program were used, and none were given to the AI to work from.
 - ShiftCraft takes ideas from everyday spreadsheet and scheduling tools; only publicly known features and general ideas guided the design. Every line of code and every picture here was made new.
 
-It uses no outside code libraries: everything is in one file.
+Everything it needs is inside the one file; the only outside code is qrcode-generator (Kazuhiko Arase, MIT) for the contact QR codes.
 
 ## Development notes
 

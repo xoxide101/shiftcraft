@@ -72,6 +72,7 @@
   const partWord = (k) => (k === 'we' ? 'weekends' : 'weekdays');
   function availIssue(p, d, s) {
     const first = p.name.split(' ')[0];
+    const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
     const a = avOf(p, avDay(d));
