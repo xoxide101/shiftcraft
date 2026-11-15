@@ -392,7 +392,14 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 }
 
 .ctx-menu button.on { font-weight: 700; }
-.ctx-menu button.on::after { content: "  �3"; }
+.ctx-menu button.on::after { content: "  \2713"; }
+/* Print or save: Week 1 2 3 4 5 of a month */
+.pw-week { display: grid; gap: 1px; text-align: left; line-height: 1.2; padding: 5px 10px; height: auto; min-height: 0; }
+.pw-week span { font-size: 12px; }
+.pw-week small { font-size: 10px; color: var(--muted); }
+.pw-week[aria-pressed="true"] small { color: inherit; }
+.pw-weeks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pw-week[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -4335,11 +4342,32 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let PD = preset.day && planDays().includes(preset.day) ? preset.day : planDays().includes(today) ? today : planDays().includes(ui.day) ? ui.day : plan.startDate;
     const thisW = weekOf(today);
     const wkName = () => (weekOf(PD) === thisW ? 'This week' : `The week of ${shortDate(curWeek())}`);
-    // the Week box (and, for one day of the timeline, the Day box)
+    // the Week chooser: a month (any month, past or ahead, in the plan or not yet), then Week 1 2 3 4 5 of it (each
+    // Monday-to-Sunday week counts in the month its Monday is in, so a month has 4 or 5). Shifts are kept by date, so a week outside the plan prints
+    // what is saved on those days, or a blank sheet to fill in by hand.
+    let shownMonth = mondayOf(PD).slice(0, 7);
+    const inPlan = (mon) => mon >= plan.startDate && mon <= addDays(plan.startDate, plan.weeks * 7 - 1);
+    const monthWeeks = (ym) => { const [y, m] = ym.split('-').map(Number), last = iso(new Date(y, m, 0)), out = []; for (let mon = mondayOf(addDays(ym + '-01', 6)); mon <= last; mon = addDays(mon, 7)) out.push(mon); return out; };
+    const addMonths = (ym, n) => { const [y, m] = ym.split('-').map(Number); return iso(new Date(y, m - 1 + n, 1)).slice(0, 7); };
     const weekSel = () => {
-      const s = h('select', { class: 'input', 'aria-label': 'Week to print', onchange: () => { const off = Math.max(0, weekDays(weekOf(PD)).indexOf(PD)); PD = weekDays(+s.value)[off]; build(); update(); } },
-        Array.from({ length: plan.weeks }, (_, k) => { const ds = weekDays(k); return h('option', { value: k, selected: k === weekOf(PD) }, `Week ${k + 1} · ${dayName(ds[0], 'short')} ${shortDate(ds[0])} – ${dayName(ds[6], 'short')} ${shortDate(ds[6])}${k === thisW ? ' (this week)' : k === thisW + 1 ? ' (next week)' : ''}`); }));
-      return h('label', { class: 'field' }, h('span', null, 'Week'), s);
+      const thisMon = mondayOf(today), pdMon = mondayOf(PD), off = Math.round((parseIso(PD) - parseIso(pdMon)) / 864e5);
+      const months = Array.from({ length: 37 }, (_, k) => addMonths(today.slice(0, 7), k - 18));
+      if (!months.includes(shownMonth)) months.push(shownMonth), months.sort();
+      const msel = h('select', { class: 'input', 'aria-label': 'Month', style: { width: 'auto' }, onchange: () => { shownMonth = msel.value; build(); } },
+        months.map((ym) => h('option', { value: ym, selected: ym === shownMonth }, monthLabel(ym) + (ym === today.slice(0, 7) ? ' (this month)' : ''))));
+      const go = (n) => { shownMonth = addMonths(shownMonth, n); build(); };
+      const weeks = monthWeeks(shownMonth).map((mon, k) => {
+        const tag = mon === thisMon ? 'this week' : mon === addDays(thisMon, 7) ? 'next week' : inPlan(mon) ? (mon < thisMon ? 'past' : 'planned') : mon < thisMon ? 'past · not in plan' : 'not planned yet';
+        return h('button', { type: 'button', class: 'btn pw-week', 'aria-pressed': String(mon === pdMon), title: `${longDate(mon)} – ${longDate(addDays(mon, 6))} (${tag})`,
+          onclick: () => { PD = addDays(mon, off); build(); update(); } },
+          h('b', null, `Week ${k + 1}`), h('span', null, `${shortDate(mon)} – ${shortDate(addDays(mon, 6))}`), h('small', null, tag));
+      });
+      return h('div', { class: 'field', style: { gridColumn: '1 / -1' } }, h('span', null, `Week · printing ${shortDate(pdMon)} – ${shortDate(addDays(pdMon, 6))}`),
+        h('div', { class: 'inline', style: { gap: '6px', flexWrap: 'wrap', alignItems: 'stretch' } },
+          h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Previous month', onclick: () => go(-1) }, '‹'), msel,
+          h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Next month', onclick: () => go(1) }, '›'),
+          h('div', { class: 'pw-weeks', role: 'group', 'aria-label': 'Week of the month' }, weeks),
+          pdMon === thisMon ? null : h('button', { type: 'button', class: 'btn sm', onclick: () => { PD = today; shownMonth = mondayOf(today).slice(0, 7); build(); update(); } }, 'This week')));
     };
     const daySel = () => {
       const s = h('select', { class: 'input', 'aria-label': 'Day to print', onchange: () => { PD = s.value; build(); update(); } }, weekDays(weekOf(PD)).map((d) => h('option', { value: d, selected: d === PD }, `${dayName(d)} ${shortDate(d)}${d === today ? ' (today)' : ''}`)));
@@ -4373,7 +4401,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const RANGES = {
       avail: () => [['all', 'Everyone: one landscape page']],
       cards: () => [['all', `Everyone (${cardPeople('all').length})`], ['phones', `Only people with a phone number (${cardPeople('phones').length})`]],
-      table: () => [['week', `${wkName()} (week ${weekOf(PD) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
+      table: () => [['week', `${wkName()}${inPlan(curWeek()) ? ` (plan week ${weekOf(PD) + 1})` : ''}`], ['all', `All ${plan.weeks} weeks, one page each`]],
       timeline: () => [['day', `One day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', `${wkName()} on 1 page (7 small tiles)`], ['week', `${wkName()}, 7 pages`], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
     };
@@ -4392,7 +4420,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
       if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(notesWhereSel()); return; }
-      box.replaceChildren(
+      // (nulls left out: replaceChildren would write them as the word “null”)
+      box.replaceChildren(...[
         sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
         o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
@@ -4400,12 +4429,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
         sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
         sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
-        sel('dpi', DPI_OPTIONS, 'Resolution (for saving)'));
-      checks.replaceChildren(
+        sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')].filter(Boolean));
+      checks.replaceChildren(...[
         notesWhereSel(),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
         o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
-        o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null);
+        o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     const update = () => {

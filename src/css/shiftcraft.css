@@ -385,4 +385,11 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 }
 
 .ctx-menu button.on { font-weight: 700; }
-.ctx-menu button.on::after { content: "  ¹3"; }
+.ctx-menu button.on::after { content: "  \2713"; }
+/* Print or save: Week 1 2 3 4 5 of a month */
+.pw-week { display: grid; gap: 1px; text-align: left; line-height: 1.2; padding: 5px 10px; height: auto; min-height: 0; }
+.pw-week span { font-size: 12px; }
+.pw-week small { font-size: 10px; color: var(--muted); }
+.pw-week[aria-pressed="true"] small { color: inherit; }
+.pw-weeks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pw-week[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
