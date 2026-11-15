@@ -205,3 +205,9 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 - Every person's row has the same layout: Any time and **+ Some days** on top, the hours below (greyed while Any time is ticked), so ticking or adding never makes one row taller than the rest.
 - **+ Some days** adds a sub-row under the person (↳ Some days · Mon, Wed): its hours sit under *Hours they can work* and its day buttons (blue) under the *Not available* days, so they read straight down. × Remove takes the line away. Two lines make a split day.
 - The buttons at the end of each row stay on one line, so rows are about half as tall as before.
+
+## Row icon buttons
+
+- The buttons at the end of each Staff row are now one matching set of small icon buttons (28 px), with a hover explanation on each: Tasks (a number badge for open tasks), Time off (a dot when time off is now or coming up), Print, Left… and Remove (red on hover).
+- The same set is used for + Some days and its Remove, Day by day (From usual, Clear), the Time off list (Approve, Deny, Edit) and Former staff (Edit, Rehire, Delete).
+- The row is much narrower, so the table fits on a normal screen with less sideways scrolling.

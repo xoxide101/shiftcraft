@@ -242,6 +242,17 @@ table.t th, table.t td { padding: 7px 10px; border: 1px solid var(--line); }
 table.t th { background: var(--panel-2); font-weight: 600; text-align: left; white-space: nowrap; }
 table.t td.c { text-align: center; }
 .nowrap { white-space: nowrap; }
+/* row icon buttons: one small matching set, hover for what each does */
+.ibs { display: inline-flex; gap: 3px; align-items: center; vertical-align: middle; }
+.ib { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); cursor: pointer; flex: none; }
+.ib svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ib svg .fill { fill: currentColor; fill-opacity: .16; }
+.ib:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.ib.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.ib.good { color: var(--good); }
+.ib:disabled { opacity: .35; cursor: default; }
+.ib-badge { position: absolute; top: -5px; right: -5px; min-width: 9px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--accent-ink, #fff); font-size: 10px; font-weight: 700; line-height: 14px; text-align: center; }
+.ib-badge:empty { min-width: 0; width: 8px; height: 8px; padding: 0; top: -3px; right: -3px; }
 table.t tfoot td { font-weight: 700; background: var(--panel-2); }
 table.t .in { width: 110px; text-align: right; }
 table.t td.cellbtn { cursor: pointer; white-space: nowrap; }

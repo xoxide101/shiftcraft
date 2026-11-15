@@ -7,17 +7,18 @@
     const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
-    const actions = (p) => h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Tasks and training', onclick: () => tasksDialog(p) }, `Tasks${openTasks(p) ? ` (${openTasks(p)})` : ''}`), ' ',
-      h('button', { class: 'btn sm', title: 'Days, weeks or a few hours off, with a reason and notes', onclick: () => timeOffDialog(p) }, `Time off${(p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied') ? ' •' : ''}`), ' ',
-      h('button', { class: 'btn sm', title: 'Print this person’s schedule', onclick: () => printPeopleDialog(p.id) }, 'Print'), ' ',
-      h('button', { class: 'btn sm', title: 'Resigned, terminated or left: they come off the schedule and lists, and everything about them is kept under Former staff', onclick: () => leftDialog(p) }, 'Left…'), ' ',
-      h('button', { class: 'btn sm ghost danger-text', onclick: () => {
+    const actions = (p) => { const soon = (p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied'); return h('td', { class: 'nowrap' }, ibs(
+      ib('tasks', `Tasks and training${openTasks(p) ? ` (${openTasks(p)} open)` : ''}`, () => tasksDialog(p), { badge: openTasks(p) }),
+      ib('timeoff', `Time off: days, weeks or a few hours off, with a reason and notes${soon ? ' (has time off now or coming up)' : ''}`, () => timeOffDialog(p), { badge: soon }),
+      ib('print', 'Print this person’s schedule', () => printPeopleDialog(p.id)),
+      ib('left', 'Left… (resigned, terminated or left): they come off the schedule and lists, and everything about them is kept under Former staff', () => leftDialog(p)),
+      ib('trash', `Remove ${p.name}`, () => {
         const n = shiftCount(p.id);
         confirmBox(`Remove ${p.name}?`, n ? `${p.name} has ${n} shift${n === 1 ? '' : 's'} in this plan. They will be removed too. You can undo this.` : 'You can undo this.', 'Remove', () => change(() => {
           plan.staff = plan.staff.filter((x) => x.id !== p.id);
           Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((s) => s.staffId !== p.id); });
         }));
-      } }, 'Remove'));
+      }, { cls: 'danger' }))); };
     // Weekdays or weekend: usual shift, available hours, parts of the day, days off
     const scheduleCells = (p, k) => {
       const st = setOf(p, k);
@@ -37,7 +38,7 @@
         h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b)),
         h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap', marginBottom: '4px' } },
           h('label', { class: 'check small', style: { margin: 0 }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), h('span', { class: 'spacer' }),
-          h('button', { type: 'button', class: 'btn sm', title: 'Other hours on some days only: adds a line under this person where you pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', onclick: () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }) }, '+ Some days')),
+          ib('addTime', '+ Some days: other hours on some days only. Adds a line under this person where you pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }))),
           h('div', { class: 'inline' + (any ? ' dim' : ''), style: { flexWrap: 'nowrap' } }, fa, '–', fb)),
         h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([pk, l]) => {
           const on = st.parts.includes(pk);
@@ -68,7 +69,7 @@
           h('td'),
           h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
             return h('button', { type: 'button', class: 'dt use' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Uses' : 'Does not use'} these hours on ${wd}s (click to change)`, onclick: () => change(() => { l.days = on ? l.days.filter((x) => x !== i) : [...l.days, i].sort(); }) }, k === 'we' ? wd.slice(0, 3) : wd[0]); }))),
-          h('td', { colspan: cols - 6 }, h('button', { type: 'button', class: 'btn sm ghost', title: 'Take these hours away', onclick: () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }) }, '× Remove')));
+          h('td', { colspan: cols - 6 }, ibs(ib('trash', 'Remove this line (take these hours away)', () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }), { cls: 'danger' }))));
       });
     };
     let head, rows, foot = null, empty = null, asked = 0;
@@ -81,8 +82,8 @@
         WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avText(a))); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
-        h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Fill the week from this person’s weekday and weekend settings', onclick: () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); }) }, 'From usual'), ' ',
-          h('button', { class: 'btn sm ghost', title: 'Clear the day-by-day availability', disabled: !Array.isArray(p.avail), onclick: () => change(() => { delete p.avail; }) }, 'Clear'))));
+        h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
+          ib('clear', 'Clear the day-by-day availability', () => change(() => { delete p.avail; }), { disabled: !Array.isArray(p.avail) })))));
     } else if (staffTab === 'contact') {
       head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Email', 'Phone number', 'Notes', ''];
       rows = people.map((p) => {
@@ -150,9 +151,9 @@
         h('tbody', null, former.map((p) => h('tr', null,
           h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label), h('td', { class: 'nowrap' }, p.phone || ''), h('td', null, p.email || ''),
           h('td', null, LEFT_WHY[p.left.why] || p.left.why), h('td', { class: 'nowrap' }, p.left.on ? shortDate(p.left.on) : ''), h('td', { class: 'small' }, p.left.note || ''),
-          h('td', { class: 'nowrap' }, h('button', { class: 'btn sm', title: 'Edit the reason, date or note', onclick: () => leftDialog(p) }, 'Edit…'), ' ',
-            h('button', { class: 'btn sm primary', title: 'Back on the team with everything as it was', onclick: () => change(() => { delete p.left; p.active = true; }) }, 'Rehire'), ' ',
-            h('button', { class: 'btn sm ghost danger-text', title: 'Delete them and their details for good', onclick: () => confirmBox(`Delete ${p.name} for good?`, 'Their details are removed from this plan (shifts already worked are removed too). You can undo this.', 'Delete', () => change(() => { plan.staff = plan.staff.filter((x) => x !== p); Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((x) => x.staffId !== p.id); }); })) }, 'Delete')))))))));
+          h('td', { class: 'nowrap' }, ibs(ib('edit', 'Edit the reason, date or note', () => leftDialog(p)),
+            ib('rehire', 'Rehire: back on the team with everything as it was', () => change(() => { delete p.left; p.active = true; }), { cls: 'good' }),
+            ib('trash', `Delete ${p.name} and their details for good`, () => confirmBox(`Delete ${p.name} for good?`, 'Their details are removed from this plan (shifts already worked are removed too). You can undo this.', 'Delete', () => change(() => { plan.staff = plan.staff.filter((x) => x !== p); Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((x) => x.staffId !== p.id); }); })), { cls: 'danger' }))))))))));
   }
   const LEFT_WHY = { resigned: 'Resigned', terminated: 'Terminated', other: 'Left' };
   // Someone leaving: why, their last day and a note; shifts after the last day can come off the schedule

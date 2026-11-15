@@ -148,9 +148,9 @@
       h('td', { class: 'small nowrap' }, t.asked ? `${shortDate(t.asked)}${t.how && TIME_OFF_HOW[t.how] ? ' · ' + TIME_OFF_HOW[t.how].toLowerCase() : ''}` : ''),
       h('td', { class: 'small' }, t.cover && staffById(t.cover) ? staffById(t.cover).name : ''),
       h('td', { class: 'small' }, t.note || ''),
-      h('td', { class: 'nowrap' }, t.status === 'requested' ? [h('button', { class: 'btn sm primary', title: 'Approve this time off', onclick: () => approveTimeOff(p, t) }, 'Approve'), ' ',
-        h('button', { class: 'btn sm', title: 'Deny it (kept as a record)', onclick: () => denyTimeOff(t) }, 'Deny'), ' '] : null,
-        h('button', { class: 'btn sm', onclick: () => timeOffDialog(p, t) }, 'Edit…'))));
+      h('td', { class: 'nowrap' }, ibs(t.status === 'requested' ? [ib('approve', 'Approve this time off', () => approveTimeOff(p, t), { cls: 'good' }),
+        ib('deny', 'Deny it (kept as a record)', () => denyTimeOff(t), { cls: 'danger' })] : null,
+        ib('edit', 'Edit this time off (or delete it)', () => timeOffDialog(p, t))))));
     const show = h('div', { class: 'seg', role: 'group', 'aria-label': 'Which time off' }, [['upcoming', 'Now and coming up'], ['past', 'Past'], ['all', 'All']].map(([k, l]) => h('button', { type: 'button', class: 'btn sm', 'aria-pressed': String(timeOffShow === k), onclick: () => { timeOffShow = k; render(); } }, l)));
     const foot = h('tr', null, h('td', { colspan: head.length }, h('div', { class: 'inline' }, h('button', { class: 'btn primary', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null) }, '+ Add time off'),
       h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Someone asks for a day (or days, or a few hours) off: kept as Requested until you approve it', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Time off request'),

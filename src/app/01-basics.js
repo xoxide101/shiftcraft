@@ -27,6 +27,29 @@
     for (const k of kids.flat(Infinity)) if (k != null && k !== false) e.append(k.nodeType ? k : String(k));
     return e;
   }
+  // Small icon buttons for the rows of tables, one matching set; the title is the hover explanation (and the screen-reader name)
+  const ROW_ICONS = {
+    tasks: '<path d="m4 6 1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/>',
+    timeoff: '<rect x="3" y="5" width="18" height="16" rx="2" class="fill"/><path d="M3 10h18M8 3v4M16 3v4M9.5 13.5l5 5M14.5 13.5l-5 5"/>',
+    print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2" class="fill"/><path d="M7 14h10v7H7Z"/>',
+    left: '<path d="M13 4H5v16h8" class="fill"/><path d="M10 12h11M17 8l4 4-4 4"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    addTime: '<circle cx="10" cy="12" r="7" class="fill"/><path d="M10 8v4l2.5 1.5M19 4v6M16 7h6"/>',
+    wand: '<path d="m4 20 11-11"/><path d="m13 7 2-2 4 4-2 2Z" class="fill"/><path d="M19 3v3M17.5 4.5h3M7 4v2M6 5h2"/>',
+    clear: '<path d="m7 21-4-4 10-10 8 8-6 6Z" class="fill"/><path d="M11 9l6 6M7 21h13"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16Z" class="fill"/><path d="m13 7 4 4"/>',
+    rehire: '<circle cx="10" cy="8" r="4" class="fill"/><path d="M3 21c1-4 3.8-6 7-6s4.5 1 5.5 2.5M19 13v7M15.5 16.5h7"/>',
+    approve: '<path d="m5 12 4 4 10-10"/>',
+    deny: '<path d="M6 6l12 12M18 6 6 18"/>',
+  };
+  // ib('trash', 'Remove Dana', () => ..., { cls: 'danger', badge: 3, disabled })
+  function ib(icon, title, onclick, o = {}) {
+    const b = h('button', { type: 'button', class: 'ib' + (o.cls ? ' ' + o.cls : ''), title, 'aria-label': title, disabled: !!o.disabled, onclick });
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ROW_ICONS[icon] || ''}</svg>`;
+    if (o.badge) b.append(h('span', { class: 'ib-badge' }, o.badge === true ? '' : String(o.badge)));
+    return b;
+  }
+  const ibs = (...btns) => h('div', { class: 'ibs' }, btns);
   const uid = () => Math.random().toString(36).slice(2, 10);
   const money = (n) => (n == null || isNaN(n) ? '—' : '$' + Math.round(n).toLocaleString());
   const hrs = (n) => (Math.round(n * 10) / 10).toFixed(1);
