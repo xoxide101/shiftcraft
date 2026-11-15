@@ -32,9 +32,13 @@
       fa.addEventListener('change', () => saveWin('from')); fb.addEventListener('change', () => saveWin('to'));
       const anyBox = h('input', { type: 'checkbox', checked: any, onchange: (e) => change(() => setSet(p, k, e.target.checked ? { from: null, to: null } : { from: Math.max(DAY_START, st.start - 60), to: Math.min(DAY_END, st.end + 60) })) });
       const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
+      // the same two lines in every row, so the table stays lined up: Any time and + Some days, then the hours (greyed for Any time)
       return [
         h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b)),
-        h('td', null, h('label', { class: 'check small', style: { marginBottom: any ? 0 : '4px' }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), any ? null : h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb), linesBox(p, k, dayIdx)),
+        h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap', marginBottom: '4px' } },
+          h('label', { class: 'check small', style: { margin: 0 }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), h('span', { class: 'spacer' }),
+          h('button', { type: 'button', class: 'btn sm', title: 'Other hours on some days only: adds a line under this person where you pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', onclick: () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }) }, '+ Some days')),
+          h('div', { class: 'inline' + (any ? ' dim' : ''), style: { flexWrap: 'nowrap' } }, fa, '–', fb)),
         h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([pk, l]) => {
           const on = st.parts.includes(pk);
           return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${pk === 'am' ? 'opening to ' + clock(plan.midStart) : pk === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to closing'} on ${partWord(k)} (click to change)`,
@@ -47,22 +51,25 @@
         }))),
       ];
     };
-    // hours on some days (split shifts): each line its own days and hours; + adds another
-    const linesBox = (p, k, dayIdx) => {
+    // hours on some days (split shifts): each line is its own sub-row under the person, lined up with the columns above:
+    // the hours under "Hours they can work" and the days under the day buttons, so nothing in the person's row moves
+    const lineRows = (p, k, cols) => {
+      const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
       const mine = (p.lines || []).filter((l) => (l.tab || (l.days.some((x) => x >= 5) ? 'we' : 'wk')) === k);
-      const row = (l) => {
+      return mine.map((l, j) => {
         const fa = timePicker(l.from, 'From'), fb = timePicker(l.to, 'Until');
         const save = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => { l.from = f; l.to = t; }); };
         fa.addEventListener('change', () => save('from')); fb.addEventListener('change', () => save('to'));
-        return h('div', { class: 'availline', title: 'On the days picked, they can work these hours (add another line for a split day)' },
-          h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
-            return h('button', { type: 'button', class: 'dt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Uses' : 'Does not use'} these hours on ${wd}s (click to change)`, onclick: () => change(() => { l.days = on ? l.days.filter((x) => x !== i) : [...l.days, i].sort(); }) }, k === 'we' ? wd.slice(0, 3) : wd[0]); })),
-          h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb),
-          h('button', { type: 'button', class: 'btn sm ghost', title: 'Take these hours away', onclick: () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }) }, '×'));
-      };
-      const st = setOf(p, k);
-      return h('div', { class: 'availlines' }, mine.map(row),
-        h('button', { type: 'button', class: 'btn sm', title: 'Hours on some days only: pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', onclick: () => change(() => { (p.lines = p.lines || []).push({ tab: k, days: [], from: st.from ?? st.start, to: st.to ?? st.end }); }) }, '+ Hours on some days'));
+        const days = l.days.filter((i) => dayIdx.includes(i)).map((i) => WEEKDAYS[i].slice(0, 3));
+        return h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 }, title: `${p.name}: on the days picked, they can work these hours (add another line for a split day)` },
+          h('td', { colspan: 2, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), `Some days ${mine.length > 1 ? j + 1 : ''}`, h('span', { class: 'muted' }, days.length ? ` · ${days.join(', ')}` : ' · pick the days →')),
+          h('td'),
+          h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb)),
+          h('td'),
+          h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
+            return h('button', { type: 'button', class: 'dt use' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Uses' : 'Does not use'} these hours on ${wd}s (click to change)`, onclick: () => change(() => { l.days = on ? l.days.filter((x) => x !== i) : [...l.days, i].sort(); }) }, k === 'we' ? wd.slice(0, 3) : wd[0]); }))),
+          h('td', { colspan: cols - 6 }, h('button', { type: 'button', class: 'btn sm ghost', title: 'Take these hours away', onclick: () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }) }, '× Remove')));
+      });
     };
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
@@ -95,14 +102,15 @@
     } else {
       const k = staffTab;
       head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift`, 'Hours they can work', 'Can work', 'Not available', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
-      rows = people.map((p) => {
+      rows = people.flatMap((p) => {
         const extra = [];
         if (k === 'wk') {
           const max = h('input', { class: 'input', type: 'number', min: 0, max: 80, value: p.maxHours || '', style: { width: '70px' }, 'aria-label': 'Max hours per week (the whole week)' });
           max.addEventListener('change', () => change(() => { p.maxHours = +max.value || 0; }));
           extra.push(h('td', null, max), h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.active, 'aria-label': 'Active', onchange: (e) => change(() => { p.active = e.target.checked; }) })));
         }
-        return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), ...scheduleCells(p, k), ...extra, actions(p));
+        const subs = lineRows(p, k, head.length);
+        return [h('tr', { class: subs.length ? 'has-sub' : '', style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), ...scheduleCells(p, k), ...extra, actions(p)), ...subs];
       });
     }
     const newName = h('input', { class: 'input', placeholder: 'Full name', 'aria-label': 'New person name', style: { width: '100%' } });
@@ -116,7 +124,7 @@
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
-    const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
+    const hint = { wk: 'Weekdays (Monday to Friday). The usual shift is what a person gets when you click their name under Unscheduled. Hours they can work: untick Any time and set the hours they are free on weekdays; + Some days adds a line under the person for other hours on the days you pick (two lines make a split day). Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',

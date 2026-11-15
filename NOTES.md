@@ -199,3 +199,9 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 - Save everything (the location file) now also carries this browser's own choices as `prefs`: every `shiftcraft…` localStorage key except the plan itself, `-ui`, `-account`, `-seen` and `-place` (theme, picture and print choices, availability list paper, quick access bar, ribbon, Staff section, Start window). Opening the file puts them back; theme and Staff section at once, the rest after the restart the message offers.
 - **On the schedule:** requested and approved time off are checked first in `availIssue` (`timeOffIssue`), so a clashing shift gets the N/A / ! mark everywhere (schedule bars, week table, timeline and calendar sheets, Check schedule). Unscheduled chips show "away" (all day) or "off 9a–1p"; the week table shows "off: vacation". Denied is a record only.
 - Tested (real clicks, Example plan): 3 days of vacation took the person off their shift; a requested 9–1 appointment kept the shift with the mark and the note; Approve; reload kept both; IDs on Hand-off.
+
+## Staff table: lined up
+
+- Every person's row has the same layout: Any time and **+ Some days** on top, the hours below (greyed while Any time is ticked), so ticking or adding never makes one row taller than the rest.
+- **+ Some days** adds a sub-row under the person (↳ Some days · Mon, Wed): its hours sit under *Hours they can work* and its day buttons (blue) under the *Not available* days, so they read straight down. × Remove takes the line away. Two lines make a split day.
+- The buttons at the end of each row stay on one line, so rows are about half as tall as before.
