@@ -379,6 +379,20 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cal-hrs { font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-hrs.special { color: var(--fg); font-weight: 700; }
 .cal-hrs.closed { color: var(--bad); font-weight: 700; }
+/* numbered notes when the Calendar is printed (29-page-notes.js): the numbers and the list show only on paper */
+.cal-n, .cal-pnotes { display: none; }
+@media print {
+  .cal-n { display: inline; font-weight: 700; }
+  .cal-nmore { display: block; font-size: 10px; }
+  .cal-pnotes { display: block; margin-top: 10px; color: #000; }
+  .cal-pnotes.sep { break-before: page; page-break-before: always; }
+  .cal-pnotes h3 { margin: 0 0 6px; font-size: 14px; }
+  .cal-pnlist { columns: 2; column-gap: 24px; font-size: 11px; line-height: 1.4; }
+  .cal-pnlist > div { break-inside: avoid; }
+}
+
+.ctx-menu button.on { font-weight: 700; }
+.ctx-menu button.on::after { content: "  �3"; }
 </style>
 </head>
 <body>
@@ -1841,20 +1855,23 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
 
   // ---------- What the availability and contact list adds from the newer parts ----------
   // in the last column: school (while the term is on or coming) and time off in the next 8 weeks
-  function comingUpLines(p) {
+  // book: give each entry its number for the numbered notes (16-contact-sheet.js, 29-page-notes.js)
+  function comingUpLines(p, book) {
+    const num = (t) => (book ? supNum(book.add(noteKey.to(p, t), noteTimeOff(p, t))) : '');
     const today = iso(new Date()), until = addDays(today, 56), out = [];
     const sc = p.school;
     if (sc && sc.on !== false && (!sc.to || sc.to >= today)) out.push(`School${sc.name ? ': ' + sc.name : ''}${sc.to ? ` (to ${shortDate(sc.to)})` : ''}`);
     const off = (p.timeOff || []).filter((t) => t.status !== 'denied' && t.to >= today && t.from <= until);
-    off.slice(0, 3).forEach((t) => out.push(`${t.from === t.to ? shortDate(t.from) : `${shortDate(t.from)}–${shortDate(t.to)}`}${t.hours ? ` ${clockShort(t.hours[0])}–${clockShort(t.hours[1])}` : ''} ${(TIME_OFF_WHY[t.why] || 'off').toLowerCase()}${t.status === 'requested' ? ' (asked)' : ''}`));
-    if (off.length > 3) out.push(`+${off.length - 3} more time off`);
+    off.slice(0, 3).forEach((t) => out.push(`${t.from === t.to ? shortDate(t.from) : `${shortDate(t.from)}–${shortDate(t.to)}`}${t.hours ? ` ${clockShort(t.hours[0])}–${clockShort(t.hours[1])}` : ''} ${(TIME_OFF_WHY[t.why] || 'off').toLowerCase()}${t.status === 'requested' ? ' (asked)' : ''}${num(t)}`));
+    if (off.length > 3) out.push(`+${off.length - 3} more time off${book ? ' ' + off.slice(3).map(num).join(',') : ''}`);
     return out;
   }
   // under the table: special store hours and events in the next 8 weeks
-  function storeComingUp() {
+  function storeComingUp(book) {
+    const num = (key, text) => (book ? ' ' + supNum(book.add(key, text)) : '');
     const today = iso(new Date()), until = addDays(today, 56), on = (x) => x.to >= today && x.from <= until;
-    const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}`);
-    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}`);
+    const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}${num(noteKey.sp(x), noteSpecial(x))}`);
+    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}${num(noteKey.ev(x), noteEvent(x))}`);
     return { sp, ev };
   }
   // ---- the availability and contact list (a printout for the wall or the office)
@@ -1921,7 +1938,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
     return c;
   }
-  function availabilitySheet() {
+  // the numbered notes: a list in two columns (under the sheet), or a page of their own
+  const alNotesList = (list, size = '8pt') => h('div', { class: 'al-noteslist', style: { columns: 2, columnGap: '24px', fontSize: size, lineHeight: 1.35 } }, list.map((n) => h('div', { style: { breakInside: 'avoid' } }, h('b', null, n.n + '. '), n.text)));
+  const alNotesPage = (list) => h('div', { style: { color: '#000', background: '#fff', fontFamily: 'Arial, Helvetica, sans-serif' } },
+    h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · availability and contact list: notes`), alNotesList(list, '10pt'));
+  // where: where the numbered notes go (29-page-notes.js); a separate page comes back as sheet.notesPage
+  function availabilitySheet(where = notesWhere) {
+    const book = where === 'off' ? null : noteBook();
     const now = new Date(), pad = (n) => String(n).padStart(2, '0');
     const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
     const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
@@ -1936,7 +1959,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
         // the hours themselves, one stretch a line (split days stacked), and school class times
         WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }),
-        h('td', { class: 'al-note' }, comingUpLines(p).map((t) => h('div', null, t))));
+        h('td', { class: 'al-note' }, comingUpLines(p, book).map((t) => h('div', null, t))));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
@@ -1967,6 +1990,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-notehead { border: 1px solid #000; background: #d9d9d9; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 9pt; }
         .al-foot { margin-top: 8px; font-size: 8.5pt; line-height: 1.3; }
         .al-foot b { margin-right: 4px; }
+        .al-notes { margin-top: 6px; }
+        .al-notes > b { display: block; font-size: 9pt; margin-bottom: 2px; }
       `),
       h('table', null,
         h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '150px' } })),
@@ -1980,7 +2005,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
         }))),
       // special store hours and events coming up (from the Calendar)
-      (() => { const { sp, ev } = storeComingUp(), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
+      (() => { const { sp, ev } = storeComingUp(book), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })(),
+      where === 'page' && book && book.list.length ? h('div', { class: 'al-notes' }, h('b', null, 'Notes'), alNotesList(book.list)) : null);
+    if (where === 'separate' && book && book.list.length) sheet.notesPage = alNotesPage(book.list);
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
@@ -2012,8 +2039,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // The availability sheet as a picture at a resolution: the page (paper size, landscape) drawn through SVG, as Print
   // screen does; dpi 96 = the screen's size
-  async function availabilityCanvas(paper, dpi) {
-    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
+  // el: another page to draw instead (the notes page)
+  async function availabilityCanvas(paper, dpi, el) {
+    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = el || availabilitySheet(); if (!el) fitAvailability(sh, pg);
     const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
     const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
@@ -2021,24 +2049,30 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
     const g = c.getContext('2d'); if (!g) throw new Error('too big');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-    return { canvas: c, svg, pg };
+    return { canvas: c, svg, pg, sheet: sh };
   }
   // A one-page PDF holding a JPEG picture of the page, wIn × hIn inches: written by hand (header, catalogue, page, image,
   // drawing, cross-reference table), so no library is needed
-  async function pdfFromCanvas(c, wIn, hIn) {
-    const jpg = new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))).arrayBuffer());
+  async function pdfFromCanvas(cs, wIn, hIn) {
+    cs = Array.isArray(cs) ? cs : [cs];
+    const jpgs = [];
+    for (const c of cs) jpgs.push(new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))).arrayBuffer()));
     const W = (wIn * 72).toFixed(2), H = (hIn * 72).toFixed(2), enc = new TextEncoder(), parts = [], offs = []; let len = 0;
     const put = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
     const obj = (n, body) => { offs[n] = len; put(`${n} 0 obj\n`); body(); put('\nendobj\n'); };
-    const draw = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    const draw = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`, total = 3 + 3 * cs.length;
     put('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
     obj(1, () => put('<< /Type /Catalog /Pages 2 0 R >>'));
-    obj(2, () => put('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
-    obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
-    obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); put(jpg); put('\nendstream'); });
-    obj(5, () => put(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+    obj(2, () => put(`<< /Type /Pages /Kids [${cs.map((_, k) => `${3 + 3 * k} 0 R`).join(' ')}] /Count ${cs.length} >>`));
+    // each page: the page, its picture, its drawing
+    cs.forEach((c, k) => {
+      const pn = 3 + 3 * k;
+      obj(pn, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${pn + 1} 0 R >> >> /Contents ${pn + 2} 0 R >>`));
+      obj(pn + 1, () => { put(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgs[k].length} >>\nstream\n`); put(jpgs[k]); put('\nendstream'); });
+      obj(pn + 2, () => put(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+    });
     const xref = len;
-    put(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => String(offs[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    put(`xref\n0 ${total}\n0000000000 65535 f \n${Array.from({ length: total - 1 }, (_, k) => String(offs[k + 1]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
     return new Blob(parts, { type: 'application/pdf' });
   }
   async function saveAvailability(o) {
@@ -2046,11 +2080,15 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const big = tooBig(Math.round(pg.W * dpi), Math.round(pg.H * dpi)), useDpi = big ? 300 : dpi;
     toast('Making the availability list…');
     try {
-      const { canvas } = await availabilityCanvas(o.availPaper, useDpi);
+      const { canvas, sheet } = await availabilityCanvas(o.availPaper, useDpi);
+      // the numbered notes on a page of their own: a second page in the PDF, or a second picture
+      const notes = sheet.notesPage ? (await availabilityCanvas(o.availPaper, useDpi, sheet.notesPage)).canvas : null;
       const name = `${fileStem('availability and contact list')}.${fmt}`;
-      const blob = fmt === 'pdf' ? await pdfFromCanvas(canvas, pg.W, pg.H) : await canvasBlob(canvas, { format: fmt, dpi: useDpi });
+      const blob = fmt === 'pdf' ? await pdfFromCanvas(notes ? [canvas, notes] : canvas, pg.W, pg.H) : await canvasBlob(canvas, { format: fmt, dpi: useDpi });
       const type = fmt === 'pdf' ? { description: 'PDF document', accept: { 'application/pdf': ['.pdf'] } } : { description: fmt.toUpperCase() + ' image', accept: { [fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt]: ['.' + fmt] } };
-      const n = await saveMany([{ name, blob, type }]);
+      const files = [{ name, blob, type }];
+      if (notes && fmt !== 'pdf') files.push({ name: name.replace(/\.\w+$/, ` notes.${fmt}`), blob: await canvasBlob(notes, { format: fmt, dpi: useDpi }), type });
+      const n = await saveMany(files);
       if (n) toast(`Saved ${name}${big ? ` (at 300 DPI: ${dpi} DPI on this paper is more than a browser can draw)` : ''}`);
     } catch (e) { toast('That could not be made: ' + e.message); }
   }
@@ -2071,6 +2109,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const pg = availPaper(availPaperPref);
     area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: 0.4in; box-sizing: border-box; }`), sheet);
     fitAvailability(sheet, pg); $('#print-area').append(sheet);
+    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: '0.4in' } }, sheet.notesPage));
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
@@ -2622,7 +2661,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
-        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see', () => window.print())))),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the numbered notes go)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
       h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
         show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
@@ -2638,7 +2677,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('button', { class: 'btn sm', title: 'Save time off, store hours and events as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'))));
     if (isList) { main.append(calListCard(shown, today, mFirst, mLast), usualHoursCard()); return; }
 
-    // the month, Monday first
+    // the month, Monday first. Printed, every entry gets a number (in date order) and the numbered notes say what it is,
+    // under the month or on a page of their own (29-page-notes.js); on screen the colours do that
+    const pbook = noteBook();
+    const numOf = (it) => (it.kind === 'special' ? pbook.add(noteKey.sp(it.x), noteSpecial(it.x)) : it.kind === 'event' ? pbook.add(noteKey.ev(it.x), noteEvent(it.x)) : pbook.add(noteKey.to(it.p, it.t), noteTimeOff(it.p, it.t)));
+    const chipN = (it) => { const c = calChip(it); if (notesWhere !== 'off') c.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' ')); return c; };
     const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
     const MAX = 6;
     const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
@@ -2651,13 +2694,22 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
         st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : `${clockShort(st.open)}–${clockShort(st.close)}`) : null,
-        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(calChip),
-        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null);
+        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(chipN),
+        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null,
+        // printed: the ones that don't fit as numbers only
+        its.length > MAX && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, its.slice(MAX - 1).map((it) => supNum(numOf(it))).join(',')) : null);
     })));
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+    if (notesWhere !== 'off' && pbook.list.length) main.append(h('div', { class: 'cal-pnotes' + (notesWhere === 'separate' ? ' sep' : '') }, h('h3', null, `Notes · ${monthLabel(cal.ym)}`),
+      h('div', { class: 'cal-pnlist' }, pbook.list.map((n) => h('div', null, h('b', null, n.n + '. '), n.text)))));
     main.append(usualHoursCard());
+  }
+  // the Calendar's print button: where the numbered notes go, then print
+  function calPrintMenu(x, y) {
+    const go = (v) => () => { setNotesWhere(v); render(); setTimeout(() => window.print(), 80); };
+    popMenu(x, y, 'Print the calendar', [['Numbered notes under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Numbered notes on a separate page', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No numbered notes', go('off'), notesWhere === 'off' ? 'on' : '']]);
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {
@@ -3607,22 +3659,94 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
 
   // ===================================================================
-  // Notes on printed pages
+  // Notes on printed pages: numbered
   // ===================================================================
-  const notesFor = (days) => days.flatMap((d) => shiftsOn(d).filter((s) => s.note).sort((a, b) => a.start - b.start).map((s) => ({ d, s, p: staffById(s.staffId) })));
+  // On screen colours and chips tell things apart (special store hours, events, time off and requests, notes on shifts).
+  // Printed, the sheet carries small numbers instead (¹ ²) and a numbered list says what each one is. Where the list goes
+  // is one choice for every printout (notesWhere, kept in this browser):
+  //   'page'     under the sheet, numbered from 1 on each page
+  //   'separate' on its own page after the sheets, one list for the whole printout (a number means the same on every page)
+  //   'off'      no numbers and no list
+  const NOTES_WHERE_KEY = KEY + '-print-notes';
+  const NOTES_WHERE = [['page', 'Numbered notes under the sheet'], ['separate', 'Numbered notes on a separate page'], ['off', 'No numbered notes']];
+  let notesWhere = 'page';
+  try { const v = localStorage.getItem(NOTES_WHERE_KEY); if (NOTES_WHERE.some(([k]) => k === v)) notesWhere = v; } catch (e) { /* blocked */ }
+  const setNotesWhere = (v) => { notesWhere = v; try { localStorage.setItem(NOTES_WHERE_KEY, v); } catch (e) { /* blocked */ } };
+  const SUPS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  const supNum = (n) => String(n).replace(/\d/g, (c) => SUPS[c]);
+  const supList = (ns) => (ns && ns.length ? ' ' + ns.map(supNum).join(',') : '');
+  // the numbers given out for one printout (or one page)
+  function noteBook() {
+    const keys = new Map(), list = [];
+    return { list, add(key, text) { if (!keys.has(key)) { list.push({ n: list.length + 1, text }); keys.set(key, list.length); } return keys.get(key); } };
+  }
+  // the texts, the same wherever they are printed
+  const noteSpecial = (sp) => `${datesOnly(sp)} · ${sp.name || 'Special store hours'}: store ${sp.closed ? 'closed all day' : `open ${clock(sp.open)} – ${clock(sp.close)}`}${sp.note ? ' — ' + sp.note : ''}`;
+  const noteEvent = (x) => `${datesOnly(x)}${x.hours ? `, ${clock(x.hours[0])} – ${clock(x.hours[1])}` : ''} · ${x.title}${x.note ? ' — ' + x.note : ''}`;
+  const noteTimeOff = (p, t) => `${timeOffWhen(t)} · ${p.name}: ${timeOffLabel(t).toLowerCase()}${t.note ? ' — ' + t.note : ''}`;
+  const noteKey = { sp: (x) => 'sp' + x.id, ev: (x) => 'ev' + x.id, to: (p, t) => 'to' + (t.id || p.id + t.from) };
+  // numbers for some days: special store hours and events (on the day), time off (on the person and day), notes on shifts
+  // o.book: share the numbers across pages; o.numbered: where the list goes (notesWhere when not given)
+  function notesFor(days, o = {}) {
+    const where = o.numbered || notesWhere, book = o.book || noteBook(), on = where !== 'off';
+    const dayN = new Map(), personN = new Map(), shiftN = new Map(), mine = new Set();
+    const take = (key, text) => { const n = book.add(key, text); mine.add(n); return n; };
+    const push = (m, k, n) => { if (!m.has(k)) m.set(k, []); if (!m.get(k).includes(n)) m.get(k).push(n); };
+    if (on) days.forEach((d) => {
+      const sp = specialOn(d);
+      if (sp) push(dayN, d, take(noteKey.sp(sp), noteSpecial(sp)));
+      eventsOn(d).forEach((x) => push(dayN, d, take(noteKey.ev(x), noteEvent(x))));
+      plan.staff.filter((p) => !p.left).forEach((p) => timeOffOn(p, d).forEach((t) => push(personN, p.id + '|' + d, take(noteKey.to(p, t), noteTimeOff(p, t)))));
+      shiftsOn(d).filter((s) => s.note).sort((a, b) => a.start - b.start).forEach((s) => {
+        const p = staffById(s.staffId);
+        shiftN.set(s, take('sh' + (s.id || d + s.staffId + s.start), `${dayName(d, 'short')} ${usDate(d).slice(0, 5)} · ${p ? p.name : '?'} (${clock(s.start)}–${clock(s.end)}): ${s.note}`));
+      });
+    });
+    return {
+      book, on, where,
+      // the list to print with this page (empty when it goes on its own page or is left out)
+      list: where === 'page' ? [...mine].sort((a, b) => a - b).map((n) => book.list[n - 1]) : [],
+      day: (d) => supList(dayN.get(d)), person: (id, d) => supList(personN.get(id + '|' + d)), personHas: (id, d) => personN.has(id + '|' + d),
+      shift: (s) => (shiftN.has(s) ? ' ' + supNum(shiftN.get(s)) : ''),
+    };
+  }
   // Writes the notes on ruled lines, then leaves the rest of the lines blank for handwriting.
   function drawNotes(text, line, list, M, CW, y, bottom, inch, pt, gap = 0.3) {
     text('Notes', M, y + pt(10), 'left', 11, '700');
     let ly = y + inch(0.45);
     list.forEach((n) => {
       if (ly > bottom) return;
-      text(`${dayName(n.d, 'short')} ${usDate(n.d).slice(0, 5)}  ·  ${n.p.name} (${clock(n.s.start)}–${clock(n.s.end)}):  ${n.s.note}`, M + pt(3), ly - pt(4), 'left', 9, '400', '#000', CW - pt(6));
+      text(`${n.n}.`, M + pt(16), ly - pt(4), 'right', 9, '700');
+      text(n.text, M + pt(22), ly - pt(4), 'left', 9, '400', '#000', CW - pt(25));
       line(M, ly, M + CW, ly, 0.5, '#bbb');
       ly += inch(gap);
     });
     for (; ly < bottom; ly += inch(gap)) line(M, ly, M + CW, ly, 0.5, '#bbb');
   }
-
+  // the separate notes page(s) after the sheets: the whole printout's list, as many pages as it takes
+  function drawNotesPages(book, o) {
+    let [pw, ph] = PAPERS[o.paper] || PAPERS.letter;
+    if (o.orient === 'landscape') [pw, ph] = [ph, pw];
+    const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), gap = 0.3, M = 0.45 * dpi;
+    const per = Math.max(1, Math.floor((H - 2 * M - 0.9 * dpi) / (gap * dpi)) - 1), pages = [];
+    for (let k = 0; k * per < book.list.length || k === 0; k++) {
+      const c = makeSurface(W, H, o), g = c.getContext('2d');
+      const pt = (n) => n / 72 * dpi, inch = (n) => n * dpi;
+      const text = (s, x, y, align = 'left', size = 9, weight = '400', col = '#000', maxW) => {
+        g.font = `${weight} ${pt(size)}px Arial, Helvetica, sans-serif`; g.fillStyle = col; g.textAlign = align;
+        let str = String(s); if (maxW) while (str.length > 1 && g.measureText(str).width > maxW) str = str.slice(0, -2) + '…';
+        g.fillText(str, x, y); g.textAlign = 'left';
+      };
+      const line = (x1, y1, x2, y2, wpt, col) => { g.strokeStyle = col; g.lineWidth = pt(wpt); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+      const n = Math.ceil(book.list.length / per);
+      text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, M + pt(18), 'left', 18, '700');
+      text(`Notes for the pages before${n > 1 ? ` · ${k + 1} of ${n}` : ''}`, W - M, M + pt(18), 'right', 10, '400', '#444');
+      drawNotes(text, line, book.list.slice(k * per, (k + 1) * per), M, W - 2 * M, M + pt(34), H - M, inch, pt, gap);
+      pages.push(c);
+    }
+    return pages;
+  }
   // ===================================================================
   // Schedule files for any span of days (a day, a week, weeks, a month)
   // ===================================================================
@@ -3764,7 +3888,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       ['Hours variance', (d) => (varianceHours(d) == null ? '—' : signed(varianceHours(d))), signed(weekTotal(dayHours) - weekTotal(targetHours))],
     ];
     const headH = pt(30);
-    const noteList = notesFor(days);
+    const nb = notesFor(days, o), noteList = nb.list;
     let notesH = o.notes || noteList.length ? Math.max(inch(1.2), inch(0.32) * (noteList.length + 1.6)) : 0;
     let avail = H - M - y - notesH - headH;
     const n = rows.length + foot.length;
@@ -3789,7 +3913,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     g.fillStyle = '#222'; g.fillRect(M, y, CW, headH);
     const mid = (hh) => y + hh / 2 + pt(cellPt) * 0.35;
     text('Name', M + pt(6), mid(headH), 'left', cellPt + 0.5, '700', '#fff');
-    days.forEach((d, i) => { text(`${dayName(d, 'short')} ${parseIso(d).getMonth() + 1}/${parseIso(d).getDate()}`, colX(i) + dayW / 2, mid(headH), 'center', cellPt + 0.5, '700', '#fff'); });
+    days.forEach((d, i) => { text(`${dayName(d, 'short')} ${parseIso(d).getMonth() + 1}/${parseIso(d).getDate()}${nb.day(d)}`, colX(i) + dayW / 2, mid(headH), 'center', cellPt + 0.5, '700', '#fff'); });
     text('Hours', M + CW - pt(6), mid(headH), 'right', cellPt + 0.5, '700', '#fff');
     y += headH;
     rows.forEach((r) => {
@@ -3802,7 +3926,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         text(ROLES[p.role].short, M + nameW - pt(6), mid(rowH), 'right', cellPt - 1.5, '400', '#555');
         days.forEach((d, i) => {
           const ss = shiftsOf(p, d), k = ss.length;
-          ss.forEach((s, j) => text(`${clock(s.start, true)}–${clock(s.end, true)}${s.note ? ' *' : ''}`, colX(i) + dayW / 2, k === 1 ? mid(rowH) : y + rowH * (j + 0.8) / k, 'center', k === 1 ? cellPt : Math.max(5, cellPt * 0.78), '400', '#000', dayW - pt(4)));
+          if (!k && nb.personHas(p.id, d)) text(`off${nb.person(p.id, d)}`, colX(i) + dayW / 2, mid(rowH), 'center', cellPt, '400', '#555', dayW - pt(4));
+          ss.forEach((s, j) => text(`${clock(s.start, true)}–${clock(s.end, true)}${nb.shift(s)}${j === 0 ? nb.person(p.id, d) : ''}`, colX(i) + dayW / 2, k === 1 ? mid(rowH) : y + rowH * (j + 0.8) / k, 'center', k === 1 ? cellPt : Math.max(5, cellPt * 0.78), '400', '#000', dayW - pt(4)));
         });
         text(hrs(total) + (over ? ' !' : ''), M + CW - pt(6), mid(rowH), 'right', cellPt, over ? '700' : '400', over ? '#b00' : '#000');
       }
@@ -3890,7 +4015,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const people = Object.keys(ROLES).flatMap((rk) => plan.staff.filter((p) => ids.has(p.id) && p.role === rk).sort((a, b) => a.name.localeCompare(b.name)));
     const numbers = new Map(people.map((p, i) => [p.id, i + 1]));
     days.forEach((d, i) => {
-      const tile = drawDaySheet(d, { ...o, pageIn: [7, 5], dpi: (tw / 7), vector: false, coverage: o.coverage, notes: false, numbers });
+      const tile = drawDaySheet(d, { ...o, pageIn: [7, 5], dpi: (tw / 7), vector: false, coverage: o.coverage, notes: false, numbers, numbered: (o.numbered || notesWhere) === 'off' ? 'off' : 'separate', book: o.book });
       const x = M + (i % cols) * (tw + GAP), y = M + TOP + Math.floor(i / cols) * (th + GAP), k = Math.min(tw / tile.width, th / tile.height);
       g.drawImage(tile, x, y, tile.width * k, tile.height * k);
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.strokeRect(x, y, tile.width * k, tile.height * k);
@@ -3936,12 +4061,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let y = M + pt(18);
     const f = forecastOf(d), t = targetHours(d), v = varianceHours(d);
     const totals = `Scheduled ${hrs(dayHours(d))} h  ·  Forecast ${money(f)}  ·  Target ${t == null ? '—' : hrs(t)} h  ·  Variance ${v == null ? '—' : signed(v)} h`;
-    if (o.numbers) { y -= pt(4); text(longDate(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
+    const nb = notesFor([d], o), noteList = nb.list;
+    if (o.numbers) { y -= pt(4); text(longDate(d) + nb.day(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
     else {
       text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 18, '700');
       text(totals, W - M, y, 'right', 10, '400', '#333');
       y += pt(20);
-      text(longDate(d), M, y, 'left', 14, '700');
+      text(longDate(d) + nb.day(d), M, y, 'left', 14, '700');
       if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
     }
     y += pt(12);
@@ -3958,7 +4084,6 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const nameW = CW * (o.numbers ? 0.07 : 0.17), x0 = M + nameW, x1 = M + CW;
     const span = DAY_END - DAY_START, xAt = (m) => x0 + (m - DAY_START) / span * (x1 - x0);
     const headH = pt(18), covH = o.coverage === false ? 0 : inch(o.numbers ? 0.8 : 1.25);
-    const noteList = notesFor([d]);
     let notesH = o.notes || noteList.length ? Math.max(inch(0.9), inch(0.3) * (noteList.length + 1.5)) : 0;
     let avail = H - M - y - headH - covH - notesH - inch(0.2);
     const n = Math.max(1, rows.length);
@@ -3977,13 +4102,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         g.fillStyle = '#e6e6e6'; g.fillRect(M, y, CW, rowH);
         text(`${r.label}  (${r.n} · ${hrs(r.h)} h)`, M + pt(5), y + rowH * 0.66, 'left', barPt, '700');
       } else {
-        if (o.numbers) text(String(o.numbers.get(r.p.id) || '?'), x0 - pt(5), y + rowH * 0.66, 'right', barPt, '700', '#000');
-        else { text(r.p.name, M + pt(5), y + rowH * 0.66, 'left', barPt, '700', '#000', nameW - pt(26)); text(ROLES[r.p.role].short, x0 - pt(4), y + rowH * 0.66, 'right', barPt - 1.5, '400', '#555'); }
+        if (o.numbers) text(String(o.numbers.get(r.p.id) || '?') + nb.person(r.p.id, d), x0 - pt(5), y + rowH * 0.66, 'right', barPt, '700', '#000');
+        else { text(r.p.name + nb.person(r.p.id, d), M + pt(5), y + rowH * 0.66, 'left', barPt, '700', '#000', nameW - pt(26)); text(ROLES[r.p.role].short, x0 - pt(4), y + rowH * 0.66, 'right', barPt - 1.5, '400', '#555'); }
         r.ss.forEach((sh) => {
           const bx = xAt(sh.start), bw = xAt(sh.end) - bx, by = y + rowH * 0.14, bh = rowH * 0.72;
           g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
           g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
-          const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${sh.note ? '   Note: ' + sh.note : ''}`;
+          const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${nb.on ? nb.shift(sh) : sh.note ? '   Note: ' + sh.note : ''}`;
           text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
           if (availIssue(r.p, d, sh)) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
         });
@@ -4084,14 +4209,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const lineH = pt(entryPt * 1.38);
     const dayHeadH = pt(entryPt * 2.1), dayFootH = pt(entryPt * 1.7);
     const shortName = (p) => { const parts = p.name.trim().split(/\s+/); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]; };
+    const nb = notesFor(daysFrom(start, weeks * 7), o), noteList = nb.list;
     const rowsData = Array.from({ length: weeks }, (_, k) => {
       const days = daysFrom(addDays(start, k * 7), 7);
       const lists = days.map((d) => shiftsOn(d).map((s) => ({ s, p: staffById(s.staffId) }))
-        .sort((a, b) => GROUPS.findIndex((g) => g[0] === ROLES[a.p.role].group) - GROUPS.findIndex((g) => g[0] === ROLES[b.p.role].group) || a.s.start - b.s.start));
+        .sort((a, b) => GROUPS.findIndex((g) => g[0] === ROLES[a.p.role].group) - GROUPS.findIndex((g) => g[0] === ROLES[b.p.role].group) || a.s.start - b.s.start)
+        // and who has time off (not working), each with the number of their note
+        .concat(nb.on ? plan.staff.filter((p) => !p.left && nb.personHas(p.id, d) && !shiftsOn(d).some((s) => s.staffId === p.id)).map((p) => ({ off: true, p })) : []));
       const most = Math.max(3, ...lists.map((l) => l.length));
       return { days, lists, h: dayHeadH + most * lineH + dayFootH + pt(4) };
     });
-    const noteList = notesFor(daysFrom(start, weeks * 7));
     const titleH = pt(48), headH = pt(20), legendH = pt(26), notesH = o.notes || noteList.length ? Math.max(inch(1.1), inch(0.3) * (noteList.length + 1.5)) : 0;
     const natural = M + titleH + headH + rowsData.reduce((t, r) => t + r.h, 0) + legendH + notesH + M;
     const paperH = Math.round(ph * dpi);
@@ -4129,21 +4256,24 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         const outside = !planDays().includes(d);
         if (outside) { g.fillStyle = '#f6f6f6'; g.fillRect(x0, y, dayW, row.h); }
         const dt = parseIso(d);
-        text(String(dt.getDate()), x0 + pt(4), y + dayHeadH * 0.78, 'left', entryPt + 4, '700');
-        if (dt.getDate() === 1 || d === start) text(dt.toLocaleDateString(undefined, { month: 'short' }), x0 + pt(4) + pt((entryPt + 4) * 1.25), y + dayHeadH * 0.78, 'left', entryPt, '700', '#555');
+        const num = String(dt.getDate()) + nb.day(d);
+        text(num, x0 + pt(4), y + dayHeadH * 0.78, 'left', entryPt + 4, '700');
+        g.font = font(entryPt + 4, '700'); const numW = g.measureText(num).width;
+        if (dt.getDate() === 1 || d === start) text(dt.toLocaleDateString(undefined, { month: 'short' }), x0 + pt(8) + numW, y + dayHeadH * 0.78, 'left', entryPt, '700', '#555');
         const fc = forecastOf(d);
         if (fc != null) text(money(fc), x0 + dayW - pt(4), y + dayHeadH * 0.72, 'right', entryPt - 0.5, '400', '#666');
         let ly = y + dayHeadH + lineH * 0.75;
-        row.lists[i].forEach(({ s, p }) => {
+        row.lists[i].forEach(({ s, p, off }) => {
+          if (off) { text(`${shortName(p)}  off${nb.person(p.id, d)}`, x0 + pt(10), ly, 'left', entryPt, '400', '#555', dayW - pt(13)); ly += lineH; return; }
           const gk = ROLES[p.role].group;
           g.fillStyle = PRINT_COLORS[gk]; g.fillRect(x0 + pt(4), ly - pt(entryPt * 0.72), pt(3), pt(entryPt * 0.8));
           const iss = availIssue(p, d, s);
-          text(`${shortName(p)}  ${clock(s.start)}–${clock(s.end)}${iss ? ' !' : ''}${s.note ? ' *' : ''}`, x0 + pt(10), ly, 'left', entryPt, '400', iss ? '#b00' : '#000', dayW - pt(13));
+          text(`${shortName(p)}  ${clock(s.start)}–${clock(s.end)}${iss ? ' !' : ''}${nb.shift(s)}${nb.person(p.id, d)}`, x0 + pt(10), ly, 'left', entryPt, '400', iss ? '#b00' : '#000', dayW - pt(13));
           ly += lineH;
         });
-        if (row.lists[i].length) {
+        if (row.lists[i].some((x) => !x.off)) {
           const tot = dayHours(d);
-          text(`${row.lists[i].length} people · ${hrs(tot)} h`, x0 + dayW - pt(4), y + row.h - pt(5), 'right', entryPt - 0.5, '700', '#333');
+          text(`${row.lists[i].filter((x) => !x.off).length} people · ${hrs(tot)} h`, x0 + dayW - pt(4), y + row.h - pt(5), 'right', entryPt - 0.5, '700', '#333');
         }
         line(x0, y, x0, y + row.h, 0.5, '#999');
       });
@@ -4166,7 +4296,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let lx = M;
     GROUPS.forEach(([gk, label]) => { g.fillStyle = PRINT_COLORS[gk]; g.fillRect(lx, y - pt(7), pt(8), pt(8)); text(label, lx + pt(12), y, 'left', 8.5); lx += pt(12) + pt(8.5 * 0.6 * label.length) + pt(18); });
     text('! = outside availability', lx, y, 'left', 8.5, '400', '#b00');
-    text('* = has a note', lx + pt(120), y, 'left', 8.5, '400', '#333');
+    if (nb.on) text('¹ ² = see the numbered notes', lx + pt(120), y, 'left', 8.5, '400', '#333');
     if (notesH) {
       y += pt(18);
       drawNotes(text, line, noteList, M, CW, y, H - M, inch, pt, 0.3);
@@ -4233,6 +4363,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       timeline: () => [['day', `This day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', 'This week on 1 page (7 small tiles)'], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
     };
+    // where the numbered notes go (one choice for every printout): under the sheet, on a page of their own, or left out
+    const notesWhereSel = () => { const s = h('select', { class: 'input', 'aria-label': 'Numbered notes', title: 'Special store hours, events, time off and notes on shifts get a small number on the sheet; the list says what each one is', onchange: () => { setNotesWhere(s.value); update(); } }, NOTES_WHERE.map(([v, l]) => h('option', { value: v, selected: notesWhere === v }, l))); return s; };
+    // the week in tiles has no room for the list under it: there it goes on its own page
+    const whereFor = () => (o.layout === 'timeline' && o.range === 'weektile' && notesWhere === 'page' ? 'separate' : notesWhere);
+    // every page of the printout, and the notes page(s) after them when the list goes on its own page
+    const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
     const sel = (key, options, label) => {
       const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
@@ -4241,7 +4377,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     function build() {
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(); return; }
+      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(notesWhereSel()); return; }
       box.replaceChildren(
         sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
@@ -4250,6 +4386,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
         sel('dpi', DPI_OPTIONS, 'Resolution (for saving)'));
       checks.replaceChildren(
+        notesWhereSel(),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
         o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
         o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null);
@@ -4268,28 +4405,36 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels (${(W * H / 1e9).toFixed(1)} billion), more than a browser can make into a ${o.format.toUpperCase()}. It will be saved as SVG instead: a vector file that prints sharp at ${o.dpi} DPI or any other.`
           : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels${o.layout === 'calendar' ? ' (taller when there are many weeks)' : ' each'} · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
       size.className = big ? 'hint warn' : 'hint';
-      preview.src = draw(items()[0], { ...o, dpi: 60, vector: false }).toDataURL();
+      if (whereFor() === 'separate') size.textContent += ' · then the numbered notes on a page of their own';
+      preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
     };
     build();
     modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview, pagePrev],
       actions: [{ label: 'Cancel' },
-        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
+        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {
           remember();
           if (o.layout === 'avail') { saveAvailability(o); return; }
           (async () => {
-            const list = items();
+            const list = items(), book = noteBook(), w = whereFor();
             toast(`Making ${list.length} file${list.length > 1 ? 's' : ''}…`);
             const files = [];
             let switched = false;
+            const drawJob = (it, opts) => draw(it, { ...opts, numbered: w, book });
             for (const it of list) {
               const [pw, ph] = pageSize();
               let vector = o.format === 'svg' || tooBig(Math.round(pw * o.dpi), Math.round(ph * o.dpi));
               let blob = null;
-              if (!vector) { try { blob = await canvasBlob(draw(it, o), o); } catch (e) { vector = true; } }
-              if (vector) { blob = await canvasBlob(draw(it, { ...o, vector: true }), o); if (o.format !== 'svg') switched = true; }
+              if (!vector) { try { blob = await canvasBlob(drawJob(it, o), o); } catch (e) { vector = true; } }
+              if (vector) { blob = await canvasBlob(drawJob(it, { ...o, vector: true }), o); if (o.format !== 'svg') switched = true; }
               const ext = vector ? 'svg' : o.format;
               files.push({ name: `${nameOf(it)}.${ext}`, blob, type: { description: ext.toUpperCase() + ' image', accept: { [ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/' + ext]: ['.' + ext] } } });
+            }
+            // the notes page(s): made after the sheets, so the list has every number
+            if (w === 'separate' && book.list.length) {
+              const [pw, ph] = pageSize(), vector = o.format === 'svg' || tooBig(Math.round(pw * o.dpi), Math.round(ph * o.dpi));
+              const pages = drawNotesPages(book, { ...o, vector });
+              for (let k = 0; k < pages.length; k++) { const ext = vector ? 'svg' : o.format, blob = await canvasBlob(pages[k], o); files.push({ name: `${nameOf(list[0])} notes${pages.length > 1 ? ' ' + (k + 1) : ''}.${ext}`, blob, type: { description: ext.toUpperCase() + ' image', accept: { [ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/' + ext]: ['.' + ext] } } }); }
             }
             const n = await saveMany(files);
             if (n) toast((n === 1 ? `Saved ${files[0].name}` : `Saved ${n} files`) + (switched ? ' (as SVG vector, because that DPI is too large for a picture file)' : ''));

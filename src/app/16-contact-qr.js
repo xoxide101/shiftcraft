@@ -43,19 +43,22 @@
 
   // ---------- What the availability and contact list adds from the newer parts ----------
   // in the last column: school (while the term is on or coming) and time off in the next 8 weeks
-  function comingUpLines(p) {
+  // book: give each entry its number for the numbered notes (16-contact-sheet.js, 29-page-notes.js)
+  function comingUpLines(p, book) {
+    const num = (t) => (book ? supNum(book.add(noteKey.to(p, t), noteTimeOff(p, t))) : '');
     const today = iso(new Date()), until = addDays(today, 56), out = [];
     const sc = p.school;
     if (sc && sc.on !== false && (!sc.to || sc.to >= today)) out.push(`School${sc.name ? ': ' + sc.name : ''}${sc.to ? ` (to ${shortDate(sc.to)})` : ''}`);
     const off = (p.timeOff || []).filter((t) => t.status !== 'denied' && t.to >= today && t.from <= until);
-    off.slice(0, 3).forEach((t) => out.push(`${t.from === t.to ? shortDate(t.from) : `${shortDate(t.from)}–${shortDate(t.to)}`}${t.hours ? ` ${clockShort(t.hours[0])}–${clockShort(t.hours[1])}` : ''} ${(TIME_OFF_WHY[t.why] || 'off').toLowerCase()}${t.status === 'requested' ? ' (asked)' : ''}`));
-    if (off.length > 3) out.push(`+${off.length - 3} more time off`);
+    off.slice(0, 3).forEach((t) => out.push(`${t.from === t.to ? shortDate(t.from) : `${shortDate(t.from)}–${shortDate(t.to)}`}${t.hours ? ` ${clockShort(t.hours[0])}–${clockShort(t.hours[1])}` : ''} ${(TIME_OFF_WHY[t.why] || 'off').toLowerCase()}${t.status === 'requested' ? ' (asked)' : ''}${num(t)}`));
+    if (off.length > 3) out.push(`+${off.length - 3} more time off${book ? ' ' + off.slice(3).map(num).join(',') : ''}`);
     return out;
   }
   // under the table: special store hours and events in the next 8 weeks
-  function storeComingUp() {
+  function storeComingUp(book) {
+    const num = (key, text) => (book ? ' ' + supNum(book.add(key, text)) : '');
     const today = iso(new Date()), until = addDays(today, 56), on = (x) => x.to >= today && x.from <= until;
-    const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}`);
-    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}`);
+    const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}${num(noteKey.sp(x), noteSpecial(x))}`);
+    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}${num(noteKey.ev(x), noteEvent(x))}`);
     return { sp, ev };
   }

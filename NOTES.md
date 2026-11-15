@@ -267,3 +267,13 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
   on their days. Each month cell shows that day's store hours (bold when special, red when closed).
 - A usually closed day shows on the Schedule and Week; Check schedule warns about shifts on it. The availability
   list's footer gives the week in one line (Mon–Sat 7am–9pm · Sun closed).
+
+## Numbered notes on printouts
+- On screen, colours and chips tell entries apart. On paper each one gets a small number (¹ ²) and a numbered list
+  says what it is: special store hours and events (on the day), time off (on the person's cell, or "off ²"), notes on
+  shifts (these used to be a *).
+- One choice for every printout, kept in this browser: numbered notes under the sheet, on a separate page after the
+  sheets (one list, so a number means the same on every page), or none. It is in the Print or save window and in the
+  Calendar tab's print button. The week on 1 page (tiles) has no room under it, so its notes always go on their own page.
+- Covers the week table, the visual timeline (day and week tiles), the calendar sheet, the availability list (a second
+  PDF page, or a second picture) and the Calendar tab printed from the screen. Code: 29-page-notes.js.

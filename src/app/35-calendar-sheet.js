@@ -13,14 +13,16 @@
     const lineH = pt(entryPt * 1.38);
     const dayHeadH = pt(entryPt * 2.1), dayFootH = pt(entryPt * 1.7);
     const shortName = (p) => { const parts = p.name.trim().split(/\s+/); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]; };
+    const nb = notesFor(daysFrom(start, weeks * 7), o), noteList = nb.list;
     const rowsData = Array.from({ length: weeks }, (_, k) => {
       const days = daysFrom(addDays(start, k * 7), 7);
       const lists = days.map((d) => shiftsOn(d).map((s) => ({ s, p: staffById(s.staffId) }))
-        .sort((a, b) => GROUPS.findIndex((g) => g[0] === ROLES[a.p.role].group) - GROUPS.findIndex((g) => g[0] === ROLES[b.p.role].group) || a.s.start - b.s.start));
+        .sort((a, b) => GROUPS.findIndex((g) => g[0] === ROLES[a.p.role].group) - GROUPS.findIndex((g) => g[0] === ROLES[b.p.role].group) || a.s.start - b.s.start)
+        // and who has time off (not working), each with the number of their note
+        .concat(nb.on ? plan.staff.filter((p) => !p.left && nb.personHas(p.id, d) && !shiftsOn(d).some((s) => s.staffId === p.id)).map((p) => ({ off: true, p })) : []));
       const most = Math.max(3, ...lists.map((l) => l.length));
       return { days, lists, h: dayHeadH + most * lineH + dayFootH + pt(4) };
     });
-    const noteList = notesFor(daysFrom(start, weeks * 7));
     const titleH = pt(48), headH = pt(20), legendH = pt(26), notesH = o.notes || noteList.length ? Math.max(inch(1.1), inch(0.3) * (noteList.length + 1.5)) : 0;
     const natural = M + titleH + headH + rowsData.reduce((t, r) => t + r.h, 0) + legendH + notesH + M;
     const paperH = Math.round(ph * dpi);
@@ -58,21 +60,24 @@
         const outside = !planDays().includes(d);
         if (outside) { g.fillStyle = '#f6f6f6'; g.fillRect(x0, y, dayW, row.h); }
         const dt = parseIso(d);
-        text(String(dt.getDate()), x0 + pt(4), y + dayHeadH * 0.78, 'left', entryPt + 4, '700');
-        if (dt.getDate() === 1 || d === start) text(dt.toLocaleDateString(undefined, { month: 'short' }), x0 + pt(4) + pt((entryPt + 4) * 1.25), y + dayHeadH * 0.78, 'left', entryPt, '700', '#555');
+        const num = String(dt.getDate()) + nb.day(d);
+        text(num, x0 + pt(4), y + dayHeadH * 0.78, 'left', entryPt + 4, '700');
+        g.font = font(entryPt + 4, '700'); const numW = g.measureText(num).width;
+        if (dt.getDate() === 1 || d === start) text(dt.toLocaleDateString(undefined, { month: 'short' }), x0 + pt(8) + numW, y + dayHeadH * 0.78, 'left', entryPt, '700', '#555');
         const fc = forecastOf(d);
         if (fc != null) text(money(fc), x0 + dayW - pt(4), y + dayHeadH * 0.72, 'right', entryPt - 0.5, '400', '#666');
         let ly = y + dayHeadH + lineH * 0.75;
-        row.lists[i].forEach(({ s, p }) => {
+        row.lists[i].forEach(({ s, p, off }) => {
+          if (off) { text(`${shortName(p)}  off${nb.person(p.id, d)}`, x0 + pt(10), ly, 'left', entryPt, '400', '#555', dayW - pt(13)); ly += lineH; return; }
           const gk = ROLES[p.role].group;
           g.fillStyle = PRINT_COLORS[gk]; g.fillRect(x0 + pt(4), ly - pt(entryPt * 0.72), pt(3), pt(entryPt * 0.8));
           const iss = availIssue(p, d, s);
-          text(`${shortName(p)}  ${clock(s.start)}–${clock(s.end)}${iss ? ' !' : ''}${s.note ? ' *' : ''}`, x0 + pt(10), ly, 'left', entryPt, '400', iss ? '#b00' : '#000', dayW - pt(13));
+          text(`${shortName(p)}  ${clock(s.start)}–${clock(s.end)}${iss ? ' !' : ''}${nb.shift(s)}${nb.person(p.id, d)}`, x0 + pt(10), ly, 'left', entryPt, '400', iss ? '#b00' : '#000', dayW - pt(13));
           ly += lineH;
         });
-        if (row.lists[i].length) {
+        if (row.lists[i].some((x) => !x.off)) {
           const tot = dayHours(d);
-          text(`${row.lists[i].length} people · ${hrs(tot)} h`, x0 + dayW - pt(4), y + row.h - pt(5), 'right', entryPt - 0.5, '700', '#333');
+          text(`${row.lists[i].filter((x) => !x.off).length} people · ${hrs(tot)} h`, x0 + dayW - pt(4), y + row.h - pt(5), 'right', entryPt - 0.5, '700', '#333');
         }
         line(x0, y, x0, y + row.h, 0.5, '#999');
       });
@@ -95,7 +100,7 @@
     let lx = M;
     GROUPS.forEach(([gk, label]) => { g.fillStyle = PRINT_COLORS[gk]; g.fillRect(lx, y - pt(7), pt(8), pt(8)); text(label, lx + pt(12), y, 'left', 8.5); lx += pt(12) + pt(8.5 * 0.6 * label.length) + pt(18); });
     text('! = outside availability', lx, y, 'left', 8.5, '400', '#b00');
-    text('* = has a note', lx + pt(120), y, 'left', 8.5, '400', '#333');
+    if (nb.on) text('¹ ² = see the numbered notes', lx + pt(120), y, 'left', 8.5, '400', '#333');
     if (notesH) {
       y += pt(18);
       drawNotes(text, line, noteList, M, CW, y, H - M, inch, pt, 0.3);

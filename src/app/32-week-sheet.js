@@ -35,7 +35,7 @@
       ['Hours variance', (d) => (varianceHours(d) == null ? '—' : signed(varianceHours(d))), signed(weekTotal(dayHours) - weekTotal(targetHours))],
     ];
     const headH = pt(30);
-    const noteList = notesFor(days);
+    const nb = notesFor(days, o), noteList = nb.list;
     let notesH = o.notes || noteList.length ? Math.max(inch(1.2), inch(0.32) * (noteList.length + 1.6)) : 0;
     let avail = H - M - y - notesH - headH;
     const n = rows.length + foot.length;
@@ -60,7 +60,7 @@
     g.fillStyle = '#222'; g.fillRect(M, y, CW, headH);
     const mid = (hh) => y + hh / 2 + pt(cellPt) * 0.35;
     text('Name', M + pt(6), mid(headH), 'left', cellPt + 0.5, '700', '#fff');
-    days.forEach((d, i) => { text(`${dayName(d, 'short')} ${parseIso(d).getMonth() + 1}/${parseIso(d).getDate()}`, colX(i) + dayW / 2, mid(headH), 'center', cellPt + 0.5, '700', '#fff'); });
+    days.forEach((d, i) => { text(`${dayName(d, 'short')} ${parseIso(d).getMonth() + 1}/${parseIso(d).getDate()}${nb.day(d)}`, colX(i) + dayW / 2, mid(headH), 'center', cellPt + 0.5, '700', '#fff'); });
     text('Hours', M + CW - pt(6), mid(headH), 'right', cellPt + 0.5, '700', '#fff');
     y += headH;
     rows.forEach((r) => {
@@ -73,7 +73,8 @@
         text(ROLES[p.role].short, M + nameW - pt(6), mid(rowH), 'right', cellPt - 1.5, '400', '#555');
         days.forEach((d, i) => {
           const ss = shiftsOf(p, d), k = ss.length;
-          ss.forEach((s, j) => text(`${clock(s.start, true)}–${clock(s.end, true)}${s.note ? ' *' : ''}`, colX(i) + dayW / 2, k === 1 ? mid(rowH) : y + rowH * (j + 0.8) / k, 'center', k === 1 ? cellPt : Math.max(5, cellPt * 0.78), '400', '#000', dayW - pt(4)));
+          if (!k && nb.personHas(p.id, d)) text(`off${nb.person(p.id, d)}`, colX(i) + dayW / 2, mid(rowH), 'center', cellPt, '400', '#555', dayW - pt(4));
+          ss.forEach((s, j) => text(`${clock(s.start, true)}–${clock(s.end, true)}${nb.shift(s)}${j === 0 ? nb.person(p.id, d) : ''}`, colX(i) + dayW / 2, k === 1 ? mid(rowH) : y + rowH * (j + 0.8) / k, 'center', k === 1 ? cellPt : Math.max(5, cellPt * 0.78), '400', '#000', dayW - pt(4)));
         });
         text(hrs(total) + (over ? ' !' : ''), M + CW - pt(6), mid(rowH), 'right', cellPt, over ? '700' : '400', over ? '#b00' : '#000');
       }

@@ -57,6 +57,12 @@
       timeline: () => [['day', `This day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', 'This week on 1 page (7 small tiles)'], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
     };
+    // where the numbered notes go (one choice for every printout): under the sheet, on a page of their own, or left out
+    const notesWhereSel = () => { const s = h('select', { class: 'input', 'aria-label': 'Numbered notes', title: 'Special store hours, events, time off and notes on shifts get a small number on the sheet; the list says what each one is', onchange: () => { setNotesWhere(s.value); update(); } }, NOTES_WHERE.map(([v, l]) => h('option', { value: v, selected: notesWhere === v }, l))); return s; };
+    // the week in tiles has no room for the list under it: there it goes on its own page
+    const whereFor = () => (o.layout === 'timeline' && o.range === 'weektile' && notesWhere === 'page' ? 'separate' : notesWhere);
+    // every page of the printout, and the notes page(s) after them when the list goes on its own page
+    const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
     const sel = (key, options, label) => {
       const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
@@ -65,7 +71,7 @@
     function build() {
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(); return; }
+      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf'; checks.replaceChildren(notesWhereSel()); return; }
       box.replaceChildren(
         sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
@@ -74,6 +80,7 @@
         sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
         sel('dpi', DPI_OPTIONS, 'Resolution (for saving)'));
       checks.replaceChildren(
+        notesWhereSel(),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
         o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
         o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null);
@@ -92,28 +99,36 @@
           ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels (${(W * H / 1e9).toFixed(1)} billion), more than a browser can make into a ${o.format.toUpperCase()}. It will be saved as SVG instead: a vector file that prints sharp at ${o.dpi} DPI or any other.`
           : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels${o.layout === 'calendar' ? ' (taller when there are many weeks)' : ' each'} · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
       size.className = big ? 'hint warn' : 'hint';
-      preview.src = draw(items()[0], { ...o, dpi: 60, vector: false }).toDataURL();
+      if (whereFor() === 'separate') size.textContent += ' · then the numbered notes on a page of their own';
+      preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
     };
     build();
     modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview, pagePrev],
       actions: [{ label: 'Cancel' },
-        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(items().map((it) => draw(it, { ...o, dpi: 300, vector: true })), o); } },
+        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {
           remember();
           if (o.layout === 'avail') { saveAvailability(o); return; }
           (async () => {
-            const list = items();
+            const list = items(), book = noteBook(), w = whereFor();
             toast(`Making ${list.length} file${list.length > 1 ? 's' : ''}…`);
             const files = [];
             let switched = false;
+            const drawJob = (it, opts) => draw(it, { ...opts, numbered: w, book });
             for (const it of list) {
               const [pw, ph] = pageSize();
               let vector = o.format === 'svg' || tooBig(Math.round(pw * o.dpi), Math.round(ph * o.dpi));
               let blob = null;
-              if (!vector) { try { blob = await canvasBlob(draw(it, o), o); } catch (e) { vector = true; } }
-              if (vector) { blob = await canvasBlob(draw(it, { ...o, vector: true }), o); if (o.format !== 'svg') switched = true; }
+              if (!vector) { try { blob = await canvasBlob(drawJob(it, o), o); } catch (e) { vector = true; } }
+              if (vector) { blob = await canvasBlob(drawJob(it, { ...o, vector: true }), o); if (o.format !== 'svg') switched = true; }
               const ext = vector ? 'svg' : o.format;
               files.push({ name: `${nameOf(it)}.${ext}`, blob, type: { description: ext.toUpperCase() + ' image', accept: { [ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/' + ext]: ['.' + ext] } } });
+            }
+            // the notes page(s): made after the sheets, so the list has every number
+            if (w === 'separate' && book.list.length) {
+              const [pw, ph] = pageSize(), vector = o.format === 'svg' || tooBig(Math.round(pw * o.dpi), Math.round(ph * o.dpi));
+              const pages = drawNotesPages(book, { ...o, vector });
+              for (let k = 0; k < pages.length; k++) { const ext = vector ? 'svg' : o.format, blob = await canvasBlob(pages[k], o); files.push({ name: `${nameOf(list[0])} notes${pages.length > 1 ? ' ' + (k + 1) : ''}.${ext}`, blob, type: { description: ext.toUpperCase() + ' image', accept: { [ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/' + ext]: ['.' + ext] } } }); }
             }
             const n = await saveMany(files);
             if (n) toast((n === 1 ? `Saved ${files[0].name}` : `Saved ${n} files`) + (switched ? ' (as SVG vector, because that DPI is too large for a picture file)' : ''));

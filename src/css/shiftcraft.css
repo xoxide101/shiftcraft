@@ -372,3 +372,17 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cal-hrs { font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-hrs.special { color: var(--fg); font-weight: 700; }
 .cal-hrs.closed { color: var(--bad); font-weight: 700; }
+/* numbered notes when the Calendar is printed (29-page-notes.js): the numbers and the list show only on paper */
+.cal-n, .cal-pnotes { display: none; }
+@media print {
+  .cal-n { display: inline; font-weight: 700; }
+  .cal-nmore { display: block; font-size: 10px; }
+  .cal-pnotes { display: block; margin-top: 10px; color: #000; }
+  .cal-pnotes.sep { break-before: page; page-break-before: always; }
+  .cal-pnotes h3 { margin: 0 0 6px; font-size: 14px; }
+  .cal-pnlist { columns: 2; column-gap: 24px; font-size: 11px; line-height: 1.4; }
+  .cal-pnlist > div { break-inside: avoid; }
+}
+
+.ctx-menu button.on { font-weight: 700; }
+.ctx-menu button.on::after { content: "  ¹3"; }

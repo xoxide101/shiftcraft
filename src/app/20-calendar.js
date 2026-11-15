@@ -232,7 +232,7 @@
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
-        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see', () => window.print())))),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the numbered notes go)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
       h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
         show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
@@ -248,7 +248,11 @@
         h('button', { class: 'btn sm', title: 'Save time off, store hours and events as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'))));
     if (isList) { main.append(calListCard(shown, today, mFirst, mLast), usualHoursCard()); return; }
 
-    // the month, Monday first
+    // the month, Monday first. Printed, every entry gets a number (in date order) and the numbered notes say what it is,
+    // under the month or on a page of their own (29-page-notes.js); on screen the colours do that
+    const pbook = noteBook();
+    const numOf = (it) => (it.kind === 'special' ? pbook.add(noteKey.sp(it.x), noteSpecial(it.x)) : it.kind === 'event' ? pbook.add(noteKey.ev(it.x), noteEvent(it.x)) : pbook.add(noteKey.to(it.p, it.t), noteTimeOff(it.p, it.t)));
+    const chipN = (it) => { const c = calChip(it); if (notesWhere !== 'off') c.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' ')); return c; };
     const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
     const MAX = 6;
     const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
@@ -261,13 +265,22 @@
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
         st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : `${clockShort(st.open)}–${clockShort(st.close)}`) : null,
-        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(calChip),
-        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null);
+        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(chipN),
+        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null,
+        // printed: the ones that don't fit as numbers only
+        its.length > MAX && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, its.slice(MAX - 1).map((it) => supNum(numOf(it))).join(',')) : null);
     })));
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+    if (notesWhere !== 'off' && pbook.list.length) main.append(h('div', { class: 'cal-pnotes' + (notesWhere === 'separate' ? ' sep' : '') }, h('h3', null, `Notes · ${monthLabel(cal.ym)}`),
+      h('div', { class: 'cal-pnlist' }, pbook.list.map((n) => h('div', null, h('b', null, n.n + '. '), n.text)))));
     main.append(usualHoursCard());
+  }
+  // the Calendar's print button: where the numbered notes go, then print
+  function calPrintMenu(x, y) {
+    const go = (v) => () => { setNotesWhere(v); render(); setTimeout(() => window.print(), 80); };
+    popMenu(x, y, 'Print the calendar', [['Numbered notes under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Numbered notes on a separate page', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No numbered notes', go('off'), notesWhere === 'off' ? 'on' : '']]);
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {

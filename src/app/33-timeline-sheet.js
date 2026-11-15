@@ -18,7 +18,7 @@
     const people = Object.keys(ROLES).flatMap((rk) => plan.staff.filter((p) => ids.has(p.id) && p.role === rk).sort((a, b) => a.name.localeCompare(b.name)));
     const numbers = new Map(people.map((p, i) => [p.id, i + 1]));
     days.forEach((d, i) => {
-      const tile = drawDaySheet(d, { ...o, pageIn: [7, 5], dpi: (tw / 7), vector: false, coverage: o.coverage, notes: false, numbers });
+      const tile = drawDaySheet(d, { ...o, pageIn: [7, 5], dpi: (tw / 7), vector: false, coverage: o.coverage, notes: false, numbers, numbered: (o.numbered || notesWhere) === 'off' ? 'off' : 'separate', book: o.book });
       const x = M + (i % cols) * (tw + GAP), y = M + TOP + Math.floor(i / cols) * (th + GAP), k = Math.min(tw / tile.width, th / tile.height);
       g.drawImage(tile, x, y, tile.width * k, tile.height * k);
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.strokeRect(x, y, tile.width * k, tile.height * k);
@@ -64,12 +64,13 @@
     let y = M + pt(18);
     const f = forecastOf(d), t = targetHours(d), v = varianceHours(d);
     const totals = `Scheduled ${hrs(dayHours(d))} h  ·  Forecast ${money(f)}  ·  Target ${t == null ? '—' : hrs(t)} h  ·  Variance ${v == null ? '—' : signed(v)} h`;
-    if (o.numbers) { y -= pt(4); text(longDate(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
+    const nb = notesFor([d], o), noteList = nb.list;
+    if (o.numbers) { y -= pt(4); text(longDate(d) + nb.day(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
     else {
       text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 18, '700');
       text(totals, W - M, y, 'right', 10, '400', '#333');
       y += pt(20);
-      text(longDate(d), M, y, 'left', 14, '700');
+      text(longDate(d) + nb.day(d), M, y, 'left', 14, '700');
       if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
     }
     y += pt(12);
@@ -86,7 +87,6 @@
     const nameW = CW * (o.numbers ? 0.07 : 0.17), x0 = M + nameW, x1 = M + CW;
     const span = DAY_END - DAY_START, xAt = (m) => x0 + (m - DAY_START) / span * (x1 - x0);
     const headH = pt(18), covH = o.coverage === false ? 0 : inch(o.numbers ? 0.8 : 1.25);
-    const noteList = notesFor([d]);
     let notesH = o.notes || noteList.length ? Math.max(inch(0.9), inch(0.3) * (noteList.length + 1.5)) : 0;
     let avail = H - M - y - headH - covH - notesH - inch(0.2);
     const n = Math.max(1, rows.length);
@@ -105,13 +105,13 @@
         g.fillStyle = '#e6e6e6'; g.fillRect(M, y, CW, rowH);
         text(`${r.label}  (${r.n} · ${hrs(r.h)} h)`, M + pt(5), y + rowH * 0.66, 'left', barPt, '700');
       } else {
-        if (o.numbers) text(String(o.numbers.get(r.p.id) || '?'), x0 - pt(5), y + rowH * 0.66, 'right', barPt, '700', '#000');
-        else { text(r.p.name, M + pt(5), y + rowH * 0.66, 'left', barPt, '700', '#000', nameW - pt(26)); text(ROLES[r.p.role].short, x0 - pt(4), y + rowH * 0.66, 'right', barPt - 1.5, '400', '#555'); }
+        if (o.numbers) text(String(o.numbers.get(r.p.id) || '?') + nb.person(r.p.id, d), x0 - pt(5), y + rowH * 0.66, 'right', barPt, '700', '#000');
+        else { text(r.p.name + nb.person(r.p.id, d), M + pt(5), y + rowH * 0.66, 'left', barPt, '700', '#000', nameW - pt(26)); text(ROLES[r.p.role].short, x0 - pt(4), y + rowH * 0.66, 'right', barPt - 1.5, '400', '#555'); }
         r.ss.forEach((sh) => {
           const bx = xAt(sh.start), bw = xAt(sh.end) - bx, by = y + rowH * 0.14, bh = rowH * 0.72;
           g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
           g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
-          const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${sh.note ? '   Note: ' + sh.note : ''}`;
+          const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${nb.on ? nb.shift(sh) : sh.note ? '   Note: ' + sh.note : ''}`;
           text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
           if (availIssue(r.p, d, sh)) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
         });

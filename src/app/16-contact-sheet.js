@@ -62,7 +62,13 @@
     if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
     return c;
   }
-  function availabilitySheet() {
+  // the numbered notes: a list in two columns (under the sheet), or a page of their own
+  const alNotesList = (list, size = '8pt') => h('div', { class: 'al-noteslist', style: { columns: 2, columnGap: '24px', fontSize: size, lineHeight: 1.35 } }, list.map((n) => h('div', { style: { breakInside: 'avoid' } }, h('b', null, n.n + '. '), n.text)));
+  const alNotesPage = (list) => h('div', { style: { color: '#000', background: '#fff', fontFamily: 'Arial, Helvetica, sans-serif' } },
+    h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · availability and contact list: notes`), alNotesList(list, '10pt'));
+  // where: where the numbered notes go (29-page-notes.js); a separate page comes back as sheet.notesPage
+  function availabilitySheet(where = notesWhere) {
+    const book = where === 'off' ? null : noteBook();
     const now = new Date(), pad = (n) => String(n).padStart(2, '0');
     const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
     const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
@@ -77,7 +83,7 @@
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
         // the hours themselves, one stretch a line (split days stacked), and school class times
         WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }),
-        h('td', { class: 'al-note' }, comingUpLines(p).map((t) => h('div', null, t))));
+        h('td', { class: 'al-note' }, comingUpLines(p, book).map((t) => h('div', null, t))));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
@@ -108,6 +114,8 @@
         .al-notehead { border: 1px solid #000; background: #d9d9d9; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 9pt; }
         .al-foot { margin-top: 8px; font-size: 8.5pt; line-height: 1.3; }
         .al-foot b { margin-right: 4px; }
+        .al-notes { margin-top: 6px; }
+        .al-notes > b { display: block; font-size: 9pt; margin-bottom: 2px; }
       `),
       h('table', null,
         h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '150px' } })),
@@ -121,7 +129,9 @@
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
         }))),
       // special store hours and events coming up (from the Calendar)
-      (() => { const { sp, ev } = storeComingUp(), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
+      (() => { const { sp, ev } = storeComingUp(book), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })(),
+      where === 'page' && book && book.list.length ? h('div', { class: 'al-notes' }, h('b', null, 'Notes'), alNotesList(book.list)) : null);
+    if (where === 'separate' && book && book.list.length) sheet.notesPage = alNotesPage(book.list);
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
@@ -153,8 +163,9 @@
   }
   // The availability sheet as a picture at a resolution: the page (paper size, landscape) drawn through SVG, as Print
   // screen does; dpi 96 = the screen's size
-  async function availabilityCanvas(paper, dpi) {
-    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
+  // el: another page to draw instead (the notes page)
+  async function availabilityCanvas(paper, dpi, el) {
+    const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = el || availabilitySheet(); if (!el) fitAvailability(sh, pg);
     const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
     const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
@@ -162,24 +173,30 @@
     const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
     const g = c.getContext('2d'); if (!g) throw new Error('too big');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-    return { canvas: c, svg, pg };
+    return { canvas: c, svg, pg, sheet: sh };
   }
   // A one-page PDF holding a JPEG picture of the page, wIn × hIn inches: written by hand (header, catalogue, page, image,
   // drawing, cross-reference table), so no library is needed
-  async function pdfFromCanvas(c, wIn, hIn) {
-    const jpg = new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))).arrayBuffer());
+  async function pdfFromCanvas(cs, wIn, hIn) {
+    cs = Array.isArray(cs) ? cs : [cs];
+    const jpgs = [];
+    for (const c of cs) jpgs.push(new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))).arrayBuffer()));
     const W = (wIn * 72).toFixed(2), H = (hIn * 72).toFixed(2), enc = new TextEncoder(), parts = [], offs = []; let len = 0;
     const put = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
     const obj = (n, body) => { offs[n] = len; put(`${n} 0 obj\n`); body(); put('\nendobj\n'); };
-    const draw = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    const draw = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`, total = 3 + 3 * cs.length;
     put('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
     obj(1, () => put('<< /Type /Catalog /Pages 2 0 R >>'));
-    obj(2, () => put('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
-    obj(3, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
-    obj(4, () => { put(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); put(jpg); put('\nendstream'); });
-    obj(5, () => put(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+    obj(2, () => put(`<< /Type /Pages /Kids [${cs.map((_, k) => `${3 + 3 * k} 0 R`).join(' ')}] /Count ${cs.length} >>`));
+    // each page: the page, its picture, its drawing
+    cs.forEach((c, k) => {
+      const pn = 3 + 3 * k;
+      obj(pn, () => put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${pn + 1} 0 R >> >> /Contents ${pn + 2} 0 R >>`));
+      obj(pn + 1, () => { put(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgs[k].length} >>\nstream\n`); put(jpgs[k]); put('\nendstream'); });
+      obj(pn + 2, () => put(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+    });
     const xref = len;
-    put(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => String(offs[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    put(`xref\n0 ${total}\n0000000000 65535 f \n${Array.from({ length: total - 1 }, (_, k) => String(offs[k + 1]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
     return new Blob(parts, { type: 'application/pdf' });
   }
   async function saveAvailability(o) {
@@ -187,11 +204,15 @@
     const big = tooBig(Math.round(pg.W * dpi), Math.round(pg.H * dpi)), useDpi = big ? 300 : dpi;
     toast('Making the availability list…');
     try {
-      const { canvas } = await availabilityCanvas(o.availPaper, useDpi);
+      const { canvas, sheet } = await availabilityCanvas(o.availPaper, useDpi);
+      // the numbered notes on a page of their own: a second page in the PDF, or a second picture
+      const notes = sheet.notesPage ? (await availabilityCanvas(o.availPaper, useDpi, sheet.notesPage)).canvas : null;
       const name = `${fileStem('availability and contact list')}.${fmt}`;
-      const blob = fmt === 'pdf' ? await pdfFromCanvas(canvas, pg.W, pg.H) : await canvasBlob(canvas, { format: fmt, dpi: useDpi });
+      const blob = fmt === 'pdf' ? await pdfFromCanvas(notes ? [canvas, notes] : canvas, pg.W, pg.H) : await canvasBlob(canvas, { format: fmt, dpi: useDpi });
       const type = fmt === 'pdf' ? { description: 'PDF document', accept: { 'application/pdf': ['.pdf'] } } : { description: fmt.toUpperCase() + ' image', accept: { [fmt === 'jpg' ? 'image/jpeg' : 'image/' + fmt]: ['.' + fmt] } };
-      const n = await saveMany([{ name, blob, type }]);
+      const files = [{ name, blob, type }];
+      if (notes && fmt !== 'pdf') files.push({ name: name.replace(/\.\w+$/, ` notes.${fmt}`), blob: await canvasBlob(notes, { format: fmt, dpi: useDpi }), type });
+      const n = await saveMany(files);
       if (n) toast(`Saved ${name}${big ? ` (at 300 DPI: ${dpi} DPI on this paper is more than a browser can draw)` : ''}`);
     } catch (e) { toast('That could not be made: ' + e.message); }
   }
@@ -212,6 +233,7 @@
     const pg = availPaper(availPaperPref);
     area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: 0.4in; box-sizing: border-box; }`), sheet);
     fitAvailability(sheet, pg); $('#print-area').append(sheet);
+    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: '0.4in' } }, sheet.notesPage));
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
