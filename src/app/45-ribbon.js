@@ -11,7 +11,7 @@
     const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
     const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
-    const VIEWS = ['schedule', 'week', 'forecast', 'handoff', 'staff', 'company'];
+    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
     // Start (the wizard): what do you want to do? Each tile goes to the place (or the window) for that job.
     const go = (start) => () => { const it = item(start); if (it.run) it.run(); };
@@ -23,6 +23,7 @@
       { title: 'Forecast and labour', what: 'Sales, labour hours, AM / MID / PM', run: view('forecast') },
       { title: 'Print or share', what: 'Week table, timeline, calendar, availability list, email', run: go('Print or save week table') },
       { title: 'Check the schedule', what: 'Gaps, overlaps, availability and hours', run: go('Check schedule') },
+      { title: 'Calendar', what: 'Time off requests, holiday store hours and events; iCal in and out', run: view('calendar') },
       { title: 'Company and location', what: 'Name, address, opening hours, positions', run: view('company') },
       { title: 'Open a saved file…', what: 'A location, team or weeks file', run: () => openFile() },
       { title: 'Carry on', what: 'Back to where you were', run: () => {} },
@@ -53,6 +54,11 @@
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
           ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save this week’s schedule only', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
+        ] },
+        { id: 'calendar', label: 'Calendar', hue: '#3c8d3c', onSelect: view('calendar'), groups: [
+          ['Add', [C('Event or note for a day', 'Event…', I.star, { big: true }), C('Special store hours', 'Special hours…', I.store, { big: true, title: 'Other opening hours (or closed) for a holiday or any day' }), C('Time off request', 'Time off request…', I.calendar, { big: true })]],
+          ['iCal', [C('Import calendar', 'Import iCal…', I.import, { big: true }), C('Export calendar', 'Export iCal…', I.exportUp, { big: true })]],
+          ['Find', [{ label: 'Search', icon: I.search, big: true, title: 'Search time off, store hours and events', run: () => { view('calendar')(); setTimeout(() => { const x = document.querySelector('#cal-q'); x && x.focus(); }, 60); } }, C('Calendar list', 'List', I.list, { big: true, title: 'Everything as a list you can sort' })]],
         ] },
         { id: 'forecast', label: 'Forecast', hue: '#e09f1f', onSelect: view('forecast'), groups: [
           ['Settings', [C('Settings', 'Settings…', I.gear, { big: true, title: 'Sales per labor hour, AM / MID / PM times, plan length' }), C('Company & location', 'Company & location', I.store, { big: true })]],

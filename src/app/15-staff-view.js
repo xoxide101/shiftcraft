@@ -1,6 +1,20 @@
   // ---------- Staff ----------
   let staffTab = 'wk';
   try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
+  // a day-by-day cell as lines: the hours (each stretch its own line), what they can’t do, and school class times
+  const avCellLines = (p, i, a) => {
+    const out = [];
+    if (a && a.k === 'times') {
+      const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+      if (!plus.length) out.push('Any');
+      plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
+      minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
+    } else out.push(avText(a));
+    const sc = p.school, today = iso(new Date());
+    if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+      sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
+    return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
+  };
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
@@ -11,6 +25,7 @@
       ib('tasks', `Tasks and training${openTasks(p) ? ` (${openTasks(p)} open)` : ''}`, () => tasksDialog(p), { badge: openTasks(p) }),
       ib('timeoff', `Time off: days, weeks or a few hours off, with a reason and notes${soon ? ' (has time off now or coming up)' : ''}`, () => timeOffDialog(p), { badge: soon }),
       ib('print', 'Print this person’s schedule', () => printPeopleDialog(p.id)),
+      ib('qr', `Contact QR code: scan to add ${p.name} to a phone’s contacts (print, save or put in the barcode library)`, () => contactQrDialog(p)),
       ib('left', 'Left… (resigned, terminated or left): they come off the schedule and lists, and everything about them is kept under Former staff', () => leftDialog(p)),
       ib('trash', `Remove ${p.name}`, () => {
         const n = shiftCount(p.id);
@@ -74,19 +89,6 @@
     };
     // a Day by day cell: Any or Off as a word; hours one range per line (7am–11am over 4pm–9pm for a split day),
     // can't-work hours as "not …", and class times while the term is on (from the School tab, not saved into the day)
-    const avCellLines = (p, i, a) => {
-      const out = [];
-      if (a && a.k === 'times') {
-        const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
-        if (!plus.length) out.push('Any');
-        plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
-        minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
-      } else out.push(avText(a));
-      const sc = p.school, today = iso(new Date());
-      if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
-        sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
-      return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
-    };
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     if (staffTab === 'timeoff') {

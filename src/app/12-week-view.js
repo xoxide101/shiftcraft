@@ -21,7 +21,7 @@
         h('button', { class: 'btn sm no-print', onclick: checkDialog }, 'Check schedule…'),
         h('button', { class: 'btn sm no-print', onclick: () => window.print() }, 'Print')),
       h('div', { class: 'table-wrap', style: { marginTop: '12px' } }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, h('th', null, 'Name'), days.map((d) => h('th', { class: 'c' }, `${dayName(d, 'short')} ${parseIso(d).getDate()}`)), h('th', { class: 'num' }, 'Hours'))),
+        h('thead', null, h('tr', null, h('th', null, 'Name'), days.map((d) => h('th', { class: 'c' }, `${dayName(d, 'short')} ${parseIso(d).getDate()}`, calMark(d))), h('th', { class: 'num' }, 'Hours'))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 9, class: 'muted' }, 'No staff yet.'))),
         h('tfoot', null,
           foot('Scheduled hours', (d) => hrs(dayHours(d))),

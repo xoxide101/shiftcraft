@@ -7,7 +7,7 @@
     const parts = p.name.trim().split(/\s+/), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
     return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(last)};${e(first)};;;`, `FN:${e(p.name)}`,
       plan.company || plan.location ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
-      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
+      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
   }
   function qrOf(text) {
     if (typeof qrcode !== 'function') return null;
@@ -56,7 +56,8 @@
       drawQr(g, vcardOf(p), x + pad, y + pad + pt(27), qs);
       const tx = x + pad + qs + pt(6), tw = cw - (tx - x) - pad; let ty = y + pad + pt(40);
       g.fillStyle = '#000'; font('700', 9.5); g.fillText(fit(p.phone || 'no phone yet', tw), tx, ty); ty += pt(13);
-      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); }
+      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); ty += pt(12); }
+      if (p.empId) { font('400', 8); g.fillStyle = '#444'; g.fillText(fit('ID ' + p.empId, tw), tx, ty); }
     });
     if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
     return c;
@@ -71,10 +72,12 @@
     const row = (p) => {
       const pend = p.pending || ROLES[p.role].group === 'trn';
       return h('tr', null,
-        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : '')),
+        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : ''), p.empId ? h('span', { class: 'al-id' }, ' #' + p.empId) : null),
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avText(a)); }));
+        // the hours themselves, one stretch a line (split days stacked), and school class times
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }),
+        h('td', { class: 'al-note' }, comingUpLines(p).map((t) => h('div', null, t))));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
@@ -99,18 +102,26 @@
         .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
         .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffc000; }
+        .al-day div { line-height: 1.15; }
+        .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
+        .al-note { border: 1px solid #000; font-size: 7.5pt !important; line-height: 1.15; vertical-align: middle; }
+        .al-notehead { border: 1px solid #000; background: #d9d9d9; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 9pt; }
+        .al-foot { margin-top: 8px; font-size: 8.5pt; line-height: 1.3; }
+        .al-foot b { margin-right: 4px; }
       `),
       h('table', null,
-        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null))),
+        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '150px' } })),
         h('thead', null, h('tr', null,
           h('th', { class: 'al-title' }, h('b', null, 'Schedule Availability and Contact Information'), plan.company || plan.location ? h('b', { style: { textDecoration: 'none', fontSize: '9pt' } }, [plan.company, plan.location].filter(Boolean).join(' · ')) : null, h('b', null, 'Version ' + version)),
           h('th', { class: 'al-headpos', style: { textAlign: 'right' } }, h('span', { class: 'al-up' }, 'Phone Numbers')),
           positions.map((pos) => h('th', { class: 'al-headpos al-postop' }, h('span', { class: 'al-up' }, pos.name))), h('th'),
-          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)))),
+          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)), h('th', { class: 'al-notehead' }, 'School · time off (next 8 weeks)'))),
         h('tbody', null, sections.flatMap(([g, title]) => {
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
-          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 10 })), ...list.map(row)] : [];
-        }))));
+          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
+        }))),
+      // special store hours and events coming up (from the Calendar)
+      (() => { const { sp, ev } = storeComingUp(); return sp.length || ev.length ? h('div', { class: 'al-foot' }, sp.length ? h('div', null, h('b', null, 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged

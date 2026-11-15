@@ -14,6 +14,7 @@
         h('button', { class: 'btn sm', title: 'Copy this whole week onto other weeks', onclick: () => copyWeekDialog(weekOf(d)) }, 'Copy week to…'),
         h('button', { class: 'btn sm', disabled: !shiftsOn(d).length, onclick: () => confirmBox(`Clear ${dayName(d)}?`, 'Everyone on this day goes back to Unscheduled. You can undo this.', 'Clear day', () => change(() => { plan.shifts[d] = []; })) }, 'Clear day'),
         h('button', { class: 'btn sm', disabled: !weekDays(weekOf(d)).some((x) => shiftsOn(x).length), onclick: () => clearRange('week') }, 'Clear week')),
+      calStrip(d),
       h('div', { style: { marginTop: '12px', display: 'grid', gap: '8px' } }, dayPicker())));
 
     const wrap = h('div', { class: 'tl-wrap' });

@@ -39,6 +39,11 @@
       err,
       h('h3', { class: 'co-h3' }, 'Opening hours'),
       hoursRow('wk', 'Weekdays (Mon–Fri)'), hoursRow('we', 'Weekend (Sat–Sun)'),
+      h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
+      (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
+        return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
+          : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
+      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
       h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
 
     // positions at this location

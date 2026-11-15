@@ -333,6 +333,47 @@ table.t .hgrid .hlabel { white-space: nowrap; overflow: hidden; text-overflow: e
 .daytoggles button.dt.use.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }
 .availline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 5px; border: 1px dashed var(--line); border-radius: 6px; }
+/* Calendar tab (20-calendar.js) */
+table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 760px; }
+table.cal th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px; text-align: left; }
+table.cal td.cal-day { vertical-align: top; height: 104px; border: 1px solid var(--line); padding: 3px 4px 5px; background: var(--panel); }
+table.cal td.cal-out { background: var(--bg); }
+table.cal td.cal-out .cal-num { opacity: .5; }
+table.cal td.cal-closed { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
+.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.cal-head .small { margin-left: auto; font-size: 10px; }
+.cal-num { border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; padding: 0 6px; border-radius: 10px; cursor: pointer; min-width: 24px; }
+.cal-num:hover { background: var(--accent-soft); }
+.cal-today .cal-num { background: var(--accent); color: var(--accent-ink); }
+.cal-add { margin-left: auto; border: 1px solid transparent; background: none; color: var(--muted); border-radius: 5px; width: 20px; height: 20px; line-height: 16px; padding: 0; cursor: pointer; font-size: 15px; opacity: 0; }
+.cal-head .small + .cal-add { margin-left: 2px; }
+td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line); }
+.cal-chip { display: block; width: 100%; text-align: left; font: inherit; font-size: 11px; line-height: 16px; padding: 1px 5px; margin-top: 2px; border-radius: 4px; border: 1px solid transparent; color: var(--fg); background: var(--accent-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.cal-chip:hover { border-color: var(--accent); }
+.cal-chip.special { background: color-mix(in srgb, var(--warn) 20%, transparent); font-weight: 600; }
+.cal-chip.special.closed { background: color-mix(in srgb, var(--bad) 20%, transparent); }
+.cal-chip.timeoff.approved { background: color-mix(in srgb, var(--good) 17%, transparent); }
+.cal-chip.timeoff.requested { background: transparent; border: 1px dashed var(--warn); }
+.cal-chip.timeoff.denied { background: transparent; border: 1px solid var(--line); color: var(--muted); text-decoration: line-through; }
+.cal-more { border: 0; background: none; color: var(--accent); font: inherit; font-size: 11px; padding: 1px 4px; cursor: pointer; }
+.cal-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; background: var(--accent-soft); border: 1px solid var(--accent); }
+.cal-key.requested { background: transparent; border: 1px dashed var(--warn); }
+.cal-key.approved { background: color-mix(in srgb, var(--good) 30%, transparent); border-color: var(--good); }
+.cal-key.denied { background: transparent; border-color: var(--muted); }
+.cal-key.special, .cal-key.open { background: color-mix(in srgb, var(--warn) 30%, transparent); border-color: var(--warn); }
+.cal-key.closed { background: color-mix(in srgb, var(--bad) 30%, transparent); border-color: var(--bad); }
+.cal-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.cal-strip .cal-chip { width: auto; max-width: 100%; font-size: 12px; padding: 3px 8px; margin: 0; }
+.cal-mark { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.th-sort { border: 0; background: none; font: inherit; font-weight: inherit; color: inherit; padding: 0; cursor: pointer; text-align: left; }
+.th-sort:hover { color: var(--accent); }
+@media print { table.cal td.cal-day { height: auto; min-height: 80px; } .cal-add, .cal-more { display: none; } }
+/* contact QR code (16-contact-qr.js) */
+.qr-card { display: flex; gap: 16px; align-items: center; }
+.qr-pic svg { display: block; width: 200px; height: 200px; border-radius: 4px; }
+.qr-who { display: grid; gap: 2px; }
+.qr-who b { font-size: 16px; }
+.qr-big { font-size: 15px; font-weight: 700; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -685,6 +726,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     rehire: '<circle cx="10" cy="8" r="4" class="fill"/><path d="M3 21c1-4 3.8-6 7-6s4.5 1 5.5 2.5M19 13v7M15.5 16.5h7"/>',
     approve: '<path d="m5 12 4 4 10-10"/>',
     deny: '<path d="M6 6l12 12M18 6 6 18"/>',
+    qr: '<path d="M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4Z" class="fill"/><path d="M14 14h2v2M20 14v2M14 20h2M18 18h2v2M17 17h0"/>',
   };
   // ib('trash', 'Remove Dana', () => ..., { cls: 'danger', badge: 3, disabled })
   function ib(icon, title, onclick, o = {}) {
@@ -1164,7 +1206,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // ===================================================================
   // Screens
   // ===================================================================
-  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['forecast', 'Forecast'], ['handoff', 'Hand-off'], ['staff', 'Staff'], ['company', 'Company & Location']];
+  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['calendar', 'Calendar'], ['forecast', 'Forecast'], ['handoff', 'Hand-off'], ['staff', 'Staff'], ['company', 'Company & Location']];
   function render() {
     if (!planDays().includes(ui.day)) ui.day = plan.startDate;
     $('#tabs').replaceChildren(...TABS.map(([k, l]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(ui.tab === k), onclick: () => { ui.tab = k; persist(); render(); } }, l)));
@@ -1173,7 +1215,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     fillMonthSelect();
     const main = $('#main');
     main.replaceChildren();
-    ({ schedule: scheduleView, week: weekView, forecast: forecastView, handoff: handoffView, staff: staffView, company: companyView })[ui.tab](main);
+    ({ schedule: scheduleView, week: weekView, calendar: calendarView, forecast: forecastView, handoff: handoffView, staff: staffView, company: companyView })[ui.tab](main);
     document.title = (ui.fileName ? ui.fileName + ' – ' : '') + 'ShiftCraft';
     paintThemeButton();
   }
@@ -1219,6 +1261,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('button', { class: 'btn sm', title: 'Copy this whole week onto other weeks', onclick: () => copyWeekDialog(weekOf(d)) }, 'Copy week to…'),
         h('button', { class: 'btn sm', disabled: !shiftsOn(d).length, onclick: () => confirmBox(`Clear ${dayName(d)}?`, 'Everyone on this day goes back to Unscheduled. You can undo this.', 'Clear day', () => change(() => { plan.shifts[d] = []; })) }, 'Clear day'),
         h('button', { class: 'btn sm', disabled: !weekDays(weekOf(d)).some((x) => shiftsOn(x).length), onclick: () => clearRange('week') }, 'Clear week')),
+      calStrip(d),
       h('div', { style: { marginTop: '12px', display: 'grid', gap: '8px' } }, dayPicker())));
 
     const wrap = h('div', { class: 'tl-wrap' });
@@ -1376,7 +1419,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('button', { class: 'btn sm no-print', onclick: checkDialog }, 'Check schedule…'),
         h('button', { class: 'btn sm no-print', onclick: () => window.print() }, 'Print')),
       h('div', { class: 'table-wrap', style: { marginTop: '12px' } }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, h('th', null, 'Name'), days.map((d) => h('th', { class: 'c' }, `${dayName(d, 'short')} ${parseIso(d).getDate()}`)), h('th', { class: 'num' }, 'Hours'))),
+        h('thead', null, h('tr', null, h('th', null, 'Name'), days.map((d) => h('th', { class: 'c' }, `${dayName(d, 'short')} ${parseIso(d).getDate()}`, calMark(d))), h('th', { class: 'num' }, 'Hours'))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 9, class: 'muted' }, 'No staff yet.'))),
         h('tfoot', null,
           foot('Scheduled hours', (d) => hrs(dayHours(d))),
@@ -1515,6 +1558,20 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // ---------- Staff ----------
   let staffTab = 'wk';
   try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
+  // a day-by-day cell as lines: the hours (each stretch its own line), what they can’t do, and school class times
+  const avCellLines = (p, i, a) => {
+    const out = [];
+    if (a && a.k === 'times') {
+      const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+      if (!plus.length) out.push('Any');
+      plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
+      minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
+    } else out.push(avText(a));
+    const sc = p.school, today = iso(new Date());
+    if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+      sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
+    return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
+  };
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
@@ -1525,6 +1582,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       ib('tasks', `Tasks and training${openTasks(p) ? ` (${openTasks(p)} open)` : ''}`, () => tasksDialog(p), { badge: openTasks(p) }),
       ib('timeoff', `Time off: days, weeks or a few hours off, with a reason and notes${soon ? ' (has time off now or coming up)' : ''}`, () => timeOffDialog(p), { badge: soon }),
       ib('print', 'Print this person’s schedule', () => printPeopleDialog(p.id)),
+      ib('qr', `Contact QR code: scan to add ${p.name} to a phone’s contacts (print, save or put in the barcode library)`, () => contactQrDialog(p)),
       ib('left', 'Left… (resigned, terminated or left): they come off the schedule and lists, and everything about them is kept under Former staff', () => leftDialog(p)),
       ib('trash', `Remove ${p.name}`, () => {
         const n = shiftCount(p.id);
@@ -1588,19 +1646,6 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     };
     // a Day by day cell: Any or Off as a word; hours one range per line (7am–11am over 4pm–9pm for a split day),
     // can't-work hours as "not …", and class times while the term is on (from the School tab, not saved into the day)
-    const avCellLines = (p, i, a) => {
-      const out = [];
-      if (a && a.k === 'times') {
-        const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
-        if (!plus.length) out.push('Any');
-        plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
-        minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
-      } else out.push(avText(a));
-      const sc = p.school, today = iso(new Date());
-      if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
-        sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
-      return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
-    };
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     if (staffTab === 'timeoff') {
@@ -1746,6 +1791,67 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       { label: 'Save', primary: true, onClick: () => save([i]) }] });
   }
 
+  // ---------- One person's contact QR code ----------
+  // The QR icon on a Staff row: that person's contact (vCard: name, role, company, phone, email, Employee ID) as a QR code
+  // to scan with a phone right off the screen, print on its own card, save (SVG in real millimetres, or the .vcf contact
+  // itself) or put in the shared barcode library for the other Craft apps.
+  function qrSvg(text, mm) {
+    const q = qrOf(text); if (!q) return '';
+    const n = q.getModuleCount(), N = n + 8; let d = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + 4} ${r + 4}h1v1h-1z`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${mm}mm" height="${mm}mm" viewBox="0 0 ${N} ${N}" shape-rendering="crispEdges"><rect width="${N}" height="${N}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  }
+  const qrPic = (svg, cls) => { const e = h('div', { class: cls }); e.innerHTML = svg; return e; };
+  function contactCard(p, svg) {
+    return h('div', { class: 'qr-card' }, qrPic(svg, 'qr-pic'),
+      h('div', { class: 'qr-who' }, h('b', null, p.name), h('div', null, ROLES[p.role].label + (p.empId ? ` · ID ${p.empId}` : '')),
+        h('div', { class: 'qr-big' }, p.phone || ''), h('div', null, p.email || ''),
+        h('div', { class: 'small muted' }, [plan.company, plan.location].filter(Boolean).join(' · ')),
+        h('div', { class: 'small muted', style: { marginTop: '6px' } }, 'Scan with a phone camera to add to contacts.')));
+  }
+  function contactQrDialog(p) {
+    const vc = vcardOf(p), svg = qrSvg(vc, 40);
+    if (!svg) { toast('The QR code maker is missing from this copy of ShiftCraft.'); return; }
+    const name = safe(p.name) || 'contact';
+    const printCard = () => {
+      if (blockedHere()) return;
+      const area = $('#print-area');
+      area.replaceChildren(h('style', null, '@page { size: letter portrait; margin: 0.5in; } #print-area .qr-card { border: 1px dashed #999; padding: 0.25in; width: 5in; color: #000; background: #fff; } #print-area .qr-pic svg { width: 1.8in; height: 1.8in; }'), contactCard(p, svg));
+      document.body.classList.add('print-people');
+      const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
+      window.addEventListener('afterprint', done);
+      setTimeout(() => window.print(), 60);
+    };
+    modal({ title: `Contact QR code · ${p.name}`, wide: true, body: [
+      contactCard(p, svg),
+      !p.phone && !p.email ? h('p', { class: 'warn small' }, 'No phone number or email yet: add them on Staff › Contact & training so the code has a way to reach them.') : null,
+      h('p', { class: 'hint' }, 'Holds their name, role, company and location, phone, email and Employee ID as a contact card (vCard). Contact cards for the whole team: Print & share › Print or save › Contact cards.')],
+    actions: [
+      { label: 'Add to barcode library', left: true, onClick: () => { cardsToLibrary([p]); return false; } },
+      { label: 'Save QR (.svg)', onClick: () => { saveBlob(`${name} contact QR.svg`, new Blob([svg], { type: 'image/svg+xml' }), { description: 'SVG picture', accept: { 'image/svg+xml': ['.svg'] } }).then((n) => n && toast('Saved ' + n)); return false; } },
+      { label: 'Save contact (.vcf)', onClick: () => { saveBlob(`${name}.vcf`, new Blob([vc + '\r\n'], { type: 'text/vcard' }), { description: 'Contact card', accept: { 'text/vcard': ['.vcf'] } }).then((n) => n && toast('Saved ' + n)); return false; } },
+      { label: 'Print', onClick: () => { setTimeout(printCard, 50); } },
+      { label: 'Close', primary: true }] });
+  }
+
+  // ---------- What the availability and contact list adds from the newer parts ----------
+  // in the last column: school (while the term is on or coming) and time off in the next 8 weeks
+  function comingUpLines(p) {
+    const today = iso(new Date()), until = addDays(today, 56), out = [];
+    const sc = p.school;
+    if (sc && sc.on !== false && (!sc.to || sc.to >= today)) out.push(`School${sc.name ? ': ' + sc.name : ''}${sc.to ? ` (to ${shortDate(sc.to)})` : ''}`);
+    const off = (p.timeOff || []).filter((t) => t.status !== 'denied' && t.to >= today && t.from <= until);
+    off.slice(0, 3).forEach((t) => out.push(`${t.from === t.to ? shortDate(t.from) : `${shortDate(t.from)}–${shortDate(t.to)}`}${t.hours ? ` ${clockShort(t.hours[0])}–${clockShort(t.hours[1])}` : ''} ${(TIME_OFF_WHY[t.why] || 'off').toLowerCase()}${t.status === 'requested' ? ' (asked)' : ''}`));
+    if (off.length > 3) out.push(`+${off.length - 3} more time off`);
+    return out;
+  }
+  // under the table: special store hours and events in the next 8 weeks
+  function storeComingUp() {
+    const today = iso(new Date()), until = addDays(today, 56), on = (x) => x.to >= today && x.from <= until;
+    const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}`);
+    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}`);
+    return { sp, ev };
+  }
   // ---- the availability and contact list (a printout for the wall or the office)
   // The availability and contact sheet itself, used by the printout and by the preview in the Print or save window
   // Contact QR codes: each person as a vCard 3.0 (name, role, company and location, phone, email) in a QR code; a phone's
@@ -1755,7 +1861,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const parts = p.name.trim().split(/\s+/), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
     return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(last)};${e(first)};;;`, `FN:${e(p.name)}`,
       plan.company || plan.location ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
-      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
+      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
   }
   function qrOf(text) {
     if (typeof qrcode !== 'function') return null;
@@ -1804,7 +1910,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       drawQr(g, vcardOf(p), x + pad, y + pad + pt(27), qs);
       const tx = x + pad + qs + pt(6), tw = cw - (tx - x) - pad; let ty = y + pad + pt(40);
       g.fillStyle = '#000'; font('700', 9.5); g.fillText(fit(p.phone || 'no phone yet', tw), tx, ty); ty += pt(13);
-      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); }
+      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); ty += pt(12); }
+      if (p.empId) { font('400', 8); g.fillStyle = '#444'; g.fillText(fit('ID ' + p.empId, tw), tx, ty); }
     });
     if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
     return c;
@@ -1819,10 +1926,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const row = (p) => {
       const pend = p.pending || ROLES[p.role].group === 'trn';
       return h('tr', null,
-        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : '')),
+        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : ''), p.empId ? h('span', { class: 'al-id' }, ' #' + p.empId) : null),
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avText(a)); }));
+        // the hours themselves, one stretch a line (split days stacked), and school class times
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }),
+        h('td', { class: 'al-note' }, comingUpLines(p).map((t) => h('div', null, t))));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, `
@@ -1847,18 +1956,26 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
         .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffc000; }
+        .al-day div { line-height: 1.15; }
+        .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
+        .al-note { border: 1px solid #000; font-size: 7.5pt !important; line-height: 1.15; vertical-align: middle; }
+        .al-notehead { border: 1px solid #000; background: #d9d9d9; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 9pt; }
+        .al-foot { margin-top: 8px; font-size: 8.5pt; line-height: 1.3; }
+        .al-foot b { margin-right: 4px; }
       `),
       h('table', null,
-        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null))),
+        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '150px' } })),
         h('thead', null, h('tr', null,
           h('th', { class: 'al-title' }, h('b', null, 'Schedule Availability and Contact Information'), plan.company || plan.location ? h('b', { style: { textDecoration: 'none', fontSize: '9pt' } }, [plan.company, plan.location].filter(Boolean).join(' · ')) : null, h('b', null, 'Version ' + version)),
           h('th', { class: 'al-headpos', style: { textAlign: 'right' } }, h('span', { class: 'al-up' }, 'Phone Numbers')),
           positions.map((pos) => h('th', { class: 'al-headpos al-postop' }, h('span', { class: 'al-up' }, pos.name))), h('th'),
-          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)))),
+          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)), h('th', { class: 'al-notehead' }, 'School · time off (next 8 weeks)'))),
         h('tbody', null, sections.flatMap(([g, title]) => {
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
-          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 10 })), ...list.map(row)] : [];
-        }))));
+          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
+        }))),
+      // special store hours and events coming up (from the Calendar)
+      (() => { const { sp, ev } = storeComingUp(); return sp.length || ev.length ? h('div', { class: 'al-foot' }, sp.length ? h('div', null, h('b', null, 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
@@ -2025,6 +2142,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       err,
       h('h3', { class: 'co-h3' }, 'Opening hours'),
       hoursRow('wk', 'Weekdays (Mon–Fri)'), hoursRow('we', 'Weekend (Sat–Sun)'),
+      h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
+      (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
+        return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
+          : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
+      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
       h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
 
     // positions at this location
@@ -2264,9 +2386,285 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const show = h('div', { class: 'seg', role: 'group', 'aria-label': 'Which time off' }, [['upcoming', 'Now and coming up'], ['past', 'Past'], ['all', 'All']].map(([k, l]) => h('button', { type: 'button', class: 'btn sm', 'aria-pressed': String(timeOffShow === k), onclick: () => { timeOffShow = k; render(); } }, l)));
     const foot = h('tr', null, h('td', { colspan: head.length }, h('div', { class: 'inline' }, h('button', { class: 'btn primary', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null) }, '+ Add time off'),
       h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Someone asks for a day (or days, or a few hours) off: kept as Requested until you approve it', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Time off request'),
-      h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Not available for a few hours on a day: a doctor or dentist appointment, school, a meeting', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'appointment', hours: [540, 660] }) }, '+ Some hours (appointment)'), h('span', { class: 'spacer' }), show)));
+      h('button', { class: 'btn', disabled: !plan.staff.some((p) => !p.left), title: 'Not available for a few hours on a day: a doctor or dentist appointment, school, a meeting', onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'appointment', hours: [540, 660] }) }, '+ Some hours (appointment)'), h('span', { class: 'spacer' }),
+      h('button', { class: 'btn', title: 'Everyone’s time off on a month calendar, with holidays and events', onclick: () => { cal.view = 'month'; calSave(); calGo(); } }, 'Calendar'),
+      h('button', { class: 'btn', title: 'Bring in time off from an iCal (.ics) file', onclick: icalImport }, 'Import iCal…'),
+      h('button', { class: 'btn', title: 'Save time off as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'), show)));
     const asked = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today).length), 0);
     return { head, rows, foot, empty: timeOffShow === 'past' ? 'No past time off.' : 'No time off coming up. Add it with + Add time off, or Time off… on a person.', asked };
+  }
+  // ===================================================================
+  // Calendar: time off, special store hours and events
+  // ===================================================================
+  // plan.specialHours = [{ id, from, to, name, closed, open, close, note, ics? }]
+  //   Store hours for a holiday (or any day): they take the place of the usual opening hours on those days. closed =
+  //   shut all day. Check schedule points out shifts on a closed day, and shifts well outside the special hours.
+  // plan.events = [{ id, from, to, title, hours: null | [start, end], note, ics? }]
+  //   Notes and information for a day (a delivery, a meeting, an inspection, a promotion). They change nothing.
+  // Time off stays on each person (p.timeOff, 19-time-off.js). The Calendar tab shows all three a month at a time or as
+  // a list to search and sort, and they go out to and come in from other calendars as iCal (.ics) files (20-ical.js).
+  // ics: the UID an entry had in a calendar file it came from, so bringing the same file in again updates it.
+  const specialOn = (d) => (plan.specialHours || []).filter((x) => x.from <= d && d <= x.to).slice(-1)[0] || null;
+  const eventsOn = (d) => (plan.events || []).filter((x) => x.from <= d && d <= x.to).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
+  const regularHours = (d) => (plan.hours || {})[(parseIso(d).getDay() + 6) % 7 >= 5 ? 'we' : 'wk'] || null;
+  const specialText = (x) => (x.closed ? 'Closed all day' : `Open ${clock(x.open)} – ${clock(x.close)}`);
+  const specialShort = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
+  const datesOnly = (x) => timeOffWhen({ from: x.from, to: x.to, hours: null });
+  const calGo = () => { ui.tab = 'calendar'; persist(); render(); };
+
+  // US holidays a store often keeps other hours on (true: usually closed all day)
+  const nthDay = (y, m, dow, n) => {
+    if (n > 0) { const d = new Date(y, m, 1); d.setDate(1 + ((dow - d.getDay() + 7) % 7) + (n - 1) * 7); return iso(d); }
+    const d = new Date(y, m + 1, 0); d.setDate(d.getDate() - ((d.getDay() - dow + 7) % 7)); return iso(d);
+  };
+  const easterOf = (y) => {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451);
+    return iso(new Date(y, Math.floor((hh + l - 7 * m + 114) / 31) - 1, ((hh + l - 7 * m + 114) % 31) + 1));
+  };
+  const HOLIDAYS = [
+    ['New Year’s Day', (y) => `${y}-01-01`, true], ['Martin Luther King Jr. Day', (y) => nthDay(y, 0, 1, 3)], ['Presidents’ Day', (y) => nthDay(y, 1, 1, 3)],
+    ['Easter Sunday', easterOf, true], ['Mother’s Day', (y) => nthDay(y, 4, 0, 2)], ['Memorial Day', (y) => nthDay(y, 4, 1, -1)], ['Father’s Day', (y) => nthDay(y, 5, 0, 3)],
+    ['Juneteenth', (y) => `${y}-06-19`], ['Independence Day', (y) => `${y}-07-04`], ['Labor Day', (y) => nthDay(y, 8, 1, 1)], ['Halloween', (y) => `${y}-10-31`],
+    ['Thanksgiving', (y) => nthDay(y, 10, 4, 4), true], ['Black Friday', (y) => addDays(nthDay(y, 10, 4, 4), 1)], ['Christmas Eve', (y) => `${y}-12-24`],
+    ['Christmas Day', (y) => `${y}-12-25`, true], ['New Year’s Eve', (y) => `${y}-12-31`]];
+  const holidaysFrom = (d, n = 18) => { const y = +d.slice(0, 4); return [y, y + 1].flatMap((yy) => HOLIDAYS.map(([name, fn, closed]) => ({ name, date: fn(yy), closed: !!closed }))).filter((x) => x.date >= d).sort((a, b) => a.date.localeCompare(b.date)).slice(0, n); };
+
+  // a row of buttons where one is pressed (like the Status buttons on Time off)
+  function calSeg(label, options, value, pick) {
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': label }, options.map(([v, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(value === v),
+      onclick: (e) => { seg.querySelectorAll('.btn').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); pick(v); } }, l)));
+    return seg;
+  }
+  const dateIn = (v) => h('input', { class: 'input', type: 'date', value: v || '' });
+  const pair2 = (a, b) => h('div', { class: 'inline', style: { alignItems: 'flex-end' } }, a, b);
+  const fieldOf = (label, el) => h('label', { class: 'field' }, h('span', null, label), el);
+  const shiftsBetween = (a, b) => Object.keys(plan.shifts).filter((d) => d >= a && d <= b).reduce((n, d) => n + plan.shifts[d].length, 0);
+
+  // ---------- Special store hours ----------
+  function specialDialog(x, preset) {
+    const today = iso(new Date()), at = (preset && preset.from) || (x && x.from) || ui.day, base = regularHours(at) || { open: 600, close: 960 };
+    const cur = x || { from: at, to: at, name: '', closed: false, open: base.open, close: base.close, note: '', ...(preset || {}) };
+    const name = h('input', { class: 'input', value: cur.name || '', placeholder: 'e.g. Christmas Eve · Inventory day · Storm', maxLength: 80 });
+    const from = dateIn(cur.from), to = dateIn(cur.to);
+    const hl = holidaysFrom(today);
+    const hol = h('select', { class: 'input', 'aria-label': 'Holiday' }, h('option', { value: '' }, 'Pick a holiday (fills in the name and date)…'),
+      hl.map((o, i) => h('option', { value: i }, `${o.name} · ${dayName(o.date, 'short')} ${shortDate(o.date)}, ${o.date.slice(0, 4)}${o.closed ? ' (often closed)' : ''}`)));
+    let closed = !!cur.closed;
+    const seg = calSeg('Open or closed', [[false, 'Open, other hours'], [true, 'Closed all day']], closed, (v) => { closed = v; sync(); });
+    const a = timePicker(cur.open, 'Opens'), b = timePicker(cur.close, 'Closes');
+    const hoursRow = pair2(fieldOf('Opens', a), fieldOf('Closes', b));
+    const note = h('textarea', { class: 'input', rows: 2, maxLength: 300, placeholder: 'Optional, e.g. close at 4 so everyone is home for dinner · skeleton crew' }, cur.note || '');
+    const info = h('p', { class: 'hint', style: { margin: 0 } });
+    hol.onchange = () => { const o = hl[+hol.value]; if (!o) return; name.value = o.name; from.value = to.value = o.date; closed = o.closed; seg.querySelectorAll('.btn').forEach((btn, i) => btn.setAttribute('aria-pressed', String(i === (closed ? 1 : 0)))); sync(); };
+    const sync = () => {
+      if (to.value && from.value && to.value < from.value) to.value = from.value;
+      if (!to.value) to.value = from.value;
+      hoursRow.style.display = closed ? 'none' : '';
+      if (!from.value) { info.textContent = ''; return; }
+      const r = regularHours(from.value), n = shiftsBetween(from.value, to.value || from.value);
+      info.textContent = `Usual hours on ${dayName(from.value)}: ${r ? `${clock(r.open)} – ${clock(r.close)}` : 'not set (Company & Location)'}.`
+        + (n ? ` ${n} shift${n === 1 ? ' is' : 's are'} already scheduled on ${from.value === to.value ? 'that day' : 'those days'}${closed ? ': Check schedule will point them out.' : '.'}` : '');
+    };
+    [from, to].forEach((e) => e.addEventListener('input', sync));
+    sync();
+    const actions = [{ label: 'Cancel' }];
+    if (x) actions.unshift({ label: 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.specialHours = plan.specialHours.filter((y) => y.id !== x.id); if (!plan.specialHours.length) delete plan.specialHours; }); toast('Special hours deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
+    actions.push({ label: x ? 'Save' : 'Add special hours', primary: true, onClick: () => {
+      if (!from.value) { toast('Pick the day.'); return false; }
+      if (!closed && b.value <= a.value) { toast('Closing time must be after opening time.'); return false; }
+      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, name: name.value.replace(/\s+/g, ' ').trim(), closed, open: a.value, close: b.value, note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}) };
+      change(() => { plan.specialHours = (plan.specialHours || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
+      toast(`${e.name || 'Special hours'}: ${specialText(e).toLowerCase()}, ${datesOnly(e)}.`);
+    } });
+    modal({ title: x ? `Special hours · ${x.name || datesOnly(x)}` : 'Special store hours', body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Other opening hours for a holiday or any day: they take the place of the usual hours on those days. Nothing on the schedule moves; Check schedule points out shifts on a closed day or well outside these hours.'),
+      fieldOf('Holiday', hol), fieldOf('Name', name),
+      pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      h('div', { class: 'field' }, h('span', null, 'The store is'), seg), hoursRow, info,
+      fieldOf('Note', note)], actions });
+  }
+
+  // ---------- Events: notes and information for a day ----------
+  function eventDialog(x, preset) {
+    const at = (preset && preset.from) || ui.day;
+    const cur = x || { from: at, to: at, title: '', hours: null, note: '', ...(preset || {}) };
+    const title = h('input', { class: 'input', value: cur.title || '', placeholder: 'e.g. Truck delivery · Health inspection · Team meeting · Sidewalk sale', maxLength: 120 });
+    const from = dateIn(cur.from), to = dateIn(cur.to);
+    let allDay = !cur.hours;
+    const seg = calSeg('When in the day', [[true, 'All day'], [false, 'At a time']], allDay, (v) => { allDay = v; sync(); });
+    const a = timePicker(cur.hours ? cur.hours[0] : 540, 'Starts'), b = timePicker(cur.hours ? cur.hours[1] : 600, 'Ends');
+    const hoursRow = pair2(fieldOf('From', a), fieldOf('Until', b));
+    const note = h('textarea', { class: 'input', rows: 3, maxLength: 500, placeholder: 'Anything to know: who is coming, what to get ready, a phone number…' }, cur.note || '');
+    const sync = () => { if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : ''; };
+    [from, to].forEach((e) => e.addEventListener('input', sync));
+    sync();
+    const actions = [{ label: 'Cancel' }];
+    if (x) actions.unshift({ label: 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.events = plan.events.filter((y) => y.id !== x.id); if (!plan.events.length) delete plan.events; }); toast('Event deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
+    actions.push({ label: x ? 'Save' : 'Add event', primary: true, onClick: () => {
+      const t = title.value.replace(/\s+/g, ' ').trim();
+      if (!t) { toast('Give the event a name.'); title.focus(); return false; }
+      if (!from.value) { toast('Pick the day.'); return false; }
+      if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
+      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}) };
+      change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
+      toast(`${e.title}: ${timeOffWhen(e)}.`);
+    } });
+    modal({ title: x ? `Event · ${x.title}` : 'Event or note for a day', body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Extra information for a day. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
+      fieldOf('What', title), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow, fieldOf('Notes', note)], actions });
+  }
+
+  // ---------- Everything on the calendar, as one list ----------
+  const CAL_KIND = { timeoff: 'Time off', special: 'Store hours', event: 'Event' };
+  function calItems() {
+    const out = [];
+    plan.staff.filter((p) => !p.left).forEach((p) => (p.timeOff || []).forEach((t) => out.push({ kind: 'timeoff', status: t.status, from: t.from, to: t.to, hours: t.hours, who: p.name, title: TIME_OFF_WHY[t.why] || 'Time off', note: t.note || '', p, t })));
+    (plan.specialHours || []).forEach((x) => out.push({ kind: 'special', status: x.closed ? 'closed' : 'open', from: x.from, to: x.to, hours: null, who: '', title: x.name || 'Special hours', note: x.note || '', x }));
+    (plan.events || []).forEach((x) => out.push({ kind: 'event', status: '', from: x.from, to: x.to, hours: x.hours, who: '', title: x.title, note: x.note || '', x }));
+    return out;
+  }
+  const calOpen = (it) => (it.kind === 'timeoff' ? timeOffDialog(it.p, it.t) : it.kind === 'special' ? specialDialog(it.x) : eventDialog(it.x));
+  const calHours = (it) => (it.kind === 'special' ? specialText(it.x) : it.hours ? `${clock(it.hours[0])} – ${clock(it.hours[1])}` : 'All day');
+  const calStatus = (it) => (it.kind === 'timeoff' ? TIME_OFF_STATUS[it.status] || '' : it.kind === 'special' ? (it.x.closed ? 'Closed' : 'Special hours') : '');
+  const calWhat = (it) => (it.kind === 'timeoff' ? `${it.who} · ${it.title}` : it.title);
+  const calText = (it) => [CAL_KIND[it.kind], it.who, it.title, it.note, calHours(it), calStatus(it), datesOnly(it), it.from, it.to, it.kind === 'timeoff' && it.status === 'requested' ? 'request' : ''].join(' ').toLowerCase();
+  const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
+  const calChipText = (it) => (it.kind === 'special' ? `${specialShort(it.x)} · ${it.title}` : it.kind === 'event' ? `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
+    : `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.title}${it.hours ? ` ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
+  const calChip = (it) => h('button', { type: 'button', class: `cal-chip ${it.kind} ${it.status}`, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } }, calChipText(it));
+  const calOrder = (a, b) => ['special', 'event', 'timeoff'].indexOf(a.kind) - ['special', 'event', 'timeoff'].indexOf(b.kind) || (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1) || calWhat(a).localeCompare(calWhat(b));
+
+  // what the Calendar shows (kept in this browser, and in Save everything with the other choices)
+  const CAL_KEY = 'shiftcraft-calendar';
+  const CAL_SHOW = { requested: true, approved: true, denied: false, special: true, event: true };
+  const cal = { ym: '', view: 'month', q: '', show: { ...CAL_SHOW }, range: 'upcoming', sort: 'from', dir: 1 };
+  try { const c = JSON.parse(localStorage.getItem(CAL_KEY) || '{}'); ['view', 'range', 'sort'].forEach((k) => { if (typeof c[k] === 'string') cal[k] = c[k]; }); if (c.dir === -1) cal.dir = -1; if (c.show) Object.assign(cal.show, c.show); } catch (e) { /* blocked */ }
+  const calSave = () => { try { localStorage.setItem(CAL_KEY, JSON.stringify({ view: cal.view, show: cal.show, range: cal.range, sort: cal.sort, dir: cal.dir })); } catch (e) { /* blocked */ } };
+  const calShown = (it) => (it.kind === 'timeoff' ? cal.show[it.status] : cal.show[it.kind]) && cal.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => calText(it).includes(w));
+  const calList = () => { cal.view = 'list'; calSave(); calGo(); };
+
+  // ---------- One day: everything on it, and adding to it ----------
+  function dayDialog(d) {
+    const its = calItems().filter((it) => it.from <= d && d <= it.to).sort(calOrder);
+    const r = regularHours(d), sp = specialOn(d);
+    let m;
+    const add = (fn) => () => { m.close(); fn(); };
+    const line = (it) => h('li', { style: { margin: '4px 0', opacity: it.status === 'denied' ? 0.55 : 1 } }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); m.close(); calOpen(it); } }, h('b', null, calWhat(it))),
+      ` · ${calHours(it)}`, calStatus(it) && it.kind === 'timeoff' ? [' · ', h('span', { class: it.status === 'requested' ? 'warn' : it.status === 'approved' ? 'good' : 'muted' }, calStatus(it))] : '', it.note ? h('span', { class: 'muted' }, ` — ${it.note}`) : null);
+    const sect = (label, list, none) => [h('h3', { class: 'co-h3' }, label), list.length ? h('ul', { style: { margin: 0, paddingLeft: '18px' } }, list.map(line)) : h('p', { class: 'muted small', style: { margin: 0 } }, none)];
+    const inPlan = planDays().includes(d);
+    m = modal({ title: longDate(d), body: [
+      h('p', { style: { margin: '0 0 4px' } }, h('b', null, 'Store hours: '), sp ? `${specialText(sp)} (${sp.name || 'special hours'})` : r ? `${clock(r.open)} – ${clock(r.close)} (usual)` : 'usual hours not set',
+        inPlan ? h('span', { class: 'muted' }, ` · ${shiftsOn(d).length} on the schedule`) : null),
+      sect('Events', its.filter((it) => it.kind === 'event'), 'No events.'),
+      sect('Time off', its.filter((it) => it.kind === 'timeoff'), 'Nobody has time off.'),
+      h('div', { class: 'inline', style: { marginTop: '14px' } },
+        h('button', { class: 'btn sm', onclick: add(() => eventDialog(null, { from: d, to: d })) }, '+ Event'),
+        h('button', { class: 'btn sm', onclick: add(() => (sp ? specialDialog(sp) : specialDialog(null, { from: d, to: d }))) }, sp ? 'Special hours…' : '+ Special hours'),
+        h('button', { class: 'btn sm', disabled: !plan.staff.some((p) => !p.left), onclick: add(() => timeOffDialog(null, null, { from: d, to: d, status: 'requested', why: 'personal' })) }, '+ Time off request'),
+        inPlan ? h('button', { class: 'btn sm', onclick: add(() => { ui.day = d; ui.tab = 'schedule'; persist(); render(); }) }, 'Open on the Schedule') : null)],
+    actions: [{ label: 'Close', primary: true }] });
+  }
+
+  // ---------- The Calendar tab ----------
+  function calendarView(main) {
+    if (!cal.ym) cal.ym = ui.day.slice(0, 7);
+    const today = iso(new Date());
+    const items = calItems(), shown = items.filter(calShown);
+    const [yy, mm] = cal.ym.split('-').map(Number), mFirst = cal.ym + '-01', mLast = iso(new Date(yy, mm, 0));
+    const toMonth = (n) => { cal.ym = iso(new Date(yy, mm - 1 + n, 1)).slice(0, 7); render(); };
+    const search = h('input', { class: 'input', type: 'search', id: 'cal-q', value: cal.q, placeholder: 'Search: a name, holiday, reason, note, “request”…', 'aria-label': 'Search the calendar', style: { width: '300px', maxWidth: '100%' } });
+    search.addEventListener('input', () => { cal.q = search.value; render(); const s = $('#cal-q'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } });
+    const count = (f) => items.filter(f).length;
+    const show = (k, label, f, title) => h('label', { class: 'check small', title }, h('input', { type: 'checkbox', checked: !!cal.show[k], onchange: (e) => { cal.show[k] = e.target.checked; calSave(); render(); } }), h('span', { class: 'cal-key ' + k }), ` ${label} (${count(f)})`);
+    const isList = cal.view === 'list';
+    main.append(h('div', { class: 'card' },
+      h('div', { class: 'daynav' },
+        isList ? null : h('div', { class: 'inline no-print' },
+          h('button', { class: 'btn icon', 'aria-label': 'Previous month', onclick: () => toMonth(-1) }, '‹'),
+          h('button', { class: 'btn icon', 'aria-label': 'Next month', onclick: () => toMonth(1) }, '›')),
+        h('h1', { style: { textAlign: 'left', minWidth: 0 } }, isList ? 'Calendar · list' : `Calendar · ${monthLabel(cal.ym)}`),
+        isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
+        h('span', { class: 'spacer' }),
+        h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see', () => window.print())))),
+      h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
+        show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
+        show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
+        show('denied', 'Denied', (it) => it.kind === 'timeoff' && it.status === 'denied', 'Denied time off (kept as a record)'),
+        show('special', 'Store hours', (it) => it.kind === 'special', 'Special store hours: holidays and other days'),
+        show('event', 'Events', (it) => it.kind === 'event', 'Events and notes for a day')),
+      h('div', { class: 'inline no-print', style: { marginTop: '10px' } },
+        h('button', { class: 'btn sm primary', onclick: () => eventDialog(null, { from: isList ? today : ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst }) }, '+ Event'),
+        h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special store hours'),
+        h('button', { class: 'btn sm', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Time off request'),
+        h('span', { class: 'spacer' }),
+        h('button', { class: 'btn sm', title: 'Bring in an iCal (.ics) file from Outlook, Google Calendar, Apple Calendar or ShiftCraft: holidays, time off, events', onclick: icalImport }, 'Import iCal…'),
+        h('button', { class: 'btn sm', title: 'Save time off, store hours and events as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'))));
+    if (isList) { main.append(calListCard(shown, today, mFirst, mLast)); return; }
+
+    // the month, Monday first
+    const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
+    const MAX = 6;
+    const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to).sort(calOrder), sp = specialOn(d);
+      const n = planDays().includes(d) ? shiftsOn(d).length : 0;
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (sp && sp.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget) dayDialog(d); } },
+        h('div', { class: 'cal-head' },
+          h('button', { type: 'button', class: 'cal-num', title: `${longDate(d)}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
+          n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
+          h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
+        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(calChip),
+        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null);
+    })));
+    main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
+      h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
+      h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+  }
+
+  // the list: search, filter and sort everything
+  function calListCard(shown, today, mFirst, mLast) {
+    const inRange = (it) => cal.range === 'all' || (cal.range === 'upcoming' ? it.to >= today : cal.range === 'past' ? it.to < today : it.from <= mLast && it.to >= mFirst);
+    const COLS = [['from', 'When', (it) => it.from + String(it.hours ? it.hours[0] : 0).padStart(4, '0') + it.to], ['kind', 'Type', (it) => CAL_KIND[it.kind]], ['what', 'Who / what', calWhat],
+      ['hours', 'Hours', (it) => (it.kind === 'special' ? (it.x.closed ? '0' : '1' + String(it.x.open).padStart(4, '0')) : it.hours ? '1' + String(it.hours[0]).padStart(4, '0') : '0')], ['status', 'Status', calStatus], ['note', 'Note', (it) => it.note]];
+    const key = (COLS.find((c) => c[0] === cal.sort) || COLS[0])[2];
+    const list = shown.filter(inRange).sort((a, b) => cal.dir * (String(key(a)).localeCompare(String(key(b)), undefined, { numeric: true, sensitivity: 'base' }) || a.from.localeCompare(b.from)));
+    const head = h('tr', null, COLS.map(([k, l]) => h('th', { 'aria-sort': cal.sort === k ? (cal.dir > 0 ? 'ascending' : 'descending') : 'none' },
+      h('button', { type: 'button', class: 'th-sort', title: `Sort by ${l.toLowerCase()}`, onclick: () => { if (cal.sort === k) cal.dir = -cal.dir; else { cal.sort = k; cal.dir = 1; } calSave(); render(); } }, l, cal.sort === k ? (cal.dir > 0 ? ' ▲' : ' ▼') : ''))), h('th', null, ''));
+    const rows = list.map((it) => h('tr', { style: { opacity: it.status === 'denied' ? 0.55 : 1 } },
+      h('td', { class: 'nowrap' }, datesOnly(it), it.from <= today && it.to >= today ? h('span', { class: 'small', style: { marginLeft: '6px', fontWeight: 700 } }, 'now') : null),
+      h('td', { class: 'nowrap' }, h('span', { class: 'cal-key ' + (it.kind === 'timeoff' ? it.status : it.kind) }), ' ', CAL_KIND[it.kind]),
+      h('td', null, it.kind === 'timeoff' ? [h('b', null, it.who), ` · ${it.title}`] : h('b', null, it.title)),
+      h('td', { class: 'nowrap small' }, calHours(it)),
+      h('td', { class: 'nowrap ' + (it.status === 'requested' ? 'warn' : it.status === 'closed' ? 'bad' : '') }, calStatus(it)),
+      h('td', { class: 'small' }, it.note),
+      h('td', { class: 'nowrap' }, ibs(it.kind === 'timeoff' && it.status === 'requested' ? [ib('approve', 'Approve this time off', () => approveTimeOff(it.p, it.t), { cls: 'good' }), ib('deny', 'Deny it (kept as a record)', () => denyTimeOff(it.t), { cls: 'danger' })] : null,
+        ib('edit', 'See or change it (or delete it)', () => calOpen(it))))));
+    const range = calSeg('Which dates', [['upcoming', 'Now and coming up'], ['month', monthLabel(cal.ym)], ['past', 'Past'], ['all', 'All']], cal.range, (v) => { cal.range = v; calSave(); render(); });
+    return h('div', { class: 'card' },
+      h('div', { class: 'inline no-print' }, range, h('span', { class: 'spacer' }), h('span', { class: 'muted small' }, `${list.length} shown · click a column heading to sort`)),
+      h('div', { class: 'table-wrap', style: { marginTop: '10px' } }, h('table', { class: 't' }, h('thead', null, head),
+        h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: COLS.length + 1, class: 'muted' }, cal.q ? `Nothing matches “${cal.q}”.` : 'Nothing here. Try another set of dates, or tick more kinds above.'))))));
+  }
+
+  // ---------- On the Schedule and the Week ----------
+  // the day's special hours and events, under the date on the Schedule (nothing when there are none)
+  function calStrip(d) {
+    const sp = specialOn(d), ev = eventsOn(d);
+    if (!sp && !ev.length) return null;
+    return h('div', { class: 'cal-strip' },
+      sp ? h('button', { type: 'button', class: 'cal-chip special' + (sp.closed ? ' closed' : ''), title: `Special store hours${sp.note ? '\nNote: ' + sp.note : ''}\nClick to see or change them`, onclick: () => specialDialog(sp) },
+        `${sp.closed ? 'Store closed' : `Store open ${clock(sp.open)} – ${clock(sp.close)}`} · ${sp.name || 'special hours'}`) : null,
+      ev.map((x) => h('button', { type: 'button', class: 'cal-chip event', title: `Event${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => eventDialog(x) }, `${x.hours ? `${clockShort(x.hours[0])}–${clockShort(x.hours[1])} ` : ''}${x.title}`)));
+  }
+  // a small line under the day in the Week's heading
+  function calMark(d) {
+    const sp = specialOn(d), ev = eventsOn(d);
+    if (!sp && !ev.length) return null;
+    const tip = [sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()}` : '', ...ev.map((x) => `${x.hours ? clockShort(x.hours[0]) + ' ' : ''}${x.title}`)].filter(Boolean).join('\n');
+    return h('div', { class: 'cal-mark', title: tip }, sp ? h('span', { class: sp.closed ? 'bad' : 'warn' }, specialShort(sp)) : null, sp && ev.length ? ' · ' : '', ev.length ? `★ ${ev.length}` : '');
   }
   // ===================================================================
   // Hours by section, and day / week totals
@@ -2307,6 +2705,238 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         tile('Week variance', signed(whole - tWeek), varClass((whole - tWeek) / 3))));
   }
 
+  // ---------- iCal (.ics) files: out to other calendars, and back in ----------
+  // Export: time off, special store hours and events as an iCalendar file that Outlook, Google Calendar and Apple Calendar
+  // open. Each entry also carries X-SHIFTCRAFT-… lines (kind, id, person, reason, status, hours), so a file ShiftCraft
+  // made comes back exactly, and bringing it in again updates the same entries instead of adding them twice.
+  // Import: any .ics file. Each entry is shown with a guess of what it is (time off for a person whose name is in it, a
+  // store closing, or an event) to change before it goes in. Times in a time zone (TZID) are read as local times.
+  const ICS_TYPE = { description: 'iCalendar file', accept: { 'text/calendar': ['.ics'] } };
+  const icsEsc = (s) => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const icsUnesc = (s) => String(s || '').replace(/\\([\\;,nN])/g, (_, c) => (c === 'n' || c === 'N' ? '\n' : c));
+  const icsFold = (line) => { // lines longer than 75 bytes go on in the next line, which starts with a space
+    const enc = new TextEncoder(); if (enc.encode(line).length <= 75) return line;
+    const out = []; let cur = '', n = 0;
+    for (const ch of line) { const b = enc.encode(ch).length; if (n + b > 75) { out.push(cur); cur = ' '; n = 1; } cur += ch; n += b; }
+    out.push(cur); return out.join('\r\n');
+  };
+  const icsDay = (d) => d.replace(/-/g, '');
+  const icsAt = (d, m) => `${icsDay(d)}T${String(Math.floor(m / 60)).padStart(2, '0')}${String(m % 60).padStart(2, '0')}00`;
+  const ICS_STATUS = { requested: 'TENTATIVE', approved: 'CONFIRMED', denied: 'CANCELLED' };
+
+  function icsEvent({ uidOf, from, to, hours, summary, desc, cats, status, x }) {
+    const L = ['BEGIN:VEVENT', `UID:${uidOf}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')}`];
+    if (hours) { L.push(`DTSTART:${icsAt(from, hours[0])}`, `DTEND:${icsAt(from, hours[1])}`); if (to > from) L.push(`RRULE:FREQ=DAILY;COUNT=${timeOffDays({ from, to })}`); }
+    else L.push(`DTSTART;VALUE=DATE:${icsDay(from)}`, `DTEND;VALUE=DATE:${icsDay(addDays(to, 1))}`);
+    L.push(`SUMMARY:${icsEsc(summary)}`);
+    if (desc) L.push(`DESCRIPTION:${icsEsc(desc)}`);
+    if (cats) L.push(`CATEGORIES:${icsEsc(cats)}`);
+    if (status) L.push(`STATUS:${status}`);
+    L.push('TRANSP:TRANSPARENT');
+    Object.entries(x).forEach(([k, v]) => { if (v != null && v !== '') L.push(`X-SHIFTCRAFT-${k}:${icsEsc(v)}`); });
+    L.push('END:VEVENT');
+    return L;
+  }
+
+  function icalExportDialog(o = {}) {
+    const today = iso(new Date());
+    const box = (label, on, title) => { const c = h('input', { type: 'checkbox', checked: on }); c.addEventListener('change', () => sync()); return { c, el: h('label', { class: 'check', title }, c, ' ' + label) }; };
+    const cA = box('Approved time off', true), cR = box('Time off requests (still to approve)', true), cD = box('Denied time off', false),
+      cS = box('Special store hours (holidays)', true), cE = box('Events and notes for a day', true),
+      cN = box('Leave out notes and reasons (for a file you share)', false, 'Time off then shows only “Time off” with the name and dates');
+    const people = sortStaff(plan.staff.filter((p) => !p.left));
+    const who = h('select', { class: 'input' }, h('option', { value: '' }, 'Everyone'), people.map((p) => h('option', { value: p.id, selected: p.id === o.person }, p.name)));
+    const range = h('select', { class: 'input' }, h('option', { value: 'upcoming' }, 'Now and coming up'), h('option', { value: 'all' }, 'Everything, past ones too'));
+    [who, range].forEach((e) => e.addEventListener('change', () => sync()));
+    const info = h('p', { class: 'hint', style: { margin: '6px 0 0' } });
+    const gather = () => {
+      const out = [], up = range.value === 'upcoming', bare = cN.c.checked, keep = (x) => !up || x.to >= today;
+      const want = { requested: cR.c.checked, approved: cA.c.checked, denied: cD.c.checked };
+      people.filter((p) => !who.value || p.id === who.value).forEach((p) => (p.timeOff || []).filter((t) => want[t.status] && keep(t)).forEach((t) => {
+        const label = bare ? 'Time off' : TIME_OFF_WHY[t.why] || 'Time off', cover = t.cover && staffById(t.cover);
+        out.push(icsEvent({ uidOf: t.ics || `${t.id}@shiftcraft`, from: t.from, to: t.to, hours: t.hours, summary: `${p.name} · ${label}${t.status === 'requested' ? ' (requested)' : t.status === 'denied' ? ' (denied)' : ''}`,
+          desc: bare ? TIME_OFF_STATUS[t.status] : [TIME_OFF_STATUS[t.status], t.paid ? (t.paid === 'paid' ? 'Paid' : 'Unpaid') : '', cover ? `Covered by ${cover.name}` : '', t.note].filter(Boolean).join('\n'),
+          cats: 'Time off', status: ICS_STATUS[t.status],
+          x: { KIND: 'timeoff', ID: t.id, PERSON: p.name, WHY: bare ? '' : t.why, STATUS: t.status, PAID: bare ? '' : t.paid, NOTE: bare ? '' : t.note } }));
+      }));
+      if (cS.c.checked) (plan.specialHours || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: null,
+        summary: `${x.name || 'Special hours'}: ${x.closed ? 'store closed' : `store open ${clock(x.open)} – ${clock(x.close)}`}`, desc: bare ? '' : x.note, cats: 'Store hours',
+        x: { KIND: 'special', ID: x.id, NAME: x.name, CLOSED: x.closed ? '1' : '0', OPEN: x.open, CLOSE: x.close, NOTE: bare ? '' : x.note } })));
+      if (cE.c.checked) (plan.events || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: x.hours, summary: x.title, desc: bare ? '' : x.note, cats: 'Event',
+        x: { KIND: 'event', ID: x.id, TITLE: x.title, NOTE: bare ? '' : x.note } })));
+      return out;
+    };
+    const sync = () => { const n = gather().length; info.textContent = n ? `${n} entr${n === 1 ? 'y goes' : 'ies go'} in the file.` : 'Nothing to put in the file with these choices.'; };
+    sync();
+    modal({ title: 'Export calendar (iCal)', body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Saves an .ics file that Outlook, Google Calendar and Apple Calendar can open or import. Bring it back into ShiftCraft with Import iCal: the same entries are updated, not added twice.'),
+      h('div', { class: 'field' }, h('span', null, 'Put in'), cA.el, cR.el, cD.el, cS.el, cE.el),
+      pair2(fieldOf('Time off for', who), fieldOf('Dates', range)), cN.el, info],
+    actions: [{ label: 'Cancel' }, { label: 'Save .ics file…', primary: true, onClick: () => {
+      const evs = gather(); if (!evs.length) { toast('Nothing to put in the file with these choices.'); return false; }
+      const person = staffById(who.value);
+      const txt = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Craft//ShiftCraft//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${icsEsc(placeName() + (person ? ' · ' + person.name : '') + ' · ShiftCraft')}`,
+        ...evs.flat(), 'END:VCALENDAR'].map(icsFold).join('\r\n') + '\r\n';
+      const name = [plan.company, plan.location, person ? person.name : '', 'calendar'].map(safe).filter(Boolean).join(' - ') + '.ics';
+      saveBlob(name, new Blob([txt], { type: 'text/calendar' }), ICS_TYPE).then((n) => n && toast(`Saved ${evs.length} entr${evs.length === 1 ? 'y' : 'ies'} as ${n}`));
+    } }] });
+  }
+
+  // ---------- Reading a file ----------
+  const icsLine = (s) => {
+    let q = false, i = 0;
+    for (; i < s.length; i++) { const c = s[i]; if (c === '"') q = !q; else if (c === ':' && !q) break; }
+    if (i >= s.length) return null;
+    const head = s.slice(0, i).split(';'), params = {};
+    head.slice(1).forEach((p) => { const k = p.indexOf('='); if (k > 0) params[p.slice(0, k).toUpperCase()] = p.slice(k + 1).replace(/^"|"$/g, ''); });
+    return { name: head[0].trim().toUpperCase(), params, value: s.slice(i + 1) };
+  };
+  function icsParse(text) {
+    const evs = []; let cur = null, depth = 0;
+    String(text).replace(/\r\n?/g, '\n').replace(/\n[ \t]/g, '').split('\n').forEach((raw) => {
+      if (!raw.trim()) return;
+      const m = icsLine(raw); if (!m) return;
+      if (m.name === 'BEGIN') { if (!cur && m.value.trim().toUpperCase() === 'VEVENT') { cur = { _p: {} }; depth = 0; } else if (cur) depth++; return; }
+      if (m.name === 'END') { if (!cur) return; if (depth === 0 && m.value.trim().toUpperCase() === 'VEVENT') { evs.push(cur); cur = null; } else depth--; return; }
+      if (cur && depth === 0 && !(m.name in cur)) { cur[m.name] = m.value; cur._p[m.name] = m.params; }
+    });
+    return evs;
+  }
+  // a DTSTART / DTEND value: { d: 'YYYY-MM-DD', t: minutes or null for a whole day }; Z (UTC) times become local times
+  const icsWhen = (v, p) => {
+    const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/.exec(String(v || '').trim()); if (!m) return null;
+    if (!m[4] || (p && String(p.VALUE).toUpperCase() === 'DATE')) return { d: `${m[1]}-${m[2]}-${m[3]}`, t: null };
+    const dt = m[7] ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])) : new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    return { d: iso(dt), t: dt.getHours() * 60 + dt.getMinutes() };
+  };
+  const icsMinutes = (dur) => { const m = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/.exec(String(dur || '')); return m ? ((+m[1] || 0) * 7 * 1440 + (+m[2] || 0) * 1440 + (+m[3] || 0) * 60 + (+m[4] || 0)) : 0; };
+  function icsItem(e) {
+    const s = icsWhen(e.DTSTART, e._p.DTSTART); if (!s) return null;
+    const en = icsWhen(e.DTEND, e._p.DTEND), dur = icsMinutes(e.DURATION);
+    let from = s.d, to = s.d, hours = null;
+    if (s.t == null) { if (en && en.d > s.d) to = addDays(en.d, -1); else if (dur >= 1440) to = addDays(s.d, Math.round(dur / 1440) - 1); }
+    else {
+      const endD = en ? en.d : iso(new Date(parseIso(s.d).getTime() + (s.t + (dur || 60)) * 60000)), endT = en ? en.t : (s.t + (dur || 60)) % 1440;
+      if (endD > s.d && !(endD === addDays(s.d, 1) && endT === 0)) { if (s.t === 0 && endT === 0) to = addDays(endD, -1); else to = endD; } // over several days: whole days
+      else { const a = Math.min(snap(s.t), 1410), b = endD > s.d ? 1425 : Math.min(snap(endT), 1425); hours = [a, Math.max(a + 15, b)]; }
+    }
+    let repeat = '';
+    if (e.RRULE) {
+      const r = Object.fromEntries(e.RRULE.split(';').map((kv) => kv.split('=')).map(([k, v]) => [String(k).toUpperCase(), v]));
+      if (r.FREQ === 'DAILY' && (!r.INTERVAL || r.INTERVAL === '1') && (r.COUNT || r.UNTIL) && from === to) { if (r.COUNT) to = addDays(from, Math.max(1, +r.COUNT) - 1); else { const u = icsWhen(r.UNTIL); if (u) to = u.d; } }
+      else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
+    }
+    if (to < from) to = from;
+    const X = (k) => (e['X-SHIFTCRAFT-' + k] != null ? icsUnesc(e['X-SHIFTCRAFT-' + k]).trim() : '');
+    return { uid: (e.UID || '').trim(), id: X('ID').replace(/[^\w-]/g, '').slice(0, 40), kind: X('KIND'), from, to, hours, repeat,
+      summary: icsUnesc(e.SUMMARY).replace(/\s+/g, ' ').trim(), desc: icsUnesc(e.DESCRIPTION).trim(), cancelled: String(e.STATUS || '').trim().toUpperCase() === 'CANCELLED',
+      person: X('PERSON'), why: X('WHY'), status: X('STATUS'), paid: X('PAID'), note: X('NOTE'), name: X('NAME'), title: X('TITLE'), closed: X('CLOSED'), open: parseInt(X('OPEN'), 10), close: parseInt(X('CLOSE'), 10) };
+  }
+
+  // what ShiftCraft already has with this file's id or UID: { kind, x, p? }
+  function icsFind(it) {
+    const ids = [it.id, it.uid.endsWith('@shiftcraft') ? it.uid.split('@')[0] : ''].filter(Boolean), same = (x) => ids.includes(x.id) || (it.uid && x.ics === it.uid);
+    for (const p of plan.staff) for (const t of p.timeOff || []) if (same(t)) return { kind: 'timeoff', x: t, p };
+    for (const x of plan.specialHours || []) if (same(x)) return { kind: 'special', x };
+    for (const x of plan.events || []) if (same(x)) return { kind: 'event', x };
+    return null;
+  }
+  const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // a first guess of what an entry is: 'event', 'closed', 'special' or 'off:<person id>'
+  function icsGuess(it, ex) {
+    const people = plan.staff.filter((p) => !p.left);
+    if (ex) return ex.kind === 'timeoff' ? 'off:' + ex.p.id : ex.kind === 'special' ? (ex.x.closed ? 'closed' : 'special') : 'event';
+    if (it.kind === 'special') return it.closed === '1' ? 'closed' : 'special';
+    if (it.kind === 'event') return 'event';
+    const named = it.person && people.find((p) => p.name.toLowerCase() === it.person.toLowerCase());
+    if (named) return 'off:' + named.id;
+    const txt = `${it.summary} ${it.desc}`.toLowerCase();
+    const full = people.find((p) => txt.includes(p.name.toLowerCase())); if (full) return 'off:' + full.id;
+    const firsts = people.filter((p) => new RegExp(`\\b${reEsc(p.name.split(' ')[0].toLowerCase())}\\b`).test(txt));
+    if (firsts.length === 1) return 'off:' + firsts[0].id;
+    if (/\b(closed|store hours|special hours|holiday hours)\b/.test(txt)) return it.hours ? 'special' : 'closed';
+    return 'event';
+  }
+  const icsWhy = (it) => {
+    if (TIME_OFF_WHY[it.why]) return it.why;
+    const txt = `${it.summary} ${it.desc}`.toLowerCase();
+    return [['sick', /\b(sick|ill|flu)\b/], ['appointment', /\b(appointment|dentist|doctor|dr\.?)\b/], ['school', /\b(school|class|exam)\b/], ['family', /\b(family|wedding|kids?)\b/],
+      ['bereavement', /\b(funeral|bereavement)\b/], ['jury', /\bjury\b/], ['vacation', /\b(vacation|holiday|trip|pto)\b/]].find(([, re]) => re.test(txt))?.[0] || 'personal';
+  };
+
+  function icalImport() {
+    const inp = h('input', { type: 'file', accept: '.ics,.ical,.icalendar,text/calendar', style: { display: 'none' } });
+    inp.addEventListener('change', async () => { const f = inp.files[0]; inp.remove(); if (f) icalImportDialog(await f.text(), f.name); });
+    document.body.append(inp); inp.click();
+  }
+
+  function icalImportDialog(text, fileName) {
+    const today = iso(new Date());
+    const found = icsParse(text).map(icsItem).filter(Boolean).sort((a, b) => a.from.localeCompare(b.from));
+    if (!found.length) { toast(`No calendar entries found in ${fileName}.`); return; }
+    const people = sortStaff(plan.staff.filter((p) => !p.left));
+    let defStatus = 'requested';
+    const rows = found.slice(0, 600).map((it) => {
+      const ex = icsFind(it);
+      const already = !ex && ((plan.events || []).some((x) => x.from === it.from && x.title.toLowerCase() === it.summary.toLowerCase())
+        || (plan.specialHours || []).some((x) => x.from === it.from && (x.name || '').toLowerCase() === (it.name || it.summary).toLowerCase()));
+      const tick = h('input', { type: 'checkbox', checked: !already && it.to >= today, 'aria-label': 'Bring this one in' });
+      const as = h('select', { class: 'input', 'aria-label': 'Add as' },
+        h('option', { value: 'event' }, 'Event (a note for the day)'), h('option', { value: 'closed' }, 'Store closed'), h('option', { value: 'special' }, 'Store open other hours'),
+        h('optgroup', { label: 'Time off for' }, people.map((p) => h('option', { value: 'off:' + p.id }, p.name))));
+      as.value = icsGuess(it, ex);
+      if (!as.value) as.value = 'event';
+      const state = ex ? h('span', { class: 'small good' }, 'Updates the one in ShiftCraft') : already ? h('span', { class: 'small muted' }, 'Looks already there') : it.to < today ? h('span', { class: 'small muted' }, 'Past') : h('span', { class: 'small' }, 'New');
+      const tr = h('tr', null, h('td', { class: 'c' }, tick), h('td', { class: 'nowrap small' }, timeOffWhen(it)),
+        h('td', { style: { minWidth: '240px' } }, h('b', null, it.summary || '(no title)'), it.desc ? h('div', { class: 'small muted', style: { maxWidth: '320px', whiteSpace: 'pre-line', overflow: 'hidden', maxHeight: '3.4em' } }, it.desc) : null,
+          it.repeat ? h('div', { class: 'small warn' }, `Repeats ${it.repeat}: only this first one comes in`) : null),
+        h('td', null, as), h('td', { class: 'nowrap' }, state));
+      return { it, ex, tick, as, tr };
+    });
+    const pick = (f) => { rows.forEach((r) => { r.tick.checked = f(r); }); };
+    const seg = calSeg('Time off from this file is', [['requested', 'Requested'], ['approved', 'Approved']], defStatus, (v) => { defStatus = v; });
+    modal({ title: `Import calendar · ${fileName}`, wide: true, body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, `${found.length} entr${found.length === 1 ? 'y' : 'ies'} found${found.length > rows.length ? ` (the first ${rows.length} are shown)` : ''}. Tick the ones to bring in and say what each one is: an event, the store closed or open other hours (a holiday), or time off for someone. A name in the entry picks the person.`),
+      h('div', { class: 'inline' }, h('span', { class: 'small' }, 'Tick:'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => true) }, 'All'),
+        h('button', { type: 'button', class: 'btn sm', onclick: () => pick((r) => r.it.to >= today) }, 'Now and coming up'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => false) }, 'None'),
+        h('span', { class: 'spacer' }), h('span', { class: 'small' }, 'Time off that doesn’t say is'), seg),
+      h('div', { class: 'table-wrap', style: { maxHeight: '52vh', overflow: 'auto', marginTop: '8px' } }, h('table', { class: 't compact' },
+        h('thead', null, h('tr', null, h('th', { class: 'c' }, 'In'), h('th', null, 'When'), h('th', null, 'Entry'), h('th', null, 'Add as'), h('th', null, ''))), h('tbody', null, rows.map((r) => r.tr)))),
+      h('p', { class: 'hint' }, 'Times with a time zone are read as times here. An entry that repeats weekly or yearly comes in once (its first day).')],
+    actions: [{ label: 'Cancel' }, { label: 'Bring them in', primary: true, onClick: () => {
+      const go = rows.filter((r) => r.tick.checked);
+      if (!go.length) { toast('Tick at least one entry.'); return false; }
+      const n = { timeoff: 0, special: 0, event: 0, updated: 0 };
+      change(() => {
+        go.forEach(({ it, ex, as }) => {
+          if (ex) { // take the old one out (it may be going in as another kind)
+            n.updated++;
+            if (ex.kind === 'timeoff') { ex.p.timeOff = ex.p.timeOff.filter((t) => t !== ex.x); if (!ex.p.timeOff.length) delete ex.p.timeOff; }
+            else if (ex.kind === 'special') plan.specialHours = plan.specialHours.filter((x) => x !== ex.x);
+            else plan.events = plan.events.filter((x) => x !== ex.x);
+          }
+          const id = ex ? ex.x.id : it.id || uid(), ics = it.uid && !it.uid.endsWith('@shiftcraft') ? { ics: it.uid.slice(0, 300) } : {};
+          const note = (it.note || it.desc || '').slice(0, 300);
+          const v = as.value;
+          if (v === 'event') { (plan.events = plan.events || []).push({ id, from: it.from, to: it.to, title: (it.title || it.summary || 'Event').slice(0, 120), hours: it.hours, note: (it.note || it.desc || '').slice(0, 500), ...ics }); n.event++; }
+          else if (v === 'closed' || v === 'special') {
+            const r = regularHours(it.from) || { open: 600, close: 960 };
+            const open = Number.isFinite(it.open) ? it.open : it.hours ? it.hours[0] : r.open, close = Number.isFinite(it.close) && it.close > open ? it.close : it.hours ? it.hours[1] : Math.max(r.close, open + 60);
+            (plan.specialHours = plan.specialHours || []).push({ id, from: it.from, to: it.to, name: (it.name || it.summary.replace(/:\s*store (closed|open).*$/i, '')).slice(0, 80), closed: v === 'closed', open, close: close > open ? close : open + 60, note, ...ics }); n.special++;
+          } else {
+            const p = staffById(v.slice(4)); if (!p) return;
+            const status = TIME_OFF_STATUS[it.status] ? it.status : it.cancelled ? 'denied' : defStatus;
+            (p.timeOff = p.timeOff || []).push({ id, from: it.from, to: it.to, hours: it.hours, why: icsWhy(it), status, note: it.kind === 'timeoff' ? it.note.slice(0, 300) : [it.summary, it.desc].filter(Boolean).join(' – ').slice(0, 300),
+              added: today, asked: today, ...(['paid', 'unpaid'].includes(it.paid) ? { paid: it.paid } : {}), ...(status !== 'requested' ? { decided: today } : {}), ...ics });
+            p.timeOff.sort((a, b) => a.from.localeCompare(b.from)); n.timeoff++;
+          }
+        });
+        ['events', 'specialHours'].forEach((k) => { if (plan[k]) { plan[k].sort((a, b) => a.from.localeCompare(b.from)); if (!plan[k].length) delete plan[k]; } });
+      });
+      const parts = [n.timeoff && `${n.timeoff} time off`, n.special && `${n.special} store hours`, n.event && `${n.event} event${n.event === 1 ? '' : 's'}`].filter(Boolean).join(', ');
+      toast(`Brought in ${parts}${n.updated ? ` (${n.updated} updated)` : ''}. You can undo this.`, { label: 'Undo', fn: undo });
+    } }] });
+  }
   // ===================================================================
   // Tasks and training
   // ===================================================================
@@ -2825,6 +3455,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let fixes = 0;
     if (!Array.isArray(p.positions)) p.positions = defaultPositions();
     p.positions = p.positions.filter((x) => x && String(x.name || '').trim()).map((x) => ({ id: x.id || uid(), name: String(x.name).trim(), active: x.active !== false }));
+    // the Calendar's special store hours and events (20-calendar.js)
+    { const okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s), okh = (a) => Array.isArray(a) && Number.isFinite(a[0]) && Number.isFinite(a[1]) && a[1] > a[0];
+      const ics = (x) => (typeof x.ics === 'string' && x.ics ? { ics: x.ics.slice(0, 300) } : {}), to = (x) => (okd(x.to) && x.to >= x.from ? x.to : x.from);
+      if (p.events !== undefined) { p.events = Array.isArray(p.events) ? p.events.filter((x) => x && okd(x.from)).map((x) => ({ id: x.id || uid(), from: x.from, to: to(x), title: String(x.title || 'Event').slice(0, 120), hours: okh(x.hours) ? [x.hours[0], x.hours[1]] : null, note: String(x.note || '').slice(0, 500), ...ics(x) })) : []; if (!p.events.length) delete p.events; }
+      if (p.specialHours !== undefined) { p.specialHours = Array.isArray(p.specialHours) ? p.specialHours.filter((x) => x && okd(x.from)).map((x) => { const open = Number.isFinite(x.open) ? x.open : 600; return { id: x.id || uid(), from: x.from, to: to(x), name: String(x.name || '').slice(0, 80), closed: !!x.closed, open, close: Number.isFinite(x.close) && x.close > open ? x.close : open + 60, note: String(x.note || '').slice(0, 300), ...ics(x) }; }) : []; if (!p.specialHours.length) delete p.specialHours; } }
     const ids = new Set();
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {
       const q = { ...x, name: String(x.name).trim() };
@@ -2842,7 +3477,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           hours: Array.isArray(t.hours) && Number.isFinite(t.hours[0]) && Number.isFinite(t.hours[1]) && t.hours[1] > t.hours[0] ? [t.hours[0], t.hours[1]] : null,
           why: TIME_OFF_WHY[t.why] ? t.why : 'other', status: TIME_OFF_STATUS[t.status] ? t.status : 'requested', note: String(t.note || '').slice(0, 300), added: ok(t.added) ? t.added : t.from,
           ...(ok(t.asked) ? { asked: t.asked } : {}), ...(TIME_OFF_HOW[t.how] ? { how: t.how } : {}), ...(typeof t.cover === 'string' && t.cover ? { cover: t.cover } : {}),
-          ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}) })) : [];
+          ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}), ...(typeof t.ics === 'string' && t.ics ? { ics: t.ics.slice(0, 300) } : {}) })) : [];
         if (!q.timeOff.length) delete q.timeOff;
       }
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }
@@ -2870,6 +3505,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     days.forEach((d) => {
       const list = shiftsOn(d);
       const seen = {};
+      // special store hours (a holiday): shifts on a closed day, or well outside the hours (over 2 h before opening, 1 h after closing)
+      const sp = specialOn(d);
+      if (sp && sp.closed && list.length) add(d, `The store is closed (${sp.name || 'special hours'}), but ${list.length} shift${list.length === 1 ? ' is' : 's are'} scheduled.`, 'bad');
+      else if (sp) list.forEach((s) => { if (s.start < sp.open - 120 || s.end > sp.close + 60) add(d, `${staffById(s.staffId).name} works ${clock(s.start)}–${clock(s.end)}, but the store is open ${clock(sp.open)} – ${clock(sp.close)} (${sp.name || 'special hours'}).`, 'warn'); });
       list.forEach((s) => {
         const p = staffById(s.staffId);
         // more than one shift on a day is fine (a split shift); only parts that overlap are a problem
@@ -2917,7 +3556,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     };
     range.addEventListener('change', draw); draw();
     modal({ title: 'Check schedule', wide: true, body: [h('label', { class: 'field' }, h('span', null, 'Check'), range), list,
-      h('p', { class: 'hint' }, 'Looks for shifts of one person that overlap (split shifts are fine), shifts outside availability, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
+      h('p', { class: 'hint' }, 'Looks for shifts of one person that overlap (split shifts are fine), shifts outside availability, shifts on a day the store is closed or outside special store hours, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
     actions: [{ label: 'Close', primary: true }] });
   }
 
@@ -3944,6 +4583,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       { label: 'Print or save visual timeline…', run: () => exportImageDialog({ layout: 'timeline' }) },
       { label: 'Print or save calendar…', run: () => exportImageDialog({ layout: 'calendar' }) },
       { label: 'Save as text or CSV…', run: exportTextDialog },
+      { label: 'Import calendar (iCal .ics)…', run: icalImport },
+      { label: 'Export calendar (iCal .ics)…', run: () => icalExportDialog() },
       { label: 'Print schedule for a person or group…', run: () => printPeopleDialog() },
       { label: 'Print availability and contact list', run: () => printAvailability() },
       { label: 'Print screen (what you see)…', key: 'Ctrl+Shift+P', run: printScreenDialog },
@@ -3972,6 +4613,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       { label: 'Time off request…', run: () => timeOffRequest(false) },
       { label: 'Not available some hours (appointment)…', run: () => timeOffRequest(true) },
       { label: 'Time off list', run: timeOffList },
+      { label: 'Special store hours (holiday)…', run: () => specialDialog(null) },
+      { label: 'Event or note for a day…', run: () => eventDialog(null) },
+      { label: 'Calendar list (search and sort)', run: calList },
       '-',
       { label: 'Check schedule…', run: checkDialog },
     ]],
@@ -4612,7 +5256,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
     const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
-    const VIEWS = ['schedule', 'week', 'forecast', 'handoff', 'staff', 'company'];
+    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
     // Start (the wizard): what do you want to do? Each tile goes to the place (or the window) for that job.
     const go = (start) => () => { const it = item(start); if (it.run) it.run(); };
@@ -4624,6 +5268,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       { title: 'Forecast and labour', what: 'Sales, labour hours, AM / MID / PM', run: view('forecast') },
       { title: 'Print or share', what: 'Week table, timeline, calendar, availability list, email', run: go('Print or save week table') },
       { title: 'Check the schedule', what: 'Gaps, overlaps, availability and hours', run: go('Check schedule') },
+      { title: 'Calendar', what: 'Time off requests, holiday store hours and events; iCal in and out', run: view('calendar') },
       { title: 'Company and location', what: 'Name, address, opening hours, positions', run: view('company') },
       { title: 'Open a saved file…', what: 'A location, team or weeks file', run: () => openFile() },
       { title: 'Carry on', what: 'Back to where you were', run: () => {} },
@@ -4654,6 +5299,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
           ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save this week’s schedule only', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
+        ] },
+        { id: 'calendar', label: 'Calendar', hue: '#3c8d3c', onSelect: view('calendar'), groups: [
+          ['Add', [C('Event or note for a day', 'Event…', I.star, { big: true }), C('Special store hours', 'Special hours…', I.store, { big: true, title: 'Other opening hours (or closed) for a holiday or any day' }), C('Time off request', 'Time off request…', I.calendar, { big: true })]],
+          ['iCal', [C('Import calendar', 'Import iCal…', I.import, { big: true }), C('Export calendar', 'Export iCal…', I.exportUp, { big: true })]],
+          ['Find', [{ label: 'Search', icon: I.search, big: true, title: 'Search time off, store hours and events', run: () => { view('calendar')(); setTimeout(() => { const x = document.querySelector('#cal-q'); x && x.focus(); }, 60); } }, C('Calendar list', 'List', I.list, { big: true, title: 'Everything as a list you can sort' })]],
         ] },
         { id: 'forecast', label: 'Forecast', hue: '#e09f1f', onSelect: view('forecast'), groups: [
           ['Settings', [C('Settings', 'Settings…', I.gear, { big: true, title: 'Sales per labor hour, AM / MID / PM times, plan length' }), C('Company & location', 'Company & location', I.store, { big: true })]],

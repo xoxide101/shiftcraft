@@ -326,3 +326,44 @@ table.t .hgrid .hlabel { white-space: nowrap; overflow: hidden; text-overflow: e
 .daytoggles button.dt.use.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }
 .availline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 5px; border: 1px dashed var(--line); border-radius: 6px; }
+/* Calendar tab (20-calendar.js) */
+table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 760px; }
+table.cal th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px; text-align: left; }
+table.cal td.cal-day { vertical-align: top; height: 104px; border: 1px solid var(--line); padding: 3px 4px 5px; background: var(--panel); }
+table.cal td.cal-out { background: var(--bg); }
+table.cal td.cal-out .cal-num { opacity: .5; }
+table.cal td.cal-closed { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
+.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+.cal-head .small { margin-left: auto; font-size: 10px; }
+.cal-num { border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; padding: 0 6px; border-radius: 10px; cursor: pointer; min-width: 24px; }
+.cal-num:hover { background: var(--accent-soft); }
+.cal-today .cal-num { background: var(--accent); color: var(--accent-ink); }
+.cal-add { margin-left: auto; border: 1px solid transparent; background: none; color: var(--muted); border-radius: 5px; width: 20px; height: 20px; line-height: 16px; padding: 0; cursor: pointer; font-size: 15px; opacity: 0; }
+.cal-head .small + .cal-add { margin-left: 2px; }
+td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line); }
+.cal-chip { display: block; width: 100%; text-align: left; font: inherit; font-size: 11px; line-height: 16px; padding: 1px 5px; margin-top: 2px; border-radius: 4px; border: 1px solid transparent; color: var(--fg); background: var(--accent-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.cal-chip:hover { border-color: var(--accent); }
+.cal-chip.special { background: color-mix(in srgb, var(--warn) 20%, transparent); font-weight: 600; }
+.cal-chip.special.closed { background: color-mix(in srgb, var(--bad) 20%, transparent); }
+.cal-chip.timeoff.approved { background: color-mix(in srgb, var(--good) 17%, transparent); }
+.cal-chip.timeoff.requested { background: transparent; border: 1px dashed var(--warn); }
+.cal-chip.timeoff.denied { background: transparent; border: 1px solid var(--line); color: var(--muted); text-decoration: line-through; }
+.cal-more { border: 0; background: none; color: var(--accent); font: inherit; font-size: 11px; padding: 1px 4px; cursor: pointer; }
+.cal-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; background: var(--accent-soft); border: 1px solid var(--accent); }
+.cal-key.requested { background: transparent; border: 1px dashed var(--warn); }
+.cal-key.approved { background: color-mix(in srgb, var(--good) 30%, transparent); border-color: var(--good); }
+.cal-key.denied { background: transparent; border-color: var(--muted); }
+.cal-key.special, .cal-key.open { background: color-mix(in srgb, var(--warn) 30%, transparent); border-color: var(--warn); }
+.cal-key.closed { background: color-mix(in srgb, var(--bad) 30%, transparent); border-color: var(--bad); }
+.cal-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.cal-strip .cal-chip { width: auto; max-width: 100%; font-size: 12px; padding: 3px 8px; margin: 0; }
+.cal-mark { font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.th-sort { border: 0; background: none; font: inherit; font-weight: inherit; color: inherit; padding: 0; cursor: pointer; text-align: left; }
+.th-sort:hover { color: var(--accent); }
+@media print { table.cal td.cal-day { height: auto; min-height: 80px; } .cal-add, .cal-more { display: none; } }
+/* contact QR code (16-contact-qr.js) */
+.qr-card { display: flex; gap: 16px; align-items: center; }
+.qr-pic svg { display: block; width: 200px; height: 200px; border-radius: 4px; }
+.qr-who { display: grid; gap: 2px; }
+.qr-who b { font-size: 16px; }
+.qr-big { font-size: 15px; font-weight: 700; margin-top: 6px; }

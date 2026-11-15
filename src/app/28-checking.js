@@ -6,6 +6,11 @@
     let fixes = 0;
     if (!Array.isArray(p.positions)) p.positions = defaultPositions();
     p.positions = p.positions.filter((x) => x && String(x.name || '').trim()).map((x) => ({ id: x.id || uid(), name: String(x.name).trim(), active: x.active !== false }));
+    // the Calendar's special store hours and events (20-calendar.js)
+    { const okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s), okh = (a) => Array.isArray(a) && Number.isFinite(a[0]) && Number.isFinite(a[1]) && a[1] > a[0];
+      const ics = (x) => (typeof x.ics === 'string' && x.ics ? { ics: x.ics.slice(0, 300) } : {}), to = (x) => (okd(x.to) && x.to >= x.from ? x.to : x.from);
+      if (p.events !== undefined) { p.events = Array.isArray(p.events) ? p.events.filter((x) => x && okd(x.from)).map((x) => ({ id: x.id || uid(), from: x.from, to: to(x), title: String(x.title || 'Event').slice(0, 120), hours: okh(x.hours) ? [x.hours[0], x.hours[1]] : null, note: String(x.note || '').slice(0, 500), ...ics(x) })) : []; if (!p.events.length) delete p.events; }
+      if (p.specialHours !== undefined) { p.specialHours = Array.isArray(p.specialHours) ? p.specialHours.filter((x) => x && okd(x.from)).map((x) => { const open = Number.isFinite(x.open) ? x.open : 600; return { id: x.id || uid(), from: x.from, to: to(x), name: String(x.name || '').slice(0, 80), closed: !!x.closed, open, close: Number.isFinite(x.close) && x.close > open ? x.close : open + 60, note: String(x.note || '').slice(0, 300), ...ics(x) }; }) : []; if (!p.specialHours.length) delete p.specialHours; } }
     const ids = new Set();
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {
       const q = { ...x, name: String(x.name).trim() };
@@ -23,7 +28,7 @@
           hours: Array.isArray(t.hours) && Number.isFinite(t.hours[0]) && Number.isFinite(t.hours[1]) && t.hours[1] > t.hours[0] ? [t.hours[0], t.hours[1]] : null,
           why: TIME_OFF_WHY[t.why] ? t.why : 'other', status: TIME_OFF_STATUS[t.status] ? t.status : 'requested', note: String(t.note || '').slice(0, 300), added: ok(t.added) ? t.added : t.from,
           ...(ok(t.asked) ? { asked: t.asked } : {}), ...(TIME_OFF_HOW[t.how] ? { how: t.how } : {}), ...(typeof t.cover === 'string' && t.cover ? { cover: t.cover } : {}),
-          ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}) })) : [];
+          ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}), ...(typeof t.ics === 'string' && t.ics ? { ics: t.ics.slice(0, 300) } : {}) })) : [];
         if (!q.timeOff.length) delete q.timeOff;
       }
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }
@@ -51,6 +56,10 @@
     days.forEach((d) => {
       const list = shiftsOn(d);
       const seen = {};
+      // special store hours (a holiday): shifts on a closed day, or well outside the hours (over 2 h before opening, 1 h after closing)
+      const sp = specialOn(d);
+      if (sp && sp.closed && list.length) add(d, `The store is closed (${sp.name || 'special hours'}), but ${list.length} shift${list.length === 1 ? ' is' : 's are'} scheduled.`, 'bad');
+      else if (sp) list.forEach((s) => { if (s.start < sp.open - 120 || s.end > sp.close + 60) add(d, `${staffById(s.staffId).name} works ${clock(s.start)}–${clock(s.end)}, but the store is open ${clock(sp.open)} – ${clock(sp.close)} (${sp.name || 'special hours'}).`, 'warn'); });
       list.forEach((s) => {
         const p = staffById(s.staffId);
         // more than one shift on a day is fine (a split shift); only parts that overlap are a problem
@@ -98,7 +107,7 @@
     };
     range.addEventListener('change', draw); draw();
     modal({ title: 'Check schedule', wide: true, body: [h('label', { class: 'field' }, h('span', null, 'Check'), range), list,
-      h('p', { class: 'hint' }, 'Looks for shifts of one person that overlap (split shifts are fine), shifts outside availability, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
+      h('p', { class: 'hint' }, 'Looks for shifts of one person that overlap (split shifts are fine), shifts outside availability, shifts on a day the store is closed or outside special store hours, inactive people, very long shifts, weekly hours over the max, and times with nobody from Manager or Supervisor on the floor.')],
     actions: [{ label: 'Close', primary: true }] });
   }
 

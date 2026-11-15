@@ -41,6 +41,7 @@
     rehire: '<circle cx="10" cy="8" r="4" class="fill"/><path d="M3 21c1-4 3.8-6 7-6s4.5 1 5.5 2.5M19 13v7M15.5 16.5h7"/>',
     approve: '<path d="m5 12 4 4 10-10"/>',
     deny: '<path d="M6 6l12 12M18 6 6 18"/>',
+    qr: '<path d="M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4Z" class="fill"/><path d="M14 14h2v2M20 14v2M14 20h2M18 18h2v2M17 17h0"/>',
   };
   // ib('trash', 'Remove Dana', () => ..., { cls: 'danger', badge: 3, disabled })
   function ib(icon, title, onclick, o = {}) {

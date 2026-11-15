@@ -225,3 +225,36 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 
 ## Day by day shows the hours
 - A Day by day cell shows *Any* or *Off* as a word, and hours one range per line: a split day reads 7am–11am over 4pm–9pm. Can't-work hours show as "not …", and class times (while the term is on) as "school 8am–3pm".
+
+## Calendar tab: time off, holiday store hours and events
+- A Calendar tab (after Week): a month at a time (Monday first) or a list. Each day shows special store hours, events and
+  time off (a dashed line is a request still to approve, ? in front of it too). Click a day's number (or +) for everything
+  on that day and to add to it; click an entry to change it.
+- Special store hours (`plan.specialHours`): other opening hours, or closed all day, for a holiday or any day. A list of US
+  holidays (Thanksgiving, Christmas Eve, Easter… worked out for this year and next) fills in the name and date. They show
+  on the Schedule under the date, in the Week heading and on Company & Location; Check schedule points out shifts on a
+  closed day and shifts well outside the special hours (over 2 h before opening or 1 h after closing).
+- Events (`plan.events`): notes and information for a day (delivery, inspection, meeting), all day or at a time. They
+  change nothing else.
+- Search and sort: one search box (names, holidays, reasons, notes, "request"), tick boxes for Requests / Approved /
+  Denied / Store hours / Events, and in the list: Now and coming up, a month, Past or All; click a heading to sort.
+  Requests can be approved or denied right in the list.
+
+## iCal (.ics) in and out
+- Export iCal: time off (approved, requests, denied), store hours and events, for everyone or one person, upcoming or
+  everything, with an option to leave out notes and reasons. Opens in Outlook, Google Calendar and Apple Calendar. Each
+  entry carries X-SHIFTCRAFT-… lines, so a ShiftCraft file comes back exactly.
+- Import iCal: any .ics file. Each entry is listed with a guess of what it is (time off for a person whose name is in it,
+  the store closed or open other hours, or an event) to change before it goes in. Bringing the same file in again updates
+  the entries (matched by id or UID) instead of adding them twice. Times in a time zone are read as local times; an entry
+  that repeats weekly or yearly comes in once.
+
+## Availability and contact list: newer details
+- Day cells show the hours themselves, one stretch a line (split days stacked), and school class times.
+- Employee ID next to each name; a last column with school and time off in the next 8 weeks; under the table, special
+  store hours and events coming up.
+
+## Contact QR code for one person
+- A QR icon on each Staff row: that person's contact (name, role, company and location, phone, email, Employee ID) as a
+  QR code to scan off the screen, print as a card, save as SVG (real millimetres) or .vcf, or put in the barcode library.
+  The contact cards printout and its vCards now carry the Employee ID too.
