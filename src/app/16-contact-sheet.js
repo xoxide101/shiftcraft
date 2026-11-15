@@ -121,7 +121,7 @@
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
         }))),
       // special store hours and events coming up (from the Calendar)
-      (() => { const { sp, ev } = storeComingUp(); return sp.length || ev.length ? h('div', { class: 'al-foot' }, sp.length ? h('div', null, h('b', null, 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
+      (() => { const { sp, ev } = storeComingUp(), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })());
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged

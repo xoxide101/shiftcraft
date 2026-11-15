@@ -17,16 +17,6 @@
       inp.addEventListener('change', () => savePlace(k, inp.value));
       return h('label', { class: 'field' + (wide ? ' wide' : '') }, h('span', null, label), inp);
     };
-    // opening hours, weekdays and weekend (like the Staff tab)
-    plan.hours = plan.hours || {};
-    const hoursRow = (k, label) => {
-      const cur = plan.hours[k];
-      if (!cur) return h('div', { class: 'co-hours' }, h('b', null, label), h('span', { class: 'muted' }, 'Not set'), h('button', { class: 'btn sm', onclick: () => change(() => { plan.hours[k] = { open: 420, close: 1260 }; }) }, 'Set hours'));
-      const a = timePicker(cur.open, label + ' open'), b = timePicker(cur.close, label + ' close');
-      const save = (moved) => { let o = a.value, c = b.value; if (c <= o) { if (moved === 'open') c = Math.min(DAY_END, o + 60); else o = Math.max(DAY_START, c - 60); } change(() => { plan.hours[k] = { open: o, close: c }; }); };
-      a.addEventListener('change', () => save('open')); b.addEventListener('change', () => save('close'));
-      return h('div', { class: 'co-hours' }, h('b', null, label), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b), h('button', { class: 'btn sm ghost', title: 'Clear these hours', onclick: () => change(() => { delete plan.hours[k]; }) }, 'Clear'));
-    };
     const notes = h('textarea', { class: 'input', rows: 3, placeholder: 'e.g. Delivery Tuesdays 7am · Parking behind the building' }, plan.placeNotes || '');
     notes.addEventListener('change', () => change(() => { plan.placeNotes = notes.value; }));
     main.append(h('div', { class: 'card' },
@@ -37,8 +27,8 @@
         field('address', 'Address', 'e.g. 1234 Main St, Denver CO 80202', true),
         field('phone', 'Phone', 'e.g. (303) 555-0142'), field('email', 'Email', 'e.g. manager@example.com'), field('website', 'Website', 'e.g. www.example.com')),
       err,
-      h('h3', { class: 'co-h3' }, 'Opening hours'),
-      hoursRow('wk', 'Weekdays (Mon–Fri)'), hoursRow('we', 'Weekend (Sat–Sun)'),
+      h('h3', { class: 'co-h3' }, 'Opening hours (Monday – Sunday)'),
+      usualHoursEditor(),
       h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
       (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
         return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))

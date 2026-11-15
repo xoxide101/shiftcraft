@@ -11,7 +11,45 @@
   // ics: the UID an entry had in a calendar file it came from, so bringing the same file in again updates it.
   const specialOn = (d) => (plan.specialHours || []).filter((x) => x.from <= d && d <= x.to).slice(-1)[0] || null;
   const eventsOn = (d) => (plan.events || []).filter((x) => x.from <= d && d <= x.to).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
-  const regularHours = (d) => (plan.hours || {})[(parseIso(d).getDay() + 6) % 7 >= 5 ? 'we' : 'wk'] || null;
+  // ---------- Usual store hours, Monday to Sunday ----------
+  // plan.hours.days = 7 entries, Monday first: { open, close } | { closed: true } | null (not set). One list, edited on the
+  // Calendar and on Company & Location alike. Older plans had plan.hours.wk / .we (weekdays / weekend): those fill the
+  // days until the week is changed. Special store hours (a holiday) take the place of the usual hours on their days.
+  const dayIdx = (d) => (parseIso(d).getDay() + 6) % 7;
+  const usualWeek = () => { const hs = plan.hours || {}; return Array.isArray(hs.days) ? WEEKDAYS.map((_, i) => hs.days[i] || null) : WEEKDAYS.map((_, i) => hs[i >= 5 ? 'we' : 'wk'] || null); };
+  const usualOn = (d) => usualWeek()[dayIdx(d)];
+  const regularHours = (d) => { const u = usualOn(d); return u && !u.closed ? u : null; };
+  // the store's hours on a day: special hours win, otherwise the usual hours for that weekday (null: not set)
+  const storeHoursOn = (d) => { const sp = specialOn(d); if (sp) return { closed: !!sp.closed, open: sp.open, close: sp.close, special: sp }; const u = usualOn(d); return u ? { closed: !!u.closed, open: u.open, close: u.close, special: null } : null; };
+  const setUsual = (fn) => change(() => { const w = usualWeek(); fn(w); plan.hours = { days: w }; });
+  const usualText = (u) => (!u ? 'not set' : u.closed ? 'closed' : `${clockShort(u.open)}–${clockShort(u.close)}`);
+  // one line for the week, alike days together: "Mon–Fri 7am–9pm · Sat 8am–9pm · Sun closed"
+  const usualSummary = () => {
+    const w = usualWeek(), out = [];
+    if (w.every((u) => !u)) return '';
+    for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(w[j + 1]) === usualText(w[i])) j++; out.push(`${WEEKDAYS[i].slice(0, 3)}${j > i ? '–' + WEEKDAYS[j].slice(0, 3) : ''} ${usualText(w[i])}`); i = j + 1; }
+    return out.join(' · ');
+  };
+  // the Monday-to-Sunday editor (Calendar and Company & Location)
+  function usualHoursEditor() {
+    const w = usualWeek();
+    const lastSet = (i) => { for (let k = i - 1; k >= 0; k--) if (w[k] && !w[k].closed) return w[k]; return w.find((u) => u && !u.closed) || { open: 420, close: 1260 }; };
+    const row = (day, i) => {
+      const cur = w[i], label = h('b', null, day);
+      const same = i > 0 && w[i - 1] && usualText(w[i - 1]) !== usualText(cur) ? h('button', { class: 'btn sm ghost', title: `Use ${WEEKDAYS[i - 1]}’s hours on ${day} too`, onclick: () => setUsual((x) => { x[i] = { ...x[i - 1] }; }) }, `Same as ${WEEKDAYS[i - 1].slice(0, 3)}`) : h('span');
+      if (!cur) return h('div', { class: 'co-hours' }, label, h('span', { class: 'muted' }, 'Not set'),
+        h('div', { class: 'inline' }, h('button', { class: 'btn sm', onclick: () => setUsual((x) => { const l = lastSet(i); x[i] = { open: l.open, close: l.close }; }) }, 'Set hours'), h('button', { class: 'btn sm ghost', onclick: () => setUsual((x) => { x[i] = { closed: true }; }) }, 'Closed')), same);
+      if (cur.closed) return h('div', { class: 'co-hours' }, label, h('span', { class: 'bad' }, 'Closed'),
+        h('div', { class: 'inline' }, h('button', { class: 'btn sm', onclick: () => setUsual((x) => { const l = lastSet(i); x[i] = { open: l.open, close: l.close }; }) }, 'Open this day'), h('button', { class: 'btn sm ghost', title: 'Clear: not set', onclick: () => setUsual((x) => { x[i] = null; }) }, 'Clear')), same);
+      const a = timePicker(cur.open, day + ' opens'), b = timePicker(cur.close, day + ' closes');
+      const save = (moved) => { let o = a.value, c = b.value; if (c <= o) { if (moved === 'open') c = Math.min(DAY_END, o + 60); else o = Math.max(DAY_START, c - 60); } setUsual((x) => { x[i] = { open: o, close: c }; }); };
+      a.addEventListener('change', () => save('open')); b.addEventListener('change', () => save('close'));
+      return h('div', { class: 'co-hours' }, label, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b),
+        h('div', { class: 'inline' }, h('button', { class: 'btn sm ghost', title: `Closed every ${day}`, onclick: () => setUsual((x) => { x[i] = { closed: true }; }) }, 'Closed'), h('button', { class: 'btn sm ghost', title: 'Clear: not set', onclick: () => setUsual((x) => { x[i] = null; }) }, 'Clear')), same);
+    };
+    return h('div', { class: 'usual-hours' }, WEEKDAYS.map(row),
+      h('p', { class: 'hint', style: { margin: '6px 0 0' } }, 'The same hours as on Company & Location (change them in either place). Special store hours on the Calendar, like Thanksgiving, Christmas or New Year’s Day, take their place on those days.'));
+  }
   const specialText = (x) => (x.closed ? 'Closed all day' : `Open ${clock(x.open)} – ${clock(x.close)}`);
   const specialShort = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
   const datesOnly = (x) => timeOffWhen({ from: x.from, to: x.to, hours: null });
@@ -161,7 +199,7 @@
     const sect = (label, list, none) => [h('h3', { class: 'co-h3' }, label), list.length ? h('ul', { style: { margin: 0, paddingLeft: '18px' } }, list.map(line)) : h('p', { class: 'muted small', style: { margin: 0 } }, none)];
     const inPlan = planDays().includes(d);
     m = modal({ title: longDate(d), body: [
-      h('p', { style: { margin: '0 0 4px' } }, h('b', null, 'Store hours: '), sp ? `${specialText(sp)} (${sp.name || 'special hours'})` : r ? `${clock(r.open)} – ${clock(r.close)} (usual)` : 'usual hours not set',
+      h('p', { style: { margin: '0 0 4px' } }, h('b', null, 'Store hours: '), sp ? [`${specialText(sp)} (${sp.name || 'special hours'})`, h('span', { class: 'muted' }, ` · instead of the usual ${usualText(usualOn(d))}`)] : r ? `${clock(r.open)} – ${clock(r.close)} (usual)` : usualOn(d) ? h('span', { class: 'bad' }, 'Closed (usual)') : 'usual hours not set',
         inPlan ? h('span', { class: 'muted' }, ` · ${shiftsOn(d).length} on the schedule`) : null),
       sect('Events', its.filter((it) => it.kind === 'event'), 'No events.'),
       sect('Time off', its.filter((it) => it.kind === 'timeoff'), 'Nobody has time off.'),
@@ -208,25 +246,33 @@
         h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', title: 'Bring in an iCal (.ics) file from Outlook, Google Calendar, Apple Calendar or ShiftCraft: holidays, time off, events', onclick: icalImport }, 'Import iCal…'),
         h('button', { class: 'btn sm', title: 'Save time off, store hours and events as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'))));
-    if (isList) { main.append(calListCard(shown, today, mFirst, mLast)); return; }
+    if (isList) { main.append(calListCard(shown, today, mFirst, mLast), usualHoursCard()); return; }
 
     // the month, Monday first
     const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
     const MAX = 6;
     const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
-      const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to).sort(calOrder), sp = specialOn(d);
+      const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to).sort(calOrder), sp = specialOn(d), st = storeHoursOn(d);
       const n = planDays().includes(d) ? shiftsOn(d).length : 0;
-      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (sp && sp.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget) dayDialog(d); } },
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget) dayDialog(d); } },
         h('div', { class: 'cal-head' },
           h('button', { type: 'button', class: 'cal-num', title: `${longDate(d)}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
           n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
+        // the store's hours that day: special hours (a holiday) win over the usual ones
+        st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : `${clockShort(st.open)}–${clockShort(st.close)}`) : null,
         its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(calChip),
         its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null);
     })));
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
-      h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+      h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+    main.append(usualHoursCard());
+  }
+  // the usual hours as a card on the Calendar
+  function usualHoursCard() {
+    return h('div', { class: 'card no-print', id: 'cal-usual' }, h('h2', { style: { margin: '0 0 2px', fontSize: '16px' } }, 'Usual store hours (Monday – Sunday)'),
+      h('p', { class: 'muted small', style: { margin: '0 0 6px' } }, usualSummary() || 'Not set yet.'), usualHoursEditor());
   }
 
   // the list: search, filter and sort everything
@@ -257,17 +303,19 @@
   // ---------- On the Schedule and the Week ----------
   // the day's special hours and events, under the date on the Schedule (nothing when there are none)
   function calStrip(d) {
-    const sp = specialOn(d), ev = eventsOn(d);
-    if (!sp && !ev.length) return null;
+    const sp = specialOn(d), ev = eventsOn(d), shut = !sp && usualOn(d) && usualOn(d).closed;
+    if (!sp && !ev.length && !shut) return null;
     return h('div', { class: 'cal-strip' },
+      shut ? h('button', { type: 'button', class: 'cal-chip special closed', title: `The store is usually closed on ${WEEKDAYS[dayIdx(d)]}s\nClick to see the usual hours`, onclick: () => { calGo(); setTimeout(() => $('#cal-usual')?.scrollIntoView({ block: 'center' }), 50); } }, `Store closed (usual on ${WEEKDAYS[dayIdx(d)]}s)`) : null,
       sp ? h('button', { type: 'button', class: 'cal-chip special' + (sp.closed ? ' closed' : ''), title: `Special store hours${sp.note ? '\nNote: ' + sp.note : ''}\nClick to see or change them`, onclick: () => specialDialog(sp) },
         `${sp.closed ? 'Store closed' : `Store open ${clock(sp.open)} – ${clock(sp.close)}`} · ${sp.name || 'special hours'}`) : null,
       ev.map((x) => h('button', { type: 'button', class: 'cal-chip event', title: `Event${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => eventDialog(x) }, `${x.hours ? `${clockShort(x.hours[0])}–${clockShort(x.hours[1])} ` : ''}${x.title}`)));
   }
   // a small line under the day in the Week's heading
   function calMark(d) {
-    const sp = specialOn(d), ev = eventsOn(d);
-    if (!sp && !ev.length) return null;
+    const sp = specialOn(d), ev = eventsOn(d), shut = !sp && usualOn(d) && usualOn(d).closed;
+    if (!sp && !ev.length && !shut) return null;
+    if (shut && !ev.length) return h('div', { class: 'cal-mark', title: 'The store is usually closed this day' }, h('span', { class: 'bad' }, 'Closed'));
     const tip = [sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()}` : '', ...ev.map((x) => `${x.hours ? clockShort(x.hours[0]) + ' ' : ''}${x.title}`)].filter(Boolean).join('\n');
     return h('div', { class: 'cal-mark', title: tip }, sp ? h('span', { class: sp.closed ? 'bad' : 'warn' }, specialShort(sp)) : null, sp && ev.length ? ' · ' : '', ev.length ? `★ ${ev.length}` : '');
   }

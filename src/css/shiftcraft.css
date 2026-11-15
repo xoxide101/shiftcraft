@@ -367,3 +367,8 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .qr-who { display: grid; gap: 2px; }
 .qr-who b { font-size: 16px; }
 .qr-big { font-size: 15px; font-weight: 700; margin-top: 6px; }
+/* usual store hours, Monday to Sunday (20-calendar.js) */
+.usual-hours .co-hours { grid-template-columns: 110px auto auto auto; }
+.cal-hrs { font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-hrs.special { color: var(--fg); font-weight: 700; }
+.cal-hrs.closed { color: var(--bad); font-weight: 700; }

@@ -258,3 +258,12 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 - A QR icon on each Staff row: that person's contact (name, role, company and location, phone, email, Employee ID) as a
   QR code to scan off the screen, print as a card, save as SVG (real millimetres) or .vcf, or put in the barcode library.
   The contact cards printout and its vCards now carry the Employee ID too.
+
+## Usual store hours, Monday to Sunday
+- One week of usual hours (`plan.hours.days`, 7 entries Monday first: open/close, closed, or not set), edited in the
+  same editor on the Calendar (under the month) and on Company & Location. Older plans' weekdays/weekend hours fill
+  the days until the week is changed. "Same as Mon" copies the day above.
+- Special store hours on the Calendar (Thanksgiving, Christmas, New Year's Day...) take the place of the usual hours
+  on their days. Each month cell shows that day's store hours (bold when special, red when closed).
+- A usually closed day shows on the Schedule and Week; Check schedule warns about shifts on it. The availability
+  list's footer gives the week in one line (Mon–Sat 7am–9pm · Sun closed).
