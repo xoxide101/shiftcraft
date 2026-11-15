@@ -75,6 +75,7 @@
     const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
+    const sch = schoolIssue(p, d, s); if (sch) return sch;
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';

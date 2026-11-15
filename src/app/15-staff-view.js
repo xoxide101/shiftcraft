@@ -4,7 +4,7 @@
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes']];
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => { const soon = (p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied'); return h('td', { class: 'nowrap' }, ibs(
@@ -72,14 +72,31 @@
           h('td', { colspan: cols - 5 }));
       });
     };
+    // a Day by day cell: Any or Off as a word; hours one range per line (7am–11am over 4pm–9pm for a split day),
+    // can't-work hours as "not …", and class times while the term is on (from the School tab, not saved into the day)
+    const avCellLines = (p, i, a) => {
+      const out = [];
+      if (a && a.k === 'times') {
+        const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+        if (!plus.length) out.push('Any');
+        plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
+        minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
+      } else out.push(avText(a));
+      const sc = p.school, today = iso(new Date());
+      if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+        sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
+      return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
+    };
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     if (staffTab === 'timeoff') {
       ({ head, rows, foot, empty, asked } = timeOffRows());
+    } else if (staffTab === 'school') {
+      ({ head, rows, foot, empty } = schoolRows());
     } else if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
-        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avText(a))); }),
+        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avCellLines(p, i, a))); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
         h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
@@ -128,6 +145,7 @@
     const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for other hours on the days you pick (two lines make a split day), and only those lines can be removed. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
+      school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. During the term, class hours are hours they can’t work, so a shift over them gets the ! mark. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
       contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },

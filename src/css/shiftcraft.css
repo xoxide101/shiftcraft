@@ -105,6 +105,7 @@ table.trained tbody tr:hover td { background: var(--accent-soft); }
 .input.need { border-color: var(--danger, #e03131); box-shadow: 0 0 0 1px var(--danger, #e03131) inset; }
 .avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
 .avcell.sys { opacity: 0.6; font-style: italic; }
+.avcell .avline { display: block; white-space: nowrap; }
 .avcell.none { background: var(--panel); color: var(--muted); }
 .avcell.on { background: #e2f0d9; color: #1c2330; }
 .avcell.off { background: #111; color: #fff; }
@@ -320,6 +321,7 @@ table.t tr.subrow td { padding: 4px 10px; background: color-mix(in srgb, var(--a
 table.t tr.subrow .sub-arrow { color: var(--accent); font-weight: 700; padding-left: 12px; }
 table.t td .inline.dim { opacity: .45; }
 table.t .hgrid { display: grid; grid-template-columns: 84px auto 28px; gap: 4px 6px; align-items: center; }
+table.t .sgrid { display: grid; grid-template-columns: auto auto 28px; gap: 6px; align-items: center; justify-content: start; }
 table.t .hgrid .hlabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .daytoggles button.dt.use.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }

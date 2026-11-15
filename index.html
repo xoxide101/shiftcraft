@@ -112,6 +112,7 @@ table.trained tbody tr:hover td { background: var(--accent-soft); }
 .input.need { border-color: var(--danger, #e03131); box-shadow: 0 0 0 1px var(--danger, #e03131) inset; }
 .avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
 .avcell.sys { opacity: 0.6; font-style: italic; }
+.avcell .avline { display: block; white-space: nowrap; }
 .avcell.none { background: var(--panel); color: var(--muted); }
 .avcell.on { background: #e2f0d9; color: #1c2330; }
 .avcell.off { background: #111; color: #fff; }
@@ -327,6 +328,7 @@ table.t tr.subrow td { padding: 4px 10px; background: color-mix(in srgb, var(--a
 table.t tr.subrow .sub-arrow { color: var(--accent); font-weight: 700; padding-left: 12px; }
 table.t td .inline.dim { opacity: .45; }
 table.t .hgrid { display: grid; grid-template-columns: 84px auto 28px; gap: 4px 6px; align-items: center; }
+table.t .sgrid { display: grid; grid-template-columns: auto auto 28px; gap: 6px; align-items: center; justify-content: start; }
 table.t .hgrid .hlabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .daytoggles button.dt.use.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }
@@ -910,6 +912,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
+    const sch = schoolIssue(p, d, s); if (sch) return sch;
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
@@ -1515,7 +1518,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes']];
+    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => { const soon = (p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied'); return h('td', { class: 'nowrap' }, ibs(
@@ -1583,14 +1586,31 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           h('td', { colspan: cols - 5 }));
       });
     };
+    // a Day by day cell: Any or Off as a word; hours one range per line (7am–11am over 4pm–9pm for a split day),
+    // can't-work hours as "not …", and class times while the term is on (from the School tab, not saved into the day)
+    const avCellLines = (p, i, a) => {
+      const out = [];
+      if (a && a.k === 'times') {
+        const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+        if (!plus.length) out.push('Any');
+        plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
+        minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
+      } else out.push(avText(a));
+      const sc = p.school, today = iso(new Date());
+      if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+        sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
+      return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
+    };
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     if (staffTab === 'timeoff') {
       ({ head, rows, foot, empty, asked } = timeOffRows());
+    } else if (staffTab === 'school') {
+      ({ head, rows, foot, empty } = schoolRows());
     } else if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
-        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avText(a))); }),
+        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avCellLines(p, i, a))); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
         h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
@@ -1639,6 +1659,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for other hours on the days you pick (two lines make a split day), and only those lines can be removed. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
+      school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. During the term, class hours are hours they can’t work, so a shift over them gets the ! mark. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
       contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
@@ -2035,6 +2056,58 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position'))))))));
   }
 
+  // ---------- School ----------
+  // p.school = { on, name, from, to, classes: [{ days: [0–6, Monday first], from, to }], note }
+  // The Staff › School tab: who is in school, the school, the term (first and last day; either can be left blank) and the
+  // class times. During the term, class times are hours they can't work: a shift over them gets the ! mark.
+  const SCHOOL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+  const schoolOn = (p, d) => {
+    const sc = p.school; if (!sc || sc.on === false || !Array.isArray(sc.classes)) return [];
+    if ((sc.from && d < sc.from) || (sc.to && d > sc.to)) return [];
+    const i = avDay(d); return sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from);
+  };
+  const schoolIssue = (p, d, s) => {
+    const c = s && schoolOn(p, d).find((x) => s.start < x.to && s.end > x.from);
+    return c ? `${p.name.split(' ')[0]} has school ${clock(c.from)} – ${clock(c.to)} on ${dayName(d)}s${p.school.name ? ` (${p.school.name})` : ''}` : '';
+  };
+  const schoolText = (sc) => (sc.classes || []).map((c) => `${c.days.map((i) => WEEKDAYS[i].slice(0, 3)).join(', ') || 'no days'} ${clockShort(c.from)}–${clockShort(c.to)}`).join(' · ');
+
+  function schoolRows() {
+    const people = sortStaff(plan.staff.filter((p) => !p.left));
+    const head = ['Name', 'Role', 'In school', 'School', 'Term: first day – last day', 'Class times (they can’t work these hours)', 'Note'];
+    const cols = head.length;
+    const dayBtns = (c) => h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Class days' }, SCHOOL_DAYS.map((i) => { const on = c.days.includes(i), wd = WEEKDAYS[i];
+      return h('button', { type: 'button', class: 'dt use' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Class' : 'No class'} on ${wd}s (click to change)`, onclick: () => change(() => { c.days = on ? c.days.filter((x) => x !== i) : [...c.days, i].sort(); }) }, wd[0]); }));
+    const classLine = (p, c, first) => {
+      const fa = timePicker(c.from, 'Class from'), fb = timePicker(c.to, 'Class until');
+      const save = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => { c.from = f; c.to = t; }); };
+      fa.addEventListener('change', () => save('from')); fb.addEventListener('change', () => save('to'));
+      return h('div', { class: 'sgrid' }, dayBtns(c), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb),
+        first ? ib('addTime', '+ Other class times: a line for days with different hours (for example Tuesday and Thursday 10am–2pm)', () => change(() => { p.school.classes.push({ days: [], from: c.from, to: c.to }); }))
+          : ib('trash', 'Remove these class times', () => change(() => { p.school.classes = p.school.classes.filter((x) => x !== c); }), { cls: 'danger' }));
+    };
+    const rows = people.flatMap((p) => {
+      const sc = p.school, on = !!sc && sc.on !== false;
+      const box = h('input', { type: 'checkbox', checked: on, 'aria-label': `${p.name} is in school`, title: on ? 'Untick if they are not in school now (what you set is kept)' : 'Tick if they go to school: then set the term and class times',
+        onchange: (e) => change(() => { if (e.target.checked) { p.school = sc ? { ...sc, on: true } : { on: true, name: '', from: '', to: '', classes: [{ days: [0, 1, 2, 3, 4], from: 480, to: 900 }], note: '' }; if (!p.school.classes.length) p.school.classes.push({ days: [0, 1, 2, 3, 4], from: 480, to: 900 }); } else if (sc) sc.on = false; }) });
+      const main = [h('td', { class: 'nowrap' }, h('b', null, p.name)), h('td', { class: 'small nowrap' }, ROLES[p.role].label), h('td', { class: 'c' }, box)];
+      if (!on) return [h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, ...main, h('td', { colspan: cols - 3, class: 'muted small' }, sc ? `Not in school now (kept: ${[sc.name, schoolText(sc)].filter(Boolean).join(' · ')})` : ''))];
+      const txt = (key, ph, label, w) => { const x = h('input', { class: 'input', value: sc[key] || '', placeholder: ph, 'aria-label': label, maxLength: key === 'note' ? 300 : 80, style: { width: '100%', minWidth: w } }); x.addEventListener('change', () => change(() => { sc[key] = x.value.trim(); })); return x; };
+      const date = (key, label) => { const x = h('input', { class: 'input', type: 'date', value: sc[key] || '', 'aria-label': label, title: label + ' (leave blank if you don’t know)' }); x.addEventListener('change', () => change(() => { sc[key] = x.value || ''; if (sc.from && sc.to && sc.to < sc.from) sc.to = sc.from; })); return x; };
+      const today = iso(new Date()), now = (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to);
+      const [c0, ...more] = sc.classes;
+      return [
+        h('tr', { class: more.length ? 'has-sub' : '', style: { opacity: p.active ? 1 : 0.55 } }, ...main,
+          h('td', null, txt('name', 'e.g. Central High · grade 11', 'School', '150px')),
+          h('td', { class: 'nowrap' }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, date('from', 'First day of the term'), '–', date('to', 'Last day of the term')),
+            h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet')),
+          h('td', null, c0 ? classLine(p, c0, true) : null),
+          h('td', null, txt('note', 'e.g. exams in June · summer: any time', 'Note', '140px'))),
+        ...more.map((c) => h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 } }, h('td', { colspan: 5, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), 'Other class times'), h('td', null, classLine(p, c, false)), h('td')))];
+    });
+    const inSchool = people.filter((p) => p.school && p.school.on !== false).length;
+    return { head, rows, empty: 'No one yet. Add your team on the Weekdays tab.', foot: h('tr', null, h('td', { colspan: cols, class: 'small muted', style: { fontWeight: 400 } }, `${inSchool} of ${people.length} in school. During the term, class times count as hours they can't work: a shift over them gets the ! mark. Before the first day or after the last day, they don't count.`)) };
+  }
   // ---------- Time off ----------
   // Days, weeks or a few hours off, with a reason, whether it is asked for or approved, and a note. Kept on the person
   // (p.timeOff), so it goes with team files, the location file and your account like everything else about them:
@@ -2757,6 +2830,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const q = { ...x, name: String(x.name).trim() };
       if (!ROLES[q.role]) { q.role = 'TM'; fixes++; }
       if (q.lines !== undefined) { q.lines = Array.isArray(q.lines) ? q.lines.filter((l) => l && Array.isArray(l.days) && Number.isFinite(l.from) && Number.isFinite(l.to)) : []; if (!q.lines.length) delete q.lines; }
+      if (q.school !== undefined) {
+        const sc = q.school, okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+        if (!sc || typeof sc !== 'object') delete q.school;
+        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300),
+          classes: Array.isArray(sc.classes) ? sc.classes.filter((c) => c && Array.isArray(c.days) && Number.isFinite(c.from) && Number.isFinite(c.to)).map((c) => ({ days: c.days.filter((x) => Number.isInteger(x) && x >= 0 && x < 7), from: c.from, to: c.to })) : [] };
+      }
       if (q.timeOff !== undefined) {
         const ok = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
         q.timeOff = Array.isArray(q.timeOff) ? q.timeOff.filter((t) => t && ok(t.from)).map((t) => ({ id: t.id || uid(), from: t.from, to: ok(t.to) && t.to >= t.from ? t.to : t.from,

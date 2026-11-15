@@ -216,3 +216,12 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 
 - The usual shift now sits on the top line of the *Hours they can work* cell, with the hours they can work (Any time) under it, in three lined-up columns: label · hours · button. One column fewer, so the whole Weekdays table fits a normal wide screen without scrolling sideways.
 - Those two lines always stay (no remove button). + on the top line adds a Some days line under the person, lined up the same way, with its days in the label and a trash button; only those lines can be removed.
+
+## School tab
+
+- Staff › **6 · School** is its own permanent tab: tick *In school*, then the school (and grade), the term (first and last day; either can be blank) and the class times (days + hours). + adds a line for days with different class hours; the first line stays, the others have a trash button.
+- During the term, class times are hours the person can't work: a shift over them gets the N/A mark with "has school 8:00am – 3:00pm on Mondays". Before or after the term they don't count.
+- Unticking *In school* keeps what was set (for next term).
+
+## Day by day shows the hours
+- A Day by day cell shows *Any* or *Off* as a word, and hours one range per line: a split day reads 7am–11am over 4pm–9pm. Can't-work hours show as "not …", and class times (while the term is on) as "school 8am–3pm".

@@ -11,6 +11,12 @@
       const q = { ...x, name: String(x.name).trim() };
       if (!ROLES[q.role]) { q.role = 'TM'; fixes++; }
       if (q.lines !== undefined) { q.lines = Array.isArray(q.lines) ? q.lines.filter((l) => l && Array.isArray(l.days) && Number.isFinite(l.from) && Number.isFinite(l.to)) : []; if (!q.lines.length) delete q.lines; }
+      if (q.school !== undefined) {
+        const sc = q.school, okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+        if (!sc || typeof sc !== 'object') delete q.school;
+        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300),
+          classes: Array.isArray(sc.classes) ? sc.classes.filter((c) => c && Array.isArray(c.days) && Number.isFinite(c.from) && Number.isFinite(c.to)).map((c) => ({ days: c.days.filter((x) => Number.isInteger(x) && x >= 0 && x < 7), from: c.from, to: c.to })) : [] };
+      }
       if (q.timeOff !== undefined) {
         const ok = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
         q.timeOff = Array.isArray(q.timeOff) ? q.timeOff.filter((t) => t && ok(t.from)).map((t) => ({ id: t.id || uid(), from: t.from, to: ok(t.to) && t.to >= t.from ? t.to : t.from,
