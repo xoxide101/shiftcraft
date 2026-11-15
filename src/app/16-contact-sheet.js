@@ -90,9 +90,14 @@
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.setLineDash && g.setLineDash([pt(3), pt(3)]); g.strokeRect(x + pt(2), y + pt(2), cw - pt(4), chh - pt(4)); g.setLineDash && g.setLineDash([]);
       g.textAlign = 'center';
       // the lines above the code and below it, measured first so the code gets the room in between
-      const sub = [on('role') ? ROLES[p.role].label : '', on('id') && p.empId ? 'ID ' + p.empId : '', on('shift') && p.shiftCode ? 'Code ' + p.shiftCode : ''].filter(Boolean).join(' · ');
-      const org = [on('company') ? plan.company : '', on('location') ? plan.location : '', on('store') && plan.storeNo ? 'Store #' + plan.storeNo : ''].filter(Boolean).join(' · ');
-      const top = [[p.name, '700', 11.5], sub ? [sub, '400', 8.5, '#444'] : null, org ? [org, '400', 7.5, '#666'] : null].filter(Boolean);
+      // under the name, one smaller line (two when it is long): title, company, location, store number, Employee ID, shift code
+      const sub = [on('role') ? ROLES[p.role].label : '', on('company') ? plan.company : '', on('location') ? plan.location : '', on('store') && plan.storeNo ? 'Store #' + plan.storeNo : '',
+        on('id') && p.empId ? 'ID ' + p.empId : '', on('shift') && p.shiftCode ? 'Code ' + p.shiftCode : ''].filter(Boolean);
+      // it breaks only between items, never inside one
+      font('400', 8 * k); const subL = [];
+      sub.forEach((t) => { const last = subL.length - 1; if (last >= 0 && g.measureText(subL[last] + ' · ' + t).width <= tw) subL[last] += ' · ' + t; else subL.push(t); });
+      if (subL.length > 2) subL.splice(1, subL.length, fit(subL.slice(1).join(' · '), tw));
+      const top = [[p.name, '700', 12], ...subL.map((t) => [t, '400', 8, '#444'])];
       font('400', 7.5 * k);
       const addr = on('addr') && p.address ? wrap2(p.address, tw) : [];
       font('400', 7.5 * k); const info = on('notes') && p.notes ? [fit(p.notes, tw)] : [];
@@ -118,7 +123,7 @@
     const [cols, rows, k0] = cardGrid(pw, ph, people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
     const cwIn = (pw - 0.6) / cols, chIn = (ph - 1.1) / rows;
     const n = Math.max(...people.map((p) => qrOf(vcardOf(p, 'qr')).getModuleCount())) + 8;
-    const lines = 1 + (['role', 'id', 'shift'].some((k) => cardOn('show', k)) ? 1 : 0) + (['company', 'location', 'store'].some((k) => cardOn('show', k)) ? 1 : 0) + (cardOn('show', 'notes') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
+    const lines = 1 + (['role', 'id', 'shift', 'company', 'location', 'store'].some((k) => cardOn('show', k)) ? 1.5 : 0) + (cardOn('show', 'notes') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
     const qsIn = Math.max(0.28, Math.min(cwIn - 0.22 * k, chIn - 0.22 * k - lines * 0.15 * k - 0.14 * k)), dotMm = qsIn * 25.4 / n;
     return `QR codes about ${(qsIn * 25.4).toFixed(0)} mm (${qsIn.toFixed(2)} in), dots ${dotMm.toFixed(2)} mm: ${dotMm >= 0.4 ? 'scans easily' : dotMm >= 0.3 ? 'scans fine with most phones' : 'small: fewer per page or less in the code scans better'}`;
   }
