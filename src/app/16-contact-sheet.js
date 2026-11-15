@@ -127,31 +127,45 @@
     const qsIn = Math.max(0.28, Math.min(cwIn - 0.22 * k, chIn - 0.22 * k - lines * 0.15 * k - 0.14 * k)), dotMm = qsIn * 25.4 / n;
     return `QR codes about ${(qsIn * 25.4).toFixed(0)} mm (${qsIn.toFixed(2)} in), dots ${dotMm.toFixed(2)} mm: ${dotMm >= 0.4 ? 'scans easily' : dotMm >= 0.3 ? 'scans fine with most phones' : 'small: fewer per page or less in the code scans better'}`;
   }
-  // the numbered notes: a list in two columns (under the sheet), or a page of their own
-  const alNotesList = (list, size = '8pt') => h('div', { class: 'al-noteslist', style: { columns: 2, columnGap: '24px', fontSize: size, lineHeight: 1.35 } }, list.map((n) => h('div', { style: { breakInside: 'avoid' } }, h('b', null, n.n + '. '), n.text)));
-  const alNotesPage = (list) => h('div', { style: { color: '#000', background: '#fff', fontFamily: 'Arial, Helvetica, sans-serif' } },
-    h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · availability and contact list: notes`), alNotesList(list, '10pt'));
-  // where: where the numbered notes go (29-page-notes.js); a separate page comes back as sheet.notesPage
-  function availabilitySheet(where = notesWhere) {
-    const book = where === 'off' ? null : noteBook();
-    const now = new Date(), pad = (n) => String(n).padStart(2, '0');
-    const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
-    const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
-    const sections = [['mgr', PLURAL.mgr], ['sup', PLURAL.sup], ['tm', PLURAL.tm]];
-    const groupOf = (p) => (ROLES[p.role].group === 'trn' || p.pending ? 'tm' : ROLES[p.role].group);
-    const tick = (on) => h('span', { class: 'al-box' + (on ? ' on' : '') }, on ? '✔' : '');
-    const row = (p) => {
-      const pend = p.pending || ROLES[p.role].group === 'trn';
-      return h('tr', null,
-        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : ''), p.empId ? h('span', { class: 'al-id' }, ' #' + p.empId) : null),
-        h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
-        positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
-        // the hours themselves, one stretch a line (split days stacked), and school class times
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }),
-        h('td', { class: 'al-note' }, comingUpLines(p, book).map((t) => h('div', null, t))));
-    };
-    const sheet = h('div', { class: 'person-sheet al-sheet' },
-      h('style', null, `
+  // ---- the details under the availability list, for the weeks chosen when printing (kept in this browser):
+  // store hours (usual Monday to Sunday, and special hours), time off with its notes, events, and holidays; two small
+  // tables side by side. where: under the list ('page'), on a page of their own ('separate'), or left out ('off').
+  const AVD_KEY = KEY + '-avail-details';
+  const AVAIL_RANGES = [['this', 'This week'], ['next1', 'Next week'], ['this2', 'This week and next'], ['next2', 'The next 2 weeks'], ['next4', 'The next 4 weeks'], ['next8', 'The next 8 weeks']];
+  const availDet = { where: 'page', range: 'next1' };
+  try { const c = JSON.parse(localStorage.getItem(AVD_KEY) || '{}'); if (['page', 'separate', 'off'].includes(c.where)) availDet.where = c.where; if (AVAIL_RANGES.some(([k]) => k === c.range)) availDet.range = c.range; } catch (e) { /* blocked */ }
+  const saveAvailDet = () => { try { localStorage.setItem(AVD_KEY, JSON.stringify(availDet)); } catch (e) { /* blocked */ } };
+  const availRange = () => { const mon = mondayOf(iso(new Date())), r = availDet.range, start = r.startsWith('this') ? mon : addDays(mon, 7), n = { this: 1, next1: 1, this2: 2, next2: 2, next4: 4, next8: 8 }[r] || 1; return [start, addDays(start, n * 7 - 1)]; };
+  function availDetails() {
+    const [a, b] = availRange(), on = (x) => x.from <= b && x.to >= a, span = a.slice(0, 4) === b.slice(0, 4) ? `${shortDate(a)} – ${shortDate(b)}` : `${shortDate(a)}, ${a.slice(0, 4)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
+    const box = (title, cols, head, rows, none) => h('div', { class: 'al-dbox' }, h('table', null, h('colgroup', null, cols.map((w) => h('col', w ? { style: { width: w } } : null))),
+      h('thead', null, h('tr', null, h('th', { colspan: head.length, class: 'al-dtitle' }, title)), h('tr', null, head.map((x) => h('th', null, x)))),
+      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'al-dnone' }, none)))));
+    const tr = (cls, ...cells) => h('tr', { class: cls || '' }, cells.map((c) => h('td', null, c)));
+    const hrsOf = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
+    // 1 · store hours: the usual week, then special hours in these weeks
+    const wk = usualWeek(), sp = (plan.specialHours || []).filter(on).sort((x, y) => x.from.localeCompare(y.from));
+    const hours = box(`Store hours · ${span}`, ['34%', '26%', ''], ['Day', 'Hours', 'Note'],
+      // the usual week with alike days together (Mon – Thu 7am–9pm), then special hours
+      [...(() => { const out = []; for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(wk[j + 1]) === usualText(wk[i])) j++; out.push(tr(wk[i] && wk[i].closed ? 'al-dclosed' : '', WEEKDAYS[i] + (j > i ? ' – ' + WEEKDAYS[j] : ''), usualText(wk[i]).replace(/^closed$/, 'Closed'), 'Usual hours')); i = j + 1; } return out; })(),
+        ...sp.map((x) => tr('al-dspecial' + (x.closed ? ' al-dclosed' : ''), datesOnly(x), hrsOf(x), (x.name || 'Special hours') + (x.note ? ' — ' + x.note : '')))], 'Not set (Company & Location).');
+    // 2 · time off (approved and asked for) with its notes
+    const off = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).filter((t) => t.status !== 'denied' && on(t)).map((t) => ({ p, t }))).sort((x, y) => x.t.from.localeCompare(y.t.from) || x.p.name.localeCompare(y.p.name));
+    const timeOff = box(`Time off · ${span}`, ['26%', '30%', '20%', ''], ['Who', 'When', 'Why', 'Note'],
+      off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : '', p.name, timeOffWhen(t), timeOffLabel(t), t.note || '')), 'Nobody has time off.');
+    // 3 · store events
+    const ev = (plan.events || []).filter(on).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
+    const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
+      ev.map((x) => tr('', datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
+    // 4 · holidays, with the store's hours on them
+    const hol = holidaysFrom(a, 60).filter((x) => x.date <= b);
+    const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+    return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
+  }
+  const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' }, h('style', null, AL_CSS),
+    h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · Schedule Availability and Contact Information: details`), availDetails());
+  const AL_CSS = `
         .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
         /* printers leave out background colours unless told to keep them: the black Off boxes, green days and yellow rows need them */
         .al-sheet, .al-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -175,28 +189,48 @@
         .al-day.hl { background: #ffc000; }
         .al-day div { line-height: 1.15; }
         .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
-        .al-note { border: 1px solid #000; font-size: 7.5pt !important; line-height: 1.15; vertical-align: middle; }
-        .al-notehead { border: 1px solid #000; background: #d9d9d9; vertical-align: bottom; text-align: center; font-weight: 400; font-size: 9pt; }
-        .al-foot { margin-top: 8px; font-size: 8.5pt; line-height: 1.3; }
-        .al-foot b { margin-right: 4px; }
-        .al-notes { margin-top: 6px; }
-        .al-notes > b { display: block; font-size: 9pt; margin-bottom: 2px; }
-      `),
+        /* the details: two small tables side by side, then two more */
+        .al-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; align-items: start; }
+        .al-dbox table { table-layout: fixed; }
+        .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; }
+        .al-dbox thead th { background: #d9d9d9; font-weight: 700; }
+        .al-dbox th.al-dtitle { background: #000; color: #fff; font-size: 9pt; text-align: center; }
+        .al-dnone { color: #555; font-style: italic; }
+        .al-dspecial td { font-weight: 700; background: #fff2cc; }
+        .al-dclosed td { background: #f4cccc; }
+        .al-dasked td { font-style: italic; }
+      `;
+  function availabilitySheet(where = availDet.where) {
+    const now = new Date(), pad = (n) => String(n).padStart(2, '0');
+    const version = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getHours())}.${pad(now.getMinutes())}`;
+    const positions = (plan.positions || []).filter((x) => x.active), people = sortStaff(plan.staff.filter((p) => p.active));
+    const sections = [['mgr', PLURAL.mgr], ['sup', PLURAL.sup], ['tm', PLURAL.tm]];
+    const groupOf = (p) => (ROLES[p.role].group === 'trn' || p.pending ? 'tm' : ROLES[p.role].group);
+    const tick = (on) => h('span', { class: 'al-box' + (on ? ' on' : '') }, on ? '✔' : '');
+    const row = (p) => {
+      const pend = p.pending || ROLES[p.role].group === 'trn';
+      return h('tr', null,
+        h('td', { class: 'al-name' + (pend ? ' pend' : '') }, p.name + (pend ? ' - Pending Training' : ''), p.empId ? h('span', { class: 'al-id' }, ' #' + p.empId) : null),
+        h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
+        positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
+        // the hours themselves, one stretch a line (split days stacked), and school class times
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
+    };
+    const sheet = h('div', { class: 'person-sheet al-sheet' },
+      h('style', null, AL_CSS),
       h('table', null,
-        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null)), h('col', { style: { width: '150px' } })),
+        h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null))),
         h('thead', null, h('tr', null,
           h('th', { class: 'al-title' }, h('b', null, 'Schedule Availability and Contact Information'), plan.company || plan.location ? h('b', { style: { textDecoration: 'none', fontSize: '9pt' } }, [plan.company, plan.location].filter(Boolean).join(' · ')) : null, h('b', null, 'Version ' + version)),
           h('th', { class: 'al-headpos', style: { textAlign: 'right' } }, h('span', { class: 'al-up' }, 'Phone Numbers')),
           positions.map((pos) => h('th', { class: 'al-headpos al-postop' }, h('span', { class: 'al-up' }, pos.name))), h('th'),
-          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)), h('th', { class: 'al-notehead' }, 'School · time off (next 8 weeks)'))),
+          WEEKDAYS.map((w) => h('th', { class: 'al-dayhead' }, w)))),
         h('tbody', null, sections.flatMap(([g, title]) => {
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
-          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 11 })), ...list.map(row)] : [];
+          return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
-      // special store hours and events coming up (from the Calendar)
-      (() => { const { sp, ev } = storeComingUp(book), us = usualSummary(); return us || sp.length || ev.length ? h('div', { class: 'al-foot' }, us ? h('div', null, h('b', null, 'Store hours:'), us) : null, sp.length ? h('div', null, h('b', null, us ? 'Special hours:' : 'Store hours:'), sp.join('  ·  ')) : null, ev.length ? h('div', null, h('b', null, 'Coming up:'), ev.join('  ·  ')) : null) : null; })(),
-      where === 'page' && book && book.list.length ? h('div', { class: 'al-notes' }, h('b', null, 'Notes'), alNotesList(book.list)) : null);
-    if (where === 'separate' && book && book.list.length) sheet.notesPage = alNotesPage(book.list);
+      where === 'page' ? availDetails() : null);
+    if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged

@@ -289,3 +289,11 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 - QR codes in pictures: every dot is the same whole number of pixels, square, so they scan cleanly.
 - Home address per person (Staff › Contact & training, with phone and email, set apart from IDs and notes).
   Company & Location › Contact details we keep: turn the address off when a location does not use it.
+
+## Availability list: details under the table
+- No more School · time off column. Under the table, four small tables two by two, for the weeks chosen in Print or
+  save (this week, next week, this week and next, the next 2 / 4 / 8 weeks): Store hours (the usual week, alike days
+  together, then special hours), Time off (who, when, why, note; requests in italics), Events, Holidays (with the
+  store's hours that day). Special and closed days are shaded.
+- The details go under the list, on a page of their own (a 2-page PDF, or a second picture), or are left out. Kept in
+  this browser. The sheet is fitted to Letter, Legal or Tabloid as before.
