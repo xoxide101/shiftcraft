@@ -395,3 +395,6 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .pw-week[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 /* Staff › Contact & training: the contact details (phone, email, address) set apart */
 td.ct-first { border-left: 2px solid var(--line); }
+/* Print or save › Contact cards: an item a row, printed / in the QR code */
+table.card-fields { width: auto; }
+table.card-fields td, table.card-fields th { padding: 3px 12px; }

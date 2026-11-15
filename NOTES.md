@@ -280,8 +280,9 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 
 ## Contact Cards
 - Two separate choices in Print or save › Contact cards, kept in this browser: what is printed on the card, and what
-  goes in the QR code (what a phone adds). Role, Employee ID, company & location, phone, email, address; the name is
-  always on both. The QR window on a Staff row and the barcode library use the same QR choice.
+  goes in the QR code (what a phone adds), as a grid: one row an item, two switches, any combination. Title (role),
+  Employee ID, shift code, company, location, store number, phone, email, home address, info (their notes); the name
+  is always on both. In the code, ID / shift code / store number / info go in the contact's note. The QR window on a Staff row and the barcode library use the same QR choice.
 - Each card is centred: name, role · ID, company; the QR code; phone, email and address at the bottom (the phone at
   the same height on every card). Cards per page: standard size (about 2.5 × 3.2 in, as many pages as needed), or
   everyone on 1 page. The window shows the QR size and dot size, and warns when the dots get small.

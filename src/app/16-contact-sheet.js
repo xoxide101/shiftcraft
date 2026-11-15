@@ -5,10 +5,16 @@
   // What goes on the contact cards and in their QR codes: two separate choices (a card can show the phone number while
   // the code leaves it out, or the other way round). Kept in this browser; the name is always on both.
   // The address is only offered while it is in use (Company & Location › Contact details we keep).
-  const CARD_FIELDS = [['role', 'Role'], ['id', 'Employee ID'], ['org', 'Company & location'], ['phone', 'Phone'], ['email', 'Email'], ['addr', 'Address']];
+  // [key, label, on by default on the card, in the QR code]
+  const CARD_FIELDS = [['role', 'Title (role)', 1, 1], ['id', 'Employee ID', 1, 1], ['shift', 'Shift code', 0, 0], ['company', 'Company', 1, 1], ['location', 'Location', 1, 1], ['store', 'Store number', 0, 0],
+    ['phone', 'Phone', 1, 1], ['email', 'Email', 1, 1], ['addr', 'Home address', 1, 1], ['notes', 'Info (notes about them)', 0, 0]];
   const CARD_KEY = KEY + '-cards';
-  const cardPrefs = { show: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), qr: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), fit: 'std' };
-  try { const c = JSON.parse(localStorage.getItem(CARD_KEY) || '{}'); if (c.show) Object.assign(cardPrefs.show, c.show); if (c.qr) Object.assign(cardPrefs.qr, c.qr); if (c.fit === 'one') cardPrefs.fit = 'one'; } catch (e) { /* blocked */ }
+  const cardPrefs = { show: Object.fromEntries(CARD_FIELDS.map(([k, , a]) => [k, !!a])), qr: Object.fromEntries(CARD_FIELDS.map(([k, , , b]) => [k, !!b])), fit: 'std' };
+  try {
+    const c = JSON.parse(localStorage.getItem(CARD_KEY) || '{}');
+    ['show', 'qr'].forEach((g) => { if (!c[g]) return; if ('org' in c[g]) { c[g].company = c[g].location = c[g].org; delete c[g].org; } Object.assign(cardPrefs[g], c[g]); }); // (company & location were one switch)
+    if (c.fit === 'one') cardPrefs.fit = 'one';
+  } catch (e) { /* blocked */ }
   const saveCardPrefs = () => { try { localStorage.setItem(CARD_KEY, JSON.stringify(cardPrefs)); } catch (e) { /* blocked */ } };
   const addrInUse = () => !(plan.contactUse && plan.contactUse.address === false);
   const cardOn = (grp, k) => !!cardPrefs[grp][k] && (k !== 'addr' || addrInUse());
@@ -16,9 +22,11 @@
     const e = (t) => String(t || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n'), on = (k) => cardOn(grp, k);
     const parts = p.name.trim().split(/\s+/), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
     return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(last)};${e(first)};;;`, `FN:${e(p.name)}`,
-      on('org') && (plan.company || plan.location) ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
+      (() => { const c = on('company') ? plan.company : '', l = on('location') ? plan.location : ''; return c || l ? `ORG:${e(c || l)}${c && l ? ';' + e(l) : ''}` : ''; })(),
       on('role') ? `TITLE:${e(ROLES[p.role].label)}` : '', on('phone') && p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', on('email') && p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '',
-      on('addr') && p.address ? `ADR;TYPE=HOME:;;${e(p.address)};;;;` : '', on('id') && p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
+      on('addr') && p.address ? `ADR;TYPE=HOME:;;${e(p.address)};;;;` : '',
+      // the rest as one note: Employee ID, shift code, store number, info
+      (() => { const n = [on('id') && p.empId ? 'Employee ID ' + p.empId : '', on('shift') && p.shiftCode ? 'Shift code ' + p.shiftCode : '', on('store') && plan.storeNo ? 'Store #' + plan.storeNo : '', on('notes') && p.notes ? p.notes : ''].filter(Boolean).join(' · '); return n ? `NOTE:${e(n)}` : ''; })(), 'END:VCARD'].filter(Boolean).join('\r\n');
   }
   function qrOf(text) {
     if (typeof qrcode !== 'function') return null;
@@ -82,18 +90,19 @@
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.setLineDash && g.setLineDash([pt(3), pt(3)]); g.strokeRect(x + pt(2), y + pt(2), cw - pt(4), chh - pt(4)); g.setLineDash && g.setLineDash([]);
       g.textAlign = 'center';
       // the lines above the code and below it, measured first so the code gets the room in between
-      const sub = [on('role') ? ROLES[p.role].label : '', on('id') && p.empId ? 'ID ' + p.empId : ''].filter(Boolean).join(' · ');
-      const org = on('org') ? [plan.company, plan.location].filter(Boolean).join(' · ') : '';
+      const sub = [on('role') ? ROLES[p.role].label : '', on('id') && p.empId ? 'ID ' + p.empId : '', on('shift') && p.shiftCode ? 'Code ' + p.shiftCode : ''].filter(Boolean).join(' · ');
+      const org = [on('company') ? plan.company : '', on('location') ? plan.location : '', on('store') && plan.storeNo ? 'Store #' + plan.storeNo : ''].filter(Boolean).join(' · ');
       const top = [[p.name, '700', 11.5], sub ? [sub, '400', 8.5, '#444'] : null, org ? [org, '400', 7.5, '#666'] : null].filter(Boolean);
       font('400', 7.5 * k);
       const addr = on('addr') && p.address ? wrap2(p.address, tw) : [];
-      const bot = [on('phone') ? [p.phone || 'no phone yet', '700', 10.5, p.phone ? '#000' : '#999'] : null, on('email') && p.email ? [p.email, '400', 8.5] : null, ...addr.map((a) => [a, '400', 7.5, '#333'])].filter(Boolean);
+      font('400', 7.5 * k); const info = on('notes') && p.notes ? [fit(p.notes, tw)] : [];
+      const bot = [on('phone') ? [p.phone || 'no phone yet', '700', 10.5, p.phone ? '#000' : '#999'] : null, on('email') && p.email ? [p.email, '400', 8.5] : null, ...addr.map((a) => [a, '400', 7.5, '#333']), ...info.map((a) => [a, '400', 7.5, '#666'])].filter(Boolean);
       const lh = (l) => pt(l[2] * k * 1.3);
       const topH = top.reduce((t, l) => t + lh(l), 0), botH = bot.reduce((t, l) => t + lh(l), 0);
       let ty = y + pad;
       top.forEach((l) => { ty += lh(l); font(l[1], l[2] * k); g.fillStyle = l[3] || '#000'; g.fillText(fit(l[0], tw), cx, ty - pt(l[2] * k * 0.28)); });
       // the phone line sits at the same height on every card: room is kept for the lines a card could have
-      const most = (on('phone') ? 10.5 : 0) + (on('email') ? 8.5 : 0) + (on('addr') ? 7.5 * Math.max(1, addr.length) : 0), botRes = Math.max(botH, pt(most * k * 1.3));
+      const most = (on('phone') ? 10.5 : 0) + (on('email') ? 8.5 : 0) + (on('addr') ? 7.5 * Math.max(1, addr.length) : 0) + (on('notes') ? 7.5 : 0), botRes = Math.max(botH, pt(most * k * 1.3));
       const room = chh - 2 * pad - topH - botRes - pt(10 * k), qs = Math.max(pt(20), Math.min(tw, room));
       g.textAlign = 'left'; drawQr(g, vcardOf(p, 'qr'), cx - qs / 2, ty + pt(5 * k), qs); g.textAlign = 'center';
       ty = y + chh - pad - botRes - pt(2);
@@ -109,7 +118,7 @@
     const [cols, rows, k0] = cardGrid(pw, ph, people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
     const cwIn = (pw - 0.6) / cols, chIn = (ph - 1.1) / rows;
     const n = Math.max(...people.map((p) => qrOf(vcardOf(p, 'qr')).getModuleCount())) + 8;
-    const lines = 1 + (cardOn('show', 'role') || cardOn('show', 'id') ? 1 : 0) + (cardOn('show', 'org') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
+    const lines = 1 + (['role', 'id', 'shift'].some((k) => cardOn('show', k)) ? 1 : 0) + (['company', 'location', 'store'].some((k) => cardOn('show', k)) ? 1 : 0) + (cardOn('show', 'notes') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
     const qsIn = Math.max(0.28, Math.min(cwIn - 0.22 * k, chIn - 0.22 * k - lines * 0.15 * k - 0.14 * k)), dotMm = qsIn * 25.4 / n;
     return `QR codes about ${(qsIn * 25.4).toFixed(0)} mm (${qsIn.toFixed(2)} in), dots ${dotMm.toFixed(2)} mm: ${dotMm >= 0.4 ? 'scans easily' : dotMm >= 0.3 ? 'scans fine with most phones' : 'small: fewer per page or less in the code scans better'}`;
   }

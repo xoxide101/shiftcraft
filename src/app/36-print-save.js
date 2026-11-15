@@ -100,11 +100,16 @@
     const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
     // contact cards: what is printed, what is in the QR code (separately), and how many to a page
     const cardChecks = () => {
-      const row = (grp, title) => h('div', { class: 'inline', style: { gap: '4px 12px' } }, h('b', { class: 'small', style: { minWidth: '190px' } }, title),
-        CARD_FIELDS.filter(([k]) => k !== 'addr' || addrInUse()).map(([k, l]) => h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: !!cardPrefs[grp][k], onchange: (e) => { cardPrefs[grp][k] = e.target.checked; saveCardPrefs(); update(); } }), ' ' + l)));
+      // one row an item, with its own two switches: printed on the card, and in the QR code (any combination)
+      const sw = (grp, k, l) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!cardPrefs[grp][k], 'aria-label': `${l}: ${grp === 'show' ? 'printed on the card' : 'in the QR code'}`, onchange: (e) => { cardPrefs[grp][k] = e.target.checked; saveCardPrefs(); update(); } }));
+      const all = (grp, v) => { CARD_FIELDS.forEach(([k]) => { cardPrefs[grp][k] = v; }); saveCardPrefs(); build(); update(); };
+      const grid = h('table', { class: 't compact card-fields' },
+        h('thead', null, h('tr', null, h('th', null, 'Name is always on both'), h('th', { class: 'c' }, 'Printed on the card'), h('th', { class: 'c' }, 'In the QR code'))),
+        h('tbody', null, CARD_FIELDS.filter(([k]) => k !== 'addr' || addrInUse()).map(([k, l]) => h('tr', null, h('td', null, l), sw('show', k, l), sw('qr', k, l))),
+          h('tr', null, h('td', { class: 'muted small' }, 'All or none'), ...['show', 'qr'].map((grp) => h('td', { class: 'c nowrap' }, h('button', { type: 'button', class: 'btn sm ghost', onclick: () => all(grp, true) }, 'All'), h('button', { type: 'button', class: 'btn sm ghost', onclick: () => all(grp, false) }, 'None'))))));
       const fitSel = h('select', { class: 'input', 'aria-label': 'Cards per page', style: { width: 'auto' }, onchange: () => { cardPrefs.fit = fitSel.value; saveCardPrefs(); update(); } },
         [['std', 'Standard size cards, as many pages as needed'], ['one', 'Everyone on 1 page (cards as big as fit)']].map(([v, l]) => h('option', { value: v, selected: cardPrefs.fit === v }, l)));
-      return h('div', { style: { display: 'grid', gap: '6px', width: '100%' } }, row('show', 'Printed on the card (name always):'), row('qr', 'In the QR code (what a phone adds):'),
+      return h('div', { style: { display: 'grid', gap: '6px', width: '100%' } }, grid,
         h('div', { class: 'inline' }, h('b', { class: 'small', style: { minWidth: '190px' } }, 'Cards per page:'), fitSel), addrInUse() ? null : h('span', { class: 'hint small' }, 'Address is set to not in use (Company & Location › Contact details we keep).'));
     };
     const sel = (key, options, label) => {
