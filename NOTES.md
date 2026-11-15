@@ -211,3 +211,8 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 - The buttons at the end of each Staff row are now one matching set of small icon buttons (28 px), with a hover explanation on each: Tasks (a number badge for open tasks), Time off (a dot when time off is now or coming up), Print, Left… and Remove (red on hover).
 - The same set is used for + Some days and its Remove, Day by day (From usual, Clear), the Time off list (Approve, Deny, Edit) and Former staff (Edit, Rehire, Delete).
 - The row is much narrower, so the table fits on a normal screen with less sideways scrolling.
+
+## Usual shift and hours in one column
+
+- The usual shift now sits on the top line of the *Hours they can work* cell, with the hours they can work (Any time) under it, in three lined-up columns: label · hours · button. One column fewer, so the whole Weekdays table fits a normal wide screen without scrolling sideways.
+- Those two lines always stay (no remove button). + on the top line adds a Some days line under the person, lined up the same way, with its days in the label and a trash button; only those lines can be removed.

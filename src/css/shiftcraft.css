@@ -319,6 +319,8 @@ table.t tr.has-sub td { border-bottom-style: dashed; }
 table.t tr.subrow td { padding: 4px 10px; background: color-mix(in srgb, var(--accent-soft) 45%, transparent); border-top-style: dashed; }
 table.t tr.subrow .sub-arrow { color: var(--accent); font-weight: 700; padding-left: 12px; }
 table.t td .inline.dim { opacity: .45; }
+table.t .hgrid { display: grid; grid-template-columns: 84px auto 28px; gap: 4px 6px; align-items: center; }
+table.t .hgrid .hlabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .daytoggles button.dt.use.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .availlines { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; align-items: flex-start; }
 .availline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 5px; border: 1px dashed var(--line); border-radius: 6px; }
