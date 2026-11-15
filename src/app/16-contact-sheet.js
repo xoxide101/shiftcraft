@@ -2,12 +2,23 @@
   // The availability and contact sheet itself, used by the printout and by the preview in the Print or save window
   // Contact QR codes: each person as a vCard 3.0 (name, role, company and location, phone, email) in a QR code; a phone's
   // camera offers to add them to its contacts. qrcode-generator (Kazuhiko Arase, MIT) makes the code, in UTF-8.
-  function vcardOf(p) {
-    const e = (t) => String(t || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n');
+  // What goes on the contact cards and in their QR codes: two separate choices (a card can show the phone number while
+  // the code leaves it out, or the other way round). Kept in this browser; the name is always on both.
+  // The address is only offered while it is in use (Company & Location › Contact details we keep).
+  const CARD_FIELDS = [['role', 'Role'], ['id', 'Employee ID'], ['org', 'Company & location'], ['phone', 'Phone'], ['email', 'Email'], ['addr', 'Address']];
+  const CARD_KEY = KEY + '-cards';
+  const cardPrefs = { show: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), qr: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), fit: 'std' };
+  try { const c = JSON.parse(localStorage.getItem(CARD_KEY) || '{}'); if (c.show) Object.assign(cardPrefs.show, c.show); if (c.qr) Object.assign(cardPrefs.qr, c.qr); if (c.fit === 'one') cardPrefs.fit = 'one'; } catch (e) { /* blocked */ }
+  const saveCardPrefs = () => { try { localStorage.setItem(CARD_KEY, JSON.stringify(cardPrefs)); } catch (e) { /* blocked */ } };
+  const addrInUse = () => !(plan.contactUse && plan.contactUse.address === false);
+  const cardOn = (grp, k) => !!cardPrefs[grp][k] && (k !== 'addr' || addrInUse());
+  function vcardOf(p, grp = 'qr') {
+    const e = (t) => String(t || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n'), on = (k) => cardOn(grp, k);
     const parts = p.name.trim().split(/\s+/), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
     return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(last)};${e(first)};;;`, `FN:${e(p.name)}`,
-      plan.company || plan.location ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
-      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
+      on('org') && (plan.company || plan.location) ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
+      on('role') ? `TITLE:${e(ROLES[p.role].label)}` : '', on('phone') && p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', on('email') && p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '',
+      on('addr') && p.address ? `ADR;TYPE=HOME:;;${e(p.address)};;;;` : '', on('id') && p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
   }
   function qrOf(text) {
     if (typeof qrcode !== 'function') return null;
@@ -15,11 +26,16 @@
     const q = qrcode(0, 'M'); q.addData(text, 'Byte'); q.make(); return q;
   }
   // a QR code drawn with plain rectangles (so it is exact on screen, in pictures and in SVG), quiet zone included
+  // In a picture every dot is the same whole number of pixels, square (1:1), so scanners read it cleanly; the code is
+  // centred in its box. In SVG (vector) the dots are exact anyway.
   function drawQr(g, text, x, y, size) {
-    const q = qrOf(text); if (!q) return;
-    const n = q.getModuleCount(), m = size / (n + 8);
-    g.fillStyle = '#fff'; g.fillRect(x, y, size, size); g.fillStyle = '#000';
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(x + (c + 4) * m, y + (r + 4) * m, m + 0.02 * m, m + 0.02 * m);
+    const q = qrOf(text); if (!q) return 0;
+    const n = q.getModuleCount(), N = n + 8, vector = !!g.toSVG;
+    const m = vector ? size / N : Math.max(1, Math.floor(size / N)), real = m * N;
+    x += (size - real) / 2; y += (size - real) / 2; if (!vector) { x = Math.round(x); y = Math.round(y); }
+    g.fillStyle = '#fff'; g.fillRect(x, y, real, real); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(x + (c + 4) * m, y + (r + 4) * m, m, m);
+    return m;
   }
   // Push the contact QR codes into the shared Craft barcode library (localStorage 'craft-barcodes', the same list
   // BarcodeCraft, LabelCraft and PressCraft use; logged in: your account's 'craft'/'barcodes' too), so any app can put
@@ -36,31 +52,66 @@
     toast(`${mine.length} contact QR code${mine.length === 1 ? '' : 's'} added to the barcode library in this browser${acct}. Use Insert › Barcode in LabelCraft or PressCraft, or BarcodeCraft, to put them on a sheet.`);
   }
   const cardPeople = (range) => sortStaff(plan.staff.filter((p) => p.active && !p.left && (range !== 'phones' || p.phone)));
-  // how many cards fit a page: cards about 2.6 × 2 in (portrait Letter: 3 × 5)
-  const cardGrid = (pw, ph) => [Math.max(1, Math.floor((pw - 0.6) / 2.55)), Math.max(1, Math.floor((ph - 1.1) / 2.0))];
+  // How the cards sit on a page. Standard: about 2.5 × 3.2 in each (portrait Letter: 3 × 3), as many pages as needed.
+  // Everyone on 1 page: the grid that gives the biggest cards for n people. k: the card's size against standard.
+  const CARD_W = 2.5, CARD_H = 3.2;
+  function cardGrid(pw, ph, n = 1) {
+    const aw = pw - 0.6, ah = ph - 1.1;
+    if (cardPrefs.fit !== 'one') { const cols = Math.max(1, Math.floor(aw / CARD_W)), rows = Math.max(1, Math.floor(ah / CARD_H)); return [cols, rows, 1]; }
+    let best = [1, n, 0];
+    for (let cols = 1; cols <= Math.max(1, n); cols++) { const rows = Math.ceil(Math.max(1, n) / cols), k = Math.min(aw / cols / CARD_W, ah / rows / CARD_H); if (k > best[2]) best = [cols, rows, k]; }
+    return best;
+  }
+  // Each card, everything centred: name; role · ID; company; the QR code; phone, email and address at the bottom.
   function drawContactCards(item, o) {
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, o), g = c.getContext('2d');
-    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi, [cols, rows] = cardGrid(pw, ph);
+    const [cols, rows, k0] = cardGrid(pw, ph, item.total || item.people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
+    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi;
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
     const font = (w, size) => { g.font = `${w} ${pt(size)}px Arial, Helvetica, sans-serif`; };
     const fit = (str, maxW) => { while (str.length > 1 && g.measureText(str).width > maxW) str = str.slice(0, -2) + '…'; return str; };
-    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · contact cards`, M, M + pt(12));
+    // words on up to two lines
+    const wrap2 = (str, maxW) => { if (g.measureText(str).width <= maxW) return [str]; const w = str.split(' '); let a = ''; while (w.length && g.measureText((a ? a + ' ' : '') + w[0]).width <= maxW) a += (a ? ' ' : '') + w.shift(); return a ? [a, fit(w.join(' '), maxW)] : [fit(str, maxW)]; };
+    const on = (f) => cardOn('show', f);
+    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, M, M + pt(12));
     font('400', 9); g.fillStyle = '#444'; g.fillText(`Scan a code with a phone camera to add that person to its contacts.${item.pages > 1 ? `   Page ${item.page} of ${item.pages}` : ''}`, M, M + pt(26));
     const cw = (W - 2 * M) / cols, chh = (H - M - TOP) / rows;
     item.people.forEach((p, i) => {
-      const x = M + (i % cols) * cw, y = TOP + Math.floor(i / cols) * chh, pad = pt(7), qs = Math.min(cw * 0.5, chh - 2 * pad - pt(30));
+      const x = M + (i % cols) * cw, y = TOP + Math.floor(i / cols) * chh, pad = pt(8 * k), cx = x + cw / 2, tw = cw - 2 * pad;
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.setLineDash && g.setLineDash([pt(3), pt(3)]); g.strokeRect(x + pt(2), y + pt(2), cw - pt(4), chh - pt(4)); g.setLineDash && g.setLineDash([]);
-      g.fillStyle = '#000'; font('700', 11); g.fillText(fit(p.name, cw - 2 * pad), x + pad, y + pad + pt(10));
-      font('400', 8.5); g.fillStyle = '#444'; g.fillText(fit(ROLES[p.role].label, cw - 2 * pad), x + pad, y + pad + pt(21));
-      drawQr(g, vcardOf(p), x + pad, y + pad + pt(27), qs);
-      const tx = x + pad + qs + pt(6), tw = cw - (tx - x) - pad; let ty = y + pad + pt(40);
-      g.fillStyle = '#000'; font('700', 9.5); g.fillText(fit(p.phone || 'no phone yet', tw), tx, ty); ty += pt(13);
-      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); ty += pt(12); }
-      if (p.empId) { font('400', 8); g.fillStyle = '#444'; g.fillText(fit('ID ' + p.empId, tw), tx, ty); }
+      g.textAlign = 'center';
+      // the lines above the code and below it, measured first so the code gets the room in between
+      const sub = [on('role') ? ROLES[p.role].label : '', on('id') && p.empId ? 'ID ' + p.empId : ''].filter(Boolean).join(' · ');
+      const org = on('org') ? [plan.company, plan.location].filter(Boolean).join(' · ') : '';
+      const top = [[p.name, '700', 11.5], sub ? [sub, '400', 8.5, '#444'] : null, org ? [org, '400', 7.5, '#666'] : null].filter(Boolean);
+      font('400', 7.5 * k);
+      const addr = on('addr') && p.address ? wrap2(p.address, tw) : [];
+      const bot = [on('phone') ? [p.phone || 'no phone yet', '700', 10.5, p.phone ? '#000' : '#999'] : null, on('email') && p.email ? [p.email, '400', 8.5] : null, ...addr.map((a) => [a, '400', 7.5, '#333'])].filter(Boolean);
+      const lh = (l) => pt(l[2] * k * 1.3);
+      const topH = top.reduce((t, l) => t + lh(l), 0), botH = bot.reduce((t, l) => t + lh(l), 0);
+      let ty = y + pad;
+      top.forEach((l) => { ty += lh(l); font(l[1], l[2] * k); g.fillStyle = l[3] || '#000'; g.fillText(fit(l[0], tw), cx, ty - pt(l[2] * k * 0.28)); });
+      // the phone line sits at the same height on every card: room is kept for the lines a card could have
+      const most = (on('phone') ? 10.5 : 0) + (on('email') ? 8.5 : 0) + (on('addr') ? 7.5 * Math.max(1, addr.length) : 0), botRes = Math.max(botH, pt(most * k * 1.3));
+      const room = chh - 2 * pad - topH - botRes - pt(10 * k), qs = Math.max(pt(20), Math.min(tw, room));
+      g.textAlign = 'left'; drawQr(g, vcardOf(p, 'qr'), cx - qs / 2, ty + pt(5 * k), qs); g.textAlign = 'center';
+      ty = y + chh - pad - botRes - pt(2);
+      bot.forEach((l) => { ty += lh(l); font(l[1], l[2] * k); g.fillStyle = l[3] || '#000'; g.fillText(fit(l[0], tw), cx, ty - pt(l[2] * k * 0.28)); });
+      g.textAlign = 'left';
     });
-    if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
+    if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Contact & training).', M, TOP + pt(20)); }
     return c;
+  }
+  // the QR code's size on paper and the size of its dots, for the Print or save window (the longest code of them all)
+  function cardQrInfo(pw, ph, people) {
+    if (!people.length || typeof qrcode !== 'function') return '';
+    const [cols, rows, k0] = cardGrid(pw, ph, people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
+    const cwIn = (pw - 0.6) / cols, chIn = (ph - 1.1) / rows;
+    const n = Math.max(...people.map((p) => qrOf(vcardOf(p, 'qr')).getModuleCount())) + 8;
+    const lines = 1 + (cardOn('show', 'role') || cardOn('show', 'id') ? 1 : 0) + (cardOn('show', 'org') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
+    const qsIn = Math.max(0.28, Math.min(cwIn - 0.22 * k, chIn - 0.22 * k - lines * 0.15 * k - 0.14 * k)), dotMm = qsIn * 25.4 / n;
+    return `QR codes about ${(qsIn * 25.4).toFixed(0)} mm (${qsIn.toFixed(2)} in), dots ${dotMm.toFixed(2)} mm: ${dotMm >= 0.4 ? 'scans easily' : dotMm >= 0.3 ? 'scans fine with most phones' : 'small: fewer per page or less in the code scans better'}`;
   }
   // the numbered notes: a list in two columns (under the sheet), or a page of their own
   const alNotesList = (list, size = '8pt') => h('div', { class: 'al-noteslist', style: { columns: 2, columnGap: '24px', fontSize: size, lineHeight: 1.35 } }, list.map((n) => h('div', { style: { breakInside: 'avoid' } }, h('b', null, n.n + '. '), n.text)));

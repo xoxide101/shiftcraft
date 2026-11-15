@@ -104,7 +104,8 @@
         h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
           ib('clear', 'Clear the day-by-day availability', () => change(() => { delete p.avail; }), { disabled: !Array.isArray(p.avail) })))));
     } else if (staffTab === 'contact') {
-      head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Email', 'Phone number', 'Notes', ''];
+      // their IDs and notes first, then how to reach them (phone, email, address) together
+      head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Notes', 'Phone number', 'Email', ...(addrInUse() ? ['Home address'] : []), ''];
       rows = people.map((p) => {
         const email = h('input', { class: 'input', type: 'email', value: p.email || '', placeholder: 'name@example.com', 'aria-label': 'Email', style: { width: '100%' } });
         email.addEventListener('change', () => change(() => { p.email = email.value.trim(); }));
@@ -113,10 +114,13 @@
         notes.addEventListener('change', () => change(() => { p.notes = notes.value; }));
         const phone = h('input', { class: 'input', type: 'tel', value: p.phone || '', placeholder: '(555) 010-0100', 'aria-label': 'Phone number', style: { width: '100%' } });
         phone.addEventListener('change', () => change(() => { p.phone = phone.value.trim(); }));
+        const addr = h('input', { class: 'input', value: p.address || '', placeholder: 'Street, city, state ZIP', 'aria-label': 'Home address', maxLength: 160, style: { width: '100%' } });
+        addr.addEventListener('change', () => change(() => { const v = addr.value.replace(/\s+/g, ' ').trim(); if (v) p.address = v; else delete p.address; }));
         return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), idBox('empId', 'Employee ID', 'e.g. 10234'), idBox('shiftCode', 'Shift code', 'e.g. TM-07'),
-          h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
-          h('td', { style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
           h('td', { style: { minWidth: '160px' } }, notes),
+          h('td', { class: 'ct-first', style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
+          h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
+          addrInUse() ? h('td', { style: { minWidth: '240px' } }, addr) : null,
           actions(p));
       });
     } else {

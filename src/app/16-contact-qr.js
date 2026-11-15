@@ -32,7 +32,7 @@
     modal({ title: `Contact QR code · ${p.name}`, wide: true, body: [
       contactCard(p, svg),
       !p.phone && !p.email ? h('p', { class: 'warn small' }, 'No phone number or email yet: add them on Staff › Contact & training so the code has a way to reach them.') : null,
-      h('p', { class: 'hint' }, 'Holds their name, role, company and location, phone, email and Employee ID as a contact card (vCard). Contact cards for the whole team: Print & share › Print or save › Contact cards.')],
+      h('p', { class: 'hint' }, `Holds their name${CARD_FIELDS.filter(([k]) => cardOn('qr', k)).map(([, l]) => ', ' + l.toLowerCase()).join('')} as a contact card (vCard): what goes in the code is chosen in Print & share › Print or save › Contact cards.`)],
     actions: [
       { label: 'Add to barcode library', left: true, onClick: () => { cardsToLibrary([p]); return false; } },
       { label: 'Save QR (.svg)', onClick: () => { saveBlob(`${name} contact QR.svg`, new Blob([svg], { type: 'image/svg+xml' }), { description: 'SVG picture', accept: { 'image/svg+xml': ['.svg'] } }).then((n) => n && toast('Saved ' + n)); return false; } },

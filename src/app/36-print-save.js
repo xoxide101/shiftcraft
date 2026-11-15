@@ -80,7 +80,7 @@
     const items = () => {
       if (o.layout === 'timeline') return o.range === 'day' ? [PD] : o.range === 'weektile' ? [weekDays(weekOf(PD))[0]] : o.range === 'week' ? weekDays(weekOf(PD)) : planDays();
       if (o.layout === 'calendar') return [o.range === 'all' ? { start: plan.startDate, weeks: plan.weeks } : { start: curWeek(), weeks: { week: 1, two: 2, month: 4 }[o.range] || 1 }];
-      if (o.layout === 'cards') { const [pw, ph] = pageSize(), [cc, rr] = cardGrid(pw, ph), per = cc * rr, ppl = cardPeople(o.range), pages = Math.max(1, Math.ceil(ppl.length / per)); return Array.from({ length: pages }, (_, k) => ({ people: ppl.slice(k * per, (k + 1) * per), page: k + 1, pages })); }
+      if (o.layout === 'cards') { const [pw, ph] = pageSize(), ppl = cardPeople(o.range), [cc, rr] = cardGrid(pw, ph, ppl.length), per = cc * rr, pages = Math.max(1, Math.ceil(ppl.length / per)); return Array.from({ length: pages }, (_, k) => ({ people: ppl.slice(k * per, (k + 1) * per), page: k + 1, pages, total: ppl.length })); }
       return o.range === 'all' ? Array.from({ length: plan.weeks }, (_, k) => k) : [weekOf(PD)];
     };
     const draw = (item, opts) => (o.layout === 'cards' ? drawContactCards(item, opts) : o.layout === 'timeline' ? (o.range === 'weektile' ? drawWeekTiles(item, opts) : drawDaySheet(item, opts)) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
@@ -98,6 +98,15 @@
     const whereFor = () => (o.layout === 'timeline' && o.range === 'weektile' && notesWhere === 'page' ? 'separate' : notesWhere);
     // every page of the printout, and the notes page(s) after them when the list goes on its own page
     const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
+    // contact cards: what is printed, what is in the QR code (separately), and how many to a page
+    const cardChecks = () => {
+      const row = (grp, title) => h('div', { class: 'inline', style: { gap: '4px 12px' } }, h('b', { class: 'small', style: { minWidth: '190px' } }, title),
+        CARD_FIELDS.filter(([k]) => k !== 'addr' || addrInUse()).map(([k, l]) => h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: !!cardPrefs[grp][k], onchange: (e) => { cardPrefs[grp][k] = e.target.checked; saveCardPrefs(); update(); } }), ' ' + l)));
+      const fitSel = h('select', { class: 'input', 'aria-label': 'Cards per page', style: { width: 'auto' }, onchange: () => { cardPrefs.fit = fitSel.value; saveCardPrefs(); update(); } },
+        [['std', 'Standard size cards, as many pages as needed'], ['one', 'Everyone on 1 page (cards as big as fit)']].map(([v, l]) => h('option', { value: v, selected: cardPrefs.fit === v }, l)));
+      return h('div', { style: { display: 'grid', gap: '6px', width: '100%' } }, row('show', 'Printed on the card (name always):'), row('qr', 'In the QR code (what a phone adds):'),
+        h('div', { class: 'inline' }, h('b', { class: 'small', style: { minWidth: '190px' } }, 'Cards per page:'), fitSel), addrInUse() ? null : h('span', { class: 'hint small' }, 'Address is set to not in use (Company & Location › Contact details we keep).'));
+    };
     const sel = (key, options, label) => {
       const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
@@ -121,6 +130,7 @@
         notesWhereSel(),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
         o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
+        o.layout === 'cards' ? cardChecks() : null,
         o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
@@ -137,6 +147,7 @@
           ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels (${(W * H / 1e9).toFixed(1)} billion), more than a browser can make into a ${o.format.toUpperCase()}. It will be saved as SVG instead: a vector file that prints sharp at ${o.dpi} DPI or any other.`
           : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels${o.layout === 'calendar' ? ' (taller when there are many weeks)' : ' each'} · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
       size.className = big ? 'hint warn' : 'hint';
+      if (o.layout === 'cards') { const info = cardQrInfo(pw, ph, cardPeople(o.range)); if (info) { size.textContent += ' · ' + info; if (/small:/.test(info)) size.className = 'hint warn'; } }
       if (whereFor() === 'separate') size.textContent += ' · then the numbered notes on a page of their own';
       preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
     };

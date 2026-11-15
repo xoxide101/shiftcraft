@@ -400,6 +400,8 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .pw-week[aria-pressed="true"] small { color: inherit; }
 .pw-weeks { display: flex; flex-wrap: wrap; gap: 6px; }
 .pw-week[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Staff › Contact & training: the contact details (phone, email, address) set apart */
+td.ct-first { border-left: 2px solid var(--line); }
 </style>
 </head>
 <body>
@@ -1687,7 +1689,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
           ib('clear', 'Clear the day-by-day availability', () => change(() => { delete p.avail; }), { disabled: !Array.isArray(p.avail) })))));
     } else if (staffTab === 'contact') {
-      head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Email', 'Phone number', 'Notes', ''];
+      // their IDs and notes first, then how to reach them (phone, email, address) together
+      head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Notes', 'Phone number', 'Email', ...(addrInUse() ? ['Home address'] : []), ''];
       rows = people.map((p) => {
         const email = h('input', { class: 'input', type: 'email', value: p.email || '', placeholder: 'name@example.com', 'aria-label': 'Email', style: { width: '100%' } });
         email.addEventListener('change', () => change(() => { p.email = email.value.trim(); }));
@@ -1696,10 +1699,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         notes.addEventListener('change', () => change(() => { p.notes = notes.value; }));
         const phone = h('input', { class: 'input', type: 'tel', value: p.phone || '', placeholder: '(555) 010-0100', 'aria-label': 'Phone number', style: { width: '100%' } });
         phone.addEventListener('change', () => change(() => { p.phone = phone.value.trim(); }));
+        const addr = h('input', { class: 'input', value: p.address || '', placeholder: 'Street, city, state ZIP', 'aria-label': 'Home address', maxLength: 160, style: { width: '100%' } });
+        addr.addEventListener('change', () => change(() => { const v = addr.value.replace(/\s+/g, ' ').trim(); if (v) p.address = v; else delete p.address; }));
         return h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), idBox('empId', 'Employee ID', 'e.g. 10234'), idBox('shiftCode', 'Shift code', 'e.g. TM-07'),
-          h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
-          h('td', { style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
           h('td', { style: { minWidth: '160px' } }, notes),
+          h('td', { class: 'ct-first', style: { minWidth: '180px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, phone, p.phone ? h('a', { class: 'btn sm', href: 'tel:' + p.phone.replace(/[^\d+]/g, ''), title: 'Call' }, '☎') : null)),
+          h('td', { style: { minWidth: '220px' } }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, email, p.email ? h('a', { class: 'btn sm', href: 'mailto:' + p.email, title: 'Write an email' }, '✉') : null)),
+          addrInUse() ? h('td', { style: { minWidth: '240px' } }, addr) : null,
           actions(p));
       });
     } else {
@@ -1851,7 +1857,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     modal({ title: `Contact QR code · ${p.name}`, wide: true, body: [
       contactCard(p, svg),
       !p.phone && !p.email ? h('p', { class: 'warn small' }, 'No phone number or email yet: add them on Staff › Contact & training so the code has a way to reach them.') : null,
-      h('p', { class: 'hint' }, 'Holds their name, role, company and location, phone, email and Employee ID as a contact card (vCard). Contact cards for the whole team: Print & share › Print or save › Contact cards.')],
+      h('p', { class: 'hint' }, `Holds their name${CARD_FIELDS.filter(([k]) => cardOn('qr', k)).map(([, l]) => ', ' + l.toLowerCase()).join('')} as a contact card (vCard): what goes in the code is chosen in Print & share › Print or save › Contact cards.`)],
     actions: [
       { label: 'Add to barcode library', left: true, onClick: () => { cardsToLibrary([p]); return false; } },
       { label: 'Save QR (.svg)', onClick: () => { saveBlob(`${name} contact QR.svg`, new Blob([svg], { type: 'image/svg+xml' }), { description: 'SVG picture', accept: { 'image/svg+xml': ['.svg'] } }).then((n) => n && toast('Saved ' + n)); return false; } },
@@ -1885,12 +1891,23 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // The availability and contact sheet itself, used by the printout and by the preview in the Print or save window
   // Contact QR codes: each person as a vCard 3.0 (name, role, company and location, phone, email) in a QR code; a phone's
   // camera offers to add them to its contacts. qrcode-generator (Kazuhiko Arase, MIT) makes the code, in UTF-8.
-  function vcardOf(p) {
-    const e = (t) => String(t || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n');
+  // What goes on the contact cards and in their QR codes: two separate choices (a card can show the phone number while
+  // the code leaves it out, or the other way round). Kept in this browser; the name is always on both.
+  // The address is only offered while it is in use (Company & Location › Contact details we keep).
+  const CARD_FIELDS = [['role', 'Role'], ['id', 'Employee ID'], ['org', 'Company & location'], ['phone', 'Phone'], ['email', 'Email'], ['addr', 'Address']];
+  const CARD_KEY = KEY + '-cards';
+  const cardPrefs = { show: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), qr: Object.fromEntries(CARD_FIELDS.map(([k]) => [k, true])), fit: 'std' };
+  try { const c = JSON.parse(localStorage.getItem(CARD_KEY) || '{}'); if (c.show) Object.assign(cardPrefs.show, c.show); if (c.qr) Object.assign(cardPrefs.qr, c.qr); if (c.fit === 'one') cardPrefs.fit = 'one'; } catch (e) { /* blocked */ }
+  const saveCardPrefs = () => { try { localStorage.setItem(CARD_KEY, JSON.stringify(cardPrefs)); } catch (e) { /* blocked */ } };
+  const addrInUse = () => !(plan.contactUse && plan.contactUse.address === false);
+  const cardOn = (grp, k) => !!cardPrefs[grp][k] && (k !== 'addr' || addrInUse());
+  function vcardOf(p, grp = 'qr') {
+    const e = (t) => String(t || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n'), on = (k) => cardOn(grp, k);
     const parts = p.name.trim().split(/\s+/), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
     return ['BEGIN:VCARD', 'VERSION:3.0', `N:${e(last)};${e(first)};;;`, `FN:${e(p.name)}`,
-      plan.company || plan.location ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
-      `TITLE:${e(ROLES[p.role].label)}`, p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '', p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
+      on('org') && (plan.company || plan.location) ? `ORG:${e(plan.company || plan.location)}${plan.company && plan.location ? ';' + e(plan.location) : ''}` : '',
+      on('role') ? `TITLE:${e(ROLES[p.role].label)}` : '', on('phone') && p.phone ? `TEL;TYPE=CELL:${e(p.phone)}` : '', on('email') && p.email ? `EMAIL;TYPE=INTERNET:${e(p.email)}` : '',
+      on('addr') && p.address ? `ADR;TYPE=HOME:;;${e(p.address)};;;;` : '', on('id') && p.empId ? `NOTE:${e('Employee ID ' + p.empId)}` : '', 'END:VCARD'].filter(Boolean).join('\r\n');
   }
   function qrOf(text) {
     if (typeof qrcode !== 'function') return null;
@@ -1898,11 +1915,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const q = qrcode(0, 'M'); q.addData(text, 'Byte'); q.make(); return q;
   }
   // a QR code drawn with plain rectangles (so it is exact on screen, in pictures and in SVG), quiet zone included
+  // In a picture every dot is the same whole number of pixels, square (1:1), so scanners read it cleanly; the code is
+  // centred in its box. In SVG (vector) the dots are exact anyway.
   function drawQr(g, text, x, y, size) {
-    const q = qrOf(text); if (!q) return;
-    const n = q.getModuleCount(), m = size / (n + 8);
-    g.fillStyle = '#fff'; g.fillRect(x, y, size, size); g.fillStyle = '#000';
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(x + (c + 4) * m, y + (r + 4) * m, m + 0.02 * m, m + 0.02 * m);
+    const q = qrOf(text); if (!q) return 0;
+    const n = q.getModuleCount(), N = n + 8, vector = !!g.toSVG;
+    const m = vector ? size / N : Math.max(1, Math.floor(size / N)), real = m * N;
+    x += (size - real) / 2; y += (size - real) / 2; if (!vector) { x = Math.round(x); y = Math.round(y); }
+    g.fillStyle = '#fff'; g.fillRect(x, y, real, real); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect(x + (c + 4) * m, y + (r + 4) * m, m, m);
+    return m;
   }
   // Push the contact QR codes into the shared Craft barcode library (localStorage 'craft-barcodes', the same list
   // BarcodeCraft, LabelCraft and PressCraft use; logged in: your account's 'craft'/'barcodes' too), so any app can put
@@ -1919,31 +1941,66 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     toast(`${mine.length} contact QR code${mine.length === 1 ? '' : 's'} added to the barcode library in this browser${acct}. Use Insert › Barcode in LabelCraft or PressCraft, or BarcodeCraft, to put them on a sheet.`);
   }
   const cardPeople = (range) => sortStaff(plan.staff.filter((p) => p.active && !p.left && (range !== 'phones' || p.phone)));
-  // how many cards fit a page: cards about 2.6 × 2 in (portrait Letter: 3 × 5)
-  const cardGrid = (pw, ph) => [Math.max(1, Math.floor((pw - 0.6) / 2.55)), Math.max(1, Math.floor((ph - 1.1) / 2.0))];
+  // How the cards sit on a page. Standard: about 2.5 × 3.2 in each (portrait Letter: 3 × 3), as many pages as needed.
+  // Everyone on 1 page: the grid that gives the biggest cards for n people. k: the card's size against standard.
+  const CARD_W = 2.5, CARD_H = 3.2;
+  function cardGrid(pw, ph, n = 1) {
+    const aw = pw - 0.6, ah = ph - 1.1;
+    if (cardPrefs.fit !== 'one') { const cols = Math.max(1, Math.floor(aw / CARD_W)), rows = Math.max(1, Math.floor(ah / CARD_H)); return [cols, rows, 1]; }
+    let best = [1, n, 0];
+    for (let cols = 1; cols <= Math.max(1, n); cols++) { const rows = Math.ceil(Math.max(1, n) / cols), k = Math.min(aw / cols / CARD_W, ah / rows / CARD_H); if (k > best[2]) best = [cols, rows, k]; }
+    return best;
+  }
+  // Each card, everything centred: name; role · ID; company; the QR code; phone, email and address at the bottom.
   function drawContactCards(item, o) {
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, o), g = c.getContext('2d');
-    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi, [cols, rows] = cardGrid(pw, ph);
+    const [cols, rows, k0] = cardGrid(pw, ph, item.total || item.people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
+    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi;
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
     const font = (w, size) => { g.font = `${w} ${pt(size)}px Arial, Helvetica, sans-serif`; };
     const fit = (str, maxW) => { while (str.length > 1 && g.measureText(str).width > maxW) str = str.slice(0, -2) + '…'; return str; };
-    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · contact cards`, M, M + pt(12));
+    // words on up to two lines
+    const wrap2 = (str, maxW) => { if (g.measureText(str).width <= maxW) return [str]; const w = str.split(' '); let a = ''; while (w.length && g.measureText((a ? a + ' ' : '') + w[0]).width <= maxW) a += (a ? ' ' : '') + w.shift(); return a ? [a, fit(w.join(' '), maxW)] : [fit(str, maxW)]; };
+    const on = (f) => cardOn('show', f);
+    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, M, M + pt(12));
     font('400', 9); g.fillStyle = '#444'; g.fillText(`Scan a code with a phone camera to add that person to its contacts.${item.pages > 1 ? `   Page ${item.page} of ${item.pages}` : ''}`, M, M + pt(26));
     const cw = (W - 2 * M) / cols, chh = (H - M - TOP) / rows;
     item.people.forEach((p, i) => {
-      const x = M + (i % cols) * cw, y = TOP + Math.floor(i / cols) * chh, pad = pt(7), qs = Math.min(cw * 0.5, chh - 2 * pad - pt(30));
+      const x = M + (i % cols) * cw, y = TOP + Math.floor(i / cols) * chh, pad = pt(8 * k), cx = x + cw / 2, tw = cw - 2 * pad;
       g.strokeStyle = '#999'; g.lineWidth = Math.max(1, dpi / 150); g.setLineDash && g.setLineDash([pt(3), pt(3)]); g.strokeRect(x + pt(2), y + pt(2), cw - pt(4), chh - pt(4)); g.setLineDash && g.setLineDash([]);
-      g.fillStyle = '#000'; font('700', 11); g.fillText(fit(p.name, cw - 2 * pad), x + pad, y + pad + pt(10));
-      font('400', 8.5); g.fillStyle = '#444'; g.fillText(fit(ROLES[p.role].label, cw - 2 * pad), x + pad, y + pad + pt(21));
-      drawQr(g, vcardOf(p), x + pad, y + pad + pt(27), qs);
-      const tx = x + pad + qs + pt(6), tw = cw - (tx - x) - pad; let ty = y + pad + pt(40);
-      g.fillStyle = '#000'; font('700', 9.5); g.fillText(fit(p.phone || 'no phone yet', tw), tx, ty); ty += pt(13);
-      if (p.email) { font('400', 8); g.fillText(fit(p.email, tw), tx, ty); ty += pt(12); }
-      if (p.empId) { font('400', 8); g.fillStyle = '#444'; g.fillText(fit('ID ' + p.empId, tw), tx, ty); }
+      g.textAlign = 'center';
+      // the lines above the code and below it, measured first so the code gets the room in between
+      const sub = [on('role') ? ROLES[p.role].label : '', on('id') && p.empId ? 'ID ' + p.empId : ''].filter(Boolean).join(' · ');
+      const org = on('org') ? [plan.company, plan.location].filter(Boolean).join(' · ') : '';
+      const top = [[p.name, '700', 11.5], sub ? [sub, '400', 8.5, '#444'] : null, org ? [org, '400', 7.5, '#666'] : null].filter(Boolean);
+      font('400', 7.5 * k);
+      const addr = on('addr') && p.address ? wrap2(p.address, tw) : [];
+      const bot = [on('phone') ? [p.phone || 'no phone yet', '700', 10.5, p.phone ? '#000' : '#999'] : null, on('email') && p.email ? [p.email, '400', 8.5] : null, ...addr.map((a) => [a, '400', 7.5, '#333'])].filter(Boolean);
+      const lh = (l) => pt(l[2] * k * 1.3);
+      const topH = top.reduce((t, l) => t + lh(l), 0), botH = bot.reduce((t, l) => t + lh(l), 0);
+      let ty = y + pad;
+      top.forEach((l) => { ty += lh(l); font(l[1], l[2] * k); g.fillStyle = l[3] || '#000'; g.fillText(fit(l[0], tw), cx, ty - pt(l[2] * k * 0.28)); });
+      // the phone line sits at the same height on every card: room is kept for the lines a card could have
+      const most = (on('phone') ? 10.5 : 0) + (on('email') ? 8.5 : 0) + (on('addr') ? 7.5 * Math.max(1, addr.length) : 0), botRes = Math.max(botH, pt(most * k * 1.3));
+      const room = chh - 2 * pad - topH - botRes - pt(10 * k), qs = Math.max(pt(20), Math.min(tw, room));
+      g.textAlign = 'left'; drawQr(g, vcardOf(p, 'qr'), cx - qs / 2, ty + pt(5 * k), qs); g.textAlign = 'center';
+      ty = y + chh - pad - botRes - pt(2);
+      bot.forEach((l) => { ty += lh(l); font(l[1], l[2] * k); g.fillStyle = l[3] || '#000'; g.fillText(fit(l[0], tw), cx, ty - pt(l[2] * k * 0.28)); });
+      g.textAlign = 'left';
     });
-    if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Day by day).', M, TOP + pt(20)); }
+    if (!item.people.length) { font('400', 11); g.fillStyle = '#666'; g.fillText('Nobody to show (add phone numbers on Staff › Contact & training).', M, TOP + pt(20)); }
     return c;
+  }
+  // the QR code's size on paper and the size of its dots, for the Print or save window (the longest code of them all)
+  function cardQrInfo(pw, ph, people) {
+    if (!people.length || typeof qrcode !== 'function') return '';
+    const [cols, rows, k0] = cardGrid(pw, ph, people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
+    const cwIn = (pw - 0.6) / cols, chIn = (ph - 1.1) / rows;
+    const n = Math.max(...people.map((p) => qrOf(vcardOf(p, 'qr')).getModuleCount())) + 8;
+    const lines = 1 + (cardOn('show', 'role') || cardOn('show', 'id') ? 1 : 0) + (cardOn('show', 'org') ? 1 : 0) + (cardOn('show', 'phone') ? 1 : 0) + (cardOn('show', 'email') ? 1 : 0) + (cardOn('show', 'addr') ? 1.6 : 0);
+    const qsIn = Math.max(0.28, Math.min(cwIn - 0.22 * k, chIn - 0.22 * k - lines * 0.15 * k - 0.14 * k)), dotMm = qsIn * 25.4 / n;
+    return `QR codes about ${(qsIn * 25.4).toFixed(0)} mm (${qsIn.toFixed(2)} in), dots ${dotMm.toFixed(2)} mm: ${dotMm >= 0.4 ? 'scans easily' : dotMm >= 0.3 ? 'scans fine with most phones' : 'small: fewer per page or less in the code scans better'}`;
   }
   // the numbered notes: a list in two columns (under the sheet), or a page of their own
   const alNotesList = (list, size = '8pt') => h('div', { class: 'al-noteslist', style: { columns: 2, columnGap: '24px', fontSize: size, lineHeight: 1.35 } }, list.map((n) => h('div', { style: { breakInside: 'avoid' } }, h('b', null, n.n + '. '), n.text)));
@@ -2188,6 +2245,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
           : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
       h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
+      h('h3', { class: 'co-h3' }, 'Contact details we keep'),
+      h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),
       h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
 
     // positions at this location
@@ -4393,7 +4453,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const items = () => {
       if (o.layout === 'timeline') return o.range === 'day' ? [PD] : o.range === 'weektile' ? [weekDays(weekOf(PD))[0]] : o.range === 'week' ? weekDays(weekOf(PD)) : planDays();
       if (o.layout === 'calendar') return [o.range === 'all' ? { start: plan.startDate, weeks: plan.weeks } : { start: curWeek(), weeks: { week: 1, two: 2, month: 4 }[o.range] || 1 }];
-      if (o.layout === 'cards') { const [pw, ph] = pageSize(), [cc, rr] = cardGrid(pw, ph), per = cc * rr, ppl = cardPeople(o.range), pages = Math.max(1, Math.ceil(ppl.length / per)); return Array.from({ length: pages }, (_, k) => ({ people: ppl.slice(k * per, (k + 1) * per), page: k + 1, pages })); }
+      if (o.layout === 'cards') { const [pw, ph] = pageSize(), ppl = cardPeople(o.range), [cc, rr] = cardGrid(pw, ph, ppl.length), per = cc * rr, pages = Math.max(1, Math.ceil(ppl.length / per)); return Array.from({ length: pages }, (_, k) => ({ people: ppl.slice(k * per, (k + 1) * per), page: k + 1, pages, total: ppl.length })); }
       return o.range === 'all' ? Array.from({ length: plan.weeks }, (_, k) => k) : [weekOf(PD)];
     };
     const draw = (item, opts) => (o.layout === 'cards' ? drawContactCards(item, opts) : o.layout === 'timeline' ? (o.range === 'weektile' ? drawWeekTiles(item, opts) : drawDaySheet(item, opts)) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
@@ -4411,6 +4471,15 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const whereFor = () => (o.layout === 'timeline' && o.range === 'weektile' && notesWhere === 'page' ? 'separate' : notesWhere);
     // every page of the printout, and the notes page(s) after them when the list goes on its own page
     const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
+    // contact cards: what is printed, what is in the QR code (separately), and how many to a page
+    const cardChecks = () => {
+      const row = (grp, title) => h('div', { class: 'inline', style: { gap: '4px 12px' } }, h('b', { class: 'small', style: { minWidth: '190px' } }, title),
+        CARD_FIELDS.filter(([k]) => k !== 'addr' || addrInUse()).map(([k, l]) => h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: !!cardPrefs[grp][k], onchange: (e) => { cardPrefs[grp][k] = e.target.checked; saveCardPrefs(); update(); } }), ' ' + l)));
+      const fitSel = h('select', { class: 'input', 'aria-label': 'Cards per page', style: { width: 'auto' }, onchange: () => { cardPrefs.fit = fitSel.value; saveCardPrefs(); update(); } },
+        [['std', 'Standard size cards, as many pages as needed'], ['one', 'Everyone on 1 page (cards as big as fit)']].map(([v, l]) => h('option', { value: v, selected: cardPrefs.fit === v }, l)));
+      return h('div', { style: { display: 'grid', gap: '6px', width: '100%' } }, row('show', 'Printed on the card (name always):'), row('qr', 'In the QR code (what a phone adds):'),
+        h('div', { class: 'inline' }, h('b', { class: 'small', style: { minWidth: '190px' } }, 'Cards per page:'), fitSel), addrInUse() ? null : h('span', { class: 'hint small' }, 'Address is set to not in use (Company & Location › Contact details we keep).'));
+    };
     const sel = (key, options, label) => {
       const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
@@ -4434,6 +4503,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         notesWhereSel(),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
         o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
+        o.layout === 'cards' ? cardChecks() : null,
         o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
@@ -4450,6 +4520,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels (${(W * H / 1e9).toFixed(1)} billion), more than a browser can make into a ${o.format.toUpperCase()}. It will be saved as SVG instead: a vector file that prints sharp at ${o.dpi} DPI or any other.`
           : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels${o.layout === 'calendar' ? ' (taller when there are many weeks)' : ' each'} · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
       size.className = big ? 'hint warn' : 'hint';
+      if (o.layout === 'cards') { const info = cardQrInfo(pw, ph, cardPeople(o.range)); if (info) { size.textContent += ' · ' + info; if (/small:/.test(info)) size.className = 'hint warn'; } }
       if (whereFor() === 'separate') size.textContent += ' · then the numbered notes on a page of their own';
       preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
     };

@@ -277,3 +277,14 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
   Calendar tab's print button. The week on 1 page (tiles) has no room under it, so its notes always go on their own page.
 - Covers the week table, the visual timeline (day and week tiles), the calendar sheet, the availability list (a second
   PDF page, or a second picture) and the Calendar tab printed from the screen. Code: 29-page-notes.js.
+
+## Contact Cards
+- Two separate choices in Print or save › Contact cards, kept in this browser: what is printed on the card, and what
+  goes in the QR code (what a phone adds). Role, Employee ID, company & location, phone, email, address; the name is
+  always on both. The QR window on a Staff row and the barcode library use the same QR choice.
+- Each card is centred: name, role · ID, company; the QR code; phone, email and address at the bottom (the phone at
+  the same height on every card). Cards per page: standard size (about 2.5 × 3.2 in, as many pages as needed), or
+  everyone on 1 page. The window shows the QR size and dot size, and warns when the dots get small.
+- QR codes in pictures: every dot is the same whole number of pixels, square, so they scan cleanly.
+- Home address per person (Staff › Contact & training, with phone and email, set apart from IDs and notes).
+  Company & Location › Contact details we keep: turn the address off when a location does not use it.

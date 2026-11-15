@@ -393,3 +393,5 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .pw-week[aria-pressed="true"] small { color: inherit; }
 .pw-weeks { display: flex; flex-wrap: wrap; gap: 6px; }
 .pw-week[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Staff › Contact & training: the contact details (phone, email, address) set apart */
+td.ct-first { border-left: 2px solid var(--line); }
