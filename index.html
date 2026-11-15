@@ -4329,8 +4329,22 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   const DPI_OPTIONS = [[300, '300 DPI – print quality (default)'], [600, '600 DPI'], [1200, '1200 DPI – very large files'], [2400, '2400 DPI – saved as SVG vector'], [4800, '4800 DPI – saved as SVG vector'], [200, '200 DPI'], [150, '150 DPI – smaller files']];
   function exportImageDialog(preset = {}) {
-    // printing always starts at this week (today's, when it is in the plan) on one page, whatever was printed last time
-    const today = iso(new Date()), PD = planDays().includes(today) ? today : PD;
+    // printing starts at this week (today's, when it is in the plan; else the day on screen), and the Week box picks
+    // any other week of the plan (next week, the one after...) for planning ahead
+    const today = iso(new Date());
+    let PD = preset.day && planDays().includes(preset.day) ? preset.day : planDays().includes(today) ? today : planDays().includes(ui.day) ? ui.day : plan.startDate;
+    const thisW = weekOf(today);
+    const wkName = () => (weekOf(PD) === thisW ? 'This week' : `The week of ${shortDate(curWeek())}`);
+    // the Week box (and, for one day of the timeline, the Day box)
+    const weekSel = () => {
+      const s = h('select', { class: 'input', 'aria-label': 'Week to print', onchange: () => { const off = Math.max(0, weekDays(weekOf(PD)).indexOf(PD)); PD = weekDays(+s.value)[off]; build(); update(); } },
+        Array.from({ length: plan.weeks }, (_, k) => { const ds = weekDays(k); return h('option', { value: k, selected: k === weekOf(PD) }, `Week ${k + 1} · ${dayName(ds[0], 'short')} ${shortDate(ds[0])} – ${dayName(ds[6], 'short')} ${shortDate(ds[6])}${k === thisW ? ' (this week)' : k === thisW + 1 ? ' (next week)' : ''}`); }));
+      return h('label', { class: 'field' }, h('span', null, 'Week'), s);
+    };
+    const daySel = () => {
+      const s = h('select', { class: 'input', 'aria-label': 'Day to print', onchange: () => { PD = s.value; build(); update(); } }, weekDays(weekOf(PD)).map((d) => h('option', { value: d, selected: d === PD }, `${dayName(d)} ${shortDate(d)}${d === today ? ' (today)' : ''}`)));
+      return h('label', { class: 'field' }, h('span', null, 'Day'), s);
+    };
     const ONE = { table: 'week', timeline: 'weektile', calendar: 'week', avail: 'all', cards: 'all' };
     const o = { layout: 'table', range: 'week', format: 'png', paper: 'letter', orient: 'landscape', dpi: 300, notes: true, coverage: true, ...imgPrefs, ...preset };
     o.range = preset.range || ONE[o.layout] || 'week';
@@ -4359,8 +4373,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const RANGES = {
       avail: () => [['all', 'Everyone: one landscape page']],
       cards: () => [['all', `Everyone (${cardPeople('all').length})`], ['phones', `Only people with a phone number (${cardPeople('phones').length})`]],
-      table: () => [['week', `This week (week ${weekOf(PD) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
-      timeline: () => [['day', `This day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', 'This week on 1 page (7 small tiles)'], ['week', 'This week, 7 pages'], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
+      table: () => [['week', `${wkName()} (week ${weekOf(PD) + 1})`], ['all', `All ${plan.weeks} weeks, one page each`]],
+      timeline: () => [['day', `One day (${dayName(PD, 'short')} ${shortDate(PD)})`], ['weektile', `${wkName()} on 1 page (7 small tiles)`], ['week', `${wkName()}, 7 pages`], ['all', `All ${plan.weeks} weeks, ${plan.weeks * 7} pages`]],
       calendar: () => [['week', `Week of ${shortDate(curWeek())}`], ['two', `2 weeks from ${shortDate(curWeek())}`], ['month', `Month: 4 weeks from ${shortDate(curWeek())}`], ['all', `Whole plan, ${plan.weeks} week${plan.weeks > 1 ? 's' : ''}`]],
     };
     // where the numbered notes go (one choice for every printout): under the sheet, on a page of their own, or left out
@@ -4370,7 +4384,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     // every page of the printout, and the notes page(s) after them when the list goes on its own page
     const allPages = (opts) => { const book = noteBook(), w = whereFor(), pages = items().map((it) => draw(it, { ...opts, numbered: w, book })); return w === 'separate' && book.list.length ? pages.concat(drawNotesPages(book, opts)) : pages; };
     const sel = (key, options, label) => {
-      const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } update(); } },
+      const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
       return h('label', { class: 'field' }, h('span', null, label), s);
     };
@@ -4381,6 +4395,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       box.replaceChildren(
         sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
+        o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
+        o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
         sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
         sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
         sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
