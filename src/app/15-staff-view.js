@@ -221,7 +221,10 @@
       let base = cur.was ? { ...cur.was } : cur.k === 'off' || cur.k === 'unk' ? { k: 'any' } : { ...cur };
       delete base.hl; delete base.was;
       if (st === 'on' && avClass(base) === 'hl') base = { k: 'any' }; // a note like If you ask is yellow by itself
-      p.avail[i] = st === 'on' ? base : st === 'hl' ? { ...base, hl: true } : { k: st === 'off' ? 'off' : 'unk', ...(base.k !== 'any' ? { was: base } : {}) };
+      // green that is just Any (or what the settings give anyway) follows the weekday / weekend settings again, so the
+      // hours and Some days lines show; green with hours of the day's own keeps them
+      const plainGreen = st === 'on' && (base.k === 'any' || JSON.stringify(base) === JSON.stringify(avFromSets(p, i)));
+      p.avail[i] = plainGreen ? null : st === 'on' ? base : st === 'hl' ? { ...base, hl: true } : { k: st === 'off' ? 'off' : 'unk', ...(base.k !== 'any' ? { was: base } : {}) };
     });
   }
   const cycleAv = (p, i) => { const c = avClass(avOf(p, i) || avFromSets(p, i)), k = AV_STATES.findIndex(([s]) => s === c); setAv(p, i, AV_STATES[(k + 1) % 4][0]); };
