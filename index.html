@@ -2139,22 +2139,26 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : t.status === 'denied' ? 'al-ddenied' : '', N.to(p, t), p.name, timeOffWhen(t), timeOffLabel(t) + (t.status === 'denied' ? ' (denied)' : ''), t.note || '')), 'Nobody has time off.');
     // 3 · store events
     const ev = eventsIn(a, b).filter((x) => (!o.show || o.show.event) && !holEvent(x)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
-    const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
+    // what it is first (its sign and name), then when, then the details (moved before a closed holiday, the note)
+    const what = (x) => { const k = markOf(x); return h('span', { class: 'al-kind' }, k && k !== 'period' ? [markSvg(k), ' '] : null, x.title); };
+    const details = (...bits) => bits.filter(Boolean).join(' · ');
+    const events = box(`Events · ${span}`, ['30%', '30%', ''], ['Event', 'When', 'Details'],
       (o.condense === false ? ev : ev.filter((x, i) => !x.series || ev.findIndex((y) => y.series && y.series.id === x.series.id) === i)).map((x) => {
         const at = x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : '';
         if (o.condense !== false && x.series) { // one line: how it repeats, and the times moved before a closed holiday
           const all = ev.filter((y) => y.series && y.series.id === x.series.id), mv = all.filter((y) => y.movedFrom);
           const sr = x.series.repeat, dn = +x.series.from.slice(8), on = sr.unit === 'week' && !(sr.days && sr.days.length) ? ` on ${dayName(x.series.from, 'short')}` : sr.unit === 'month' ? ` on the ${dn}${[11, 12, 13].includes(dn) ? 'th' : ['th', 'st', 'nd', 'rd'][dn % 10] || 'th'}` : '';
-          return tr(mv.length ? 'al-dspecial' : '', N.ev(x), `${repeatText({ ...sr, until: '' }).replace(/^every/, 'Every')}${on}${sr.until ? ' until ' + shortDate(sr.until) : ''}${at}`, x.title + (mv.length ? ` (moved: ${mv.map((y) => `${dayName(y.from, 'short')} ${shortDate(y.from)} for ${shortDate(y.movedFrom)}`).join('; ')}, closed)` : ''), x.note || '');
+          return tr(mv.length ? 'al-dspecial' : '', N.ev(x), what(x), `${repeatText({ ...sr, until: '' }).replace(/^every/, 'Every')}${on}${sr.until ? ' until ' + shortDate(sr.until) : ''}${at}`,
+            details(mv.length ? `Moved to ${mv.map((y) => `${dayName(y.from, 'short')} ${shortDate(y.from)} (${shortDate(y.movedFrom)} closed)`).join(', ')}` : '', x.note));
         }
-        return tr(x.movedFrom ? 'al-dspecial' : '', N.ev(x), datesOnly(x) + at, x.title + (x.movedFrom ? ` (moved from ${shortDate(x.movedFrom)}: closed)` : ''), x.note || '');
+        return tr(x.movedFrom ? 'al-dspecial' : '', N.ev(x), what(x), datesOnly(x) + at, details(x.movedFrom ? `Moved here: ${shortDate(x.movedFrom)} closed` : '', x.note));
       }), 'No events.');
     // 4 · holidays, with the store's hours on them
     // the list's holidays, and events that are holidays (ticked, or named like one); one row a day and name
     const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x, type: holEventType(x) })), ...holidaysFrom(a, 60).filter((x) => x.date <= b && !eventsOn(x.date).some((e) => e.replaces === x.name)).map((x) => ({ ...x, type: NATIONAL.has(x.name) ? 'national' : 'local' }))]
       .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holLike(y.name, x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
-    const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
-      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name + (x.type === 'local' ? ' (local)' : ''), s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+    const holidays = box(`Holidays · ${span}`, ['36%', '30%', ''], ['Holiday', 'Date', 'Store'],
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', x.name + (x.type === 'local' ? ' (local)' : ''), `${dayName(x.date, 'short')} ${shortDate(x.date)}`, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     const tb = o.tables || {};
     return h('div', { class: 'al-details' }, [tb.hours !== false ? hours : null, tb.timeoff !== false ? timeOff : null, tb.events !== false ? events : null, tb.holidays !== false ? holidays : null].filter(Boolean));
   }
@@ -2199,6 +2203,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-dspecial td { font-weight: 700; background: #fff2cc; }
         .al-dclosed td { background: #f4cccc; }
         .al-dasked td { font-style: italic; }
+        .al-kind { white-space: nowrap; } .al-kind svg { width: 12px; height: 12px; fill: none; stroke: #000; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; }
         .al-ddenied td { color: #777; text-decoration: line-through; }
         /* black and white: available white, OFF black with white letters, call or arrange first grey */
         .al-bw .al-day { background: #fff; }
