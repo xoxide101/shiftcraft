@@ -122,6 +122,7 @@
   const CAL_MARKS = [
     ['period', 'End of period', /\bend of (the )?(pay ?)?(period|month)\b|\beop\b/i, ''],
     ['payday', 'Payday', /\bpay ?day\b|\bpayroll\b/i, '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9h.01M18 15h.01"/>'],
+    ['produce', 'Produce', /\bproduce\b|\bveg(gie|etable)s?\b|\bfarmers?\b/i, '<path d="M12 8.2c4.2 0 7.5 2.6 7.5 6.3S16.2 21 12 21s-7.5-2.8-7.5-6.5S7.8 8.2 12 8.2z"/><path d="M12 8.2V4.5M12 8.2 8.6 6.4M12 8.2l3.4-1.8M12 8.2l-1.8 2.3M12 8.2l1.8 2.3"/>'],
     ['truck', 'Truck delivery', /\btruck\b|\bdelivery\b/i, '<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/>'],
     ['inventory', 'Inventory', /\binventory\b/i, '<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/><path d="M8.5 10h7M8.5 14h7M8.5 18h4"/>'],
     ['insurance', 'Insurance enrollment', /\binsurance\b|\benrol?lment\b|\bbenefits\b/i, '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M12 9v6M9 12h6"/>'],
@@ -190,7 +191,7 @@
     const at = (preset && preset.from) || ui.day;
     const cur = x || { from: at, to: at, title: '', hours: null, note: '', ...(preset || {}) };
     const title = h('input', { class: 'input', value: cur.title || '', placeholder: 'e.g. Truck delivery · Health inspection · Team meeting · Sidewalk sale', maxLength: 120 });
-    const picks = h('div', { class: 'inline', style: { gap: '4px' } }, ['End of period', 'Payday', 'Inventory', 'Truck delivery', 'Insurance enrollment', 'Meeting'].map((t) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { title.value = t; title.focus(); } }, t)));
+    const picks = h('div', { class: 'inline', style: { gap: '4px' } }, ['End of period', 'Payday', 'Inventory', 'Truck delivery', 'Produce', 'Insurance enrollment', 'Meeting'].map((t) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { title.value = t; title.focus(); } }, t)));
     const from = dateIn(cur.from), to = dateIn(cur.to);
     // repeats: never, every week, every other week, every month, or every n days / weeks / months / years, until a day or not
     const r0 = cur.repeat || null;
