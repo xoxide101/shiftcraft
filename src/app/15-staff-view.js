@@ -205,7 +205,9 @@
         toast(`${p.name} is under Former staff. Their details are kept.`);
       } }] });
   }
-  const avClass = (a) => (!a ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|morning|afternoon|evening/i.test(a.note || '')) ? 'hl' : 'on');
+  // the colours of a day: green can work, red can't, yellow call or arrange first (marked, or a note like Emergency or
+  // If you ask), black not given
+  const avClass = (a) => (!a || a.k === 'unk' ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|if you ask|call|arrange/i.test(a.note || '')) ? 'hl' : 'on');
   // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
   function availEditor(p, i) {
     const cur = JSON.parse(JSON.stringify(avOf(p, i) || avFromSets(p, i)));
@@ -216,7 +218,7 @@
     const hl = h('input', { type: 'checkbox', checked: !!cur.hl });
     const draw = () => {
       box.replaceChildren(...[
-        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
+        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note'], ['unk', 'Not given']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
         kind === 'note' ? h('div', { class: 'inline' }, AV_NOTES.map((n) => h('button', { type: 'button', class: 'btn sm' + (note === n ? ' primary' : ''), onclick: () => { note = n; draw(); } }, n)),
           h('input', { class: 'input', value: AV_NOTES.includes(note) ? '' : note, placeholder: 'or your own words', style: { width: '160px' }, oninput: (e) => { if (e.target.value.trim()) note = e.target.value.trim(); } })) : null,
         kind === 'times' ? h('div', { class: 'grid', style: { gap: '6px' } },
@@ -226,13 +228,13 @@
             h('button', { type: 'button', class: 'btn sm ghost', title: 'Take this range away', disabled: ranges.length < 2, onclick: () => { ranges.splice(j, 1); draw(); } }, '×'))),
           h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([OPEN, CLOSE, '+']); draw(); } }, '+ Can work'), h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([720, 780, '-']); draw(); } }, '+ Can’t work')),
           h('p', { class: 'hint' }, 'Where a can’t-work range overlaps a can-work range, can’t wins. With no can-work range, they can work any time apart from the can’t-work ranges.')) : null,
-        h('label', { class: 'check' }, hl, ' Highlight this day (orange on the list)')].filter(Boolean));
+        h('label', { class: 'check' }, hl, ' Call or arrange first (yellow on the list)')].filter(Boolean));
     };
     draw();
     const entry = () => (kind === 'times' ? { k: 'times', r: ranges.map((r) => [r[0], r[1], r[2] === '-' ? '-' : '+']) } : kind === 'note' ? { k: 'note', note } : { k: kind });
     const save = (days) => change(() => { if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map((_, k) => avFromSets(p, k)); days.forEach((k) => { p.avail[k] = { ...entry(), ...(hl.checked ? { hl: true } : {}) }; }); });
     modal({ title: `${p.name} · ${WEEKDAYS[i]}`, body: box, wide: true, actions: [
-      { label: 'Not given', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
+      { label: 'Use the weekday / weekend settings', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
       { label: i >= 5 ? 'Same for the weekend' : 'Same for weekdays', onClick: () => save(i >= 5 ? [5, 6] : [0, 1, 2, 3, 4]) },
       { label: 'Same every day', onClick: () => save([0, 1, 2, 3, 4, 5, 6]) },
       { label: 'Save', primary: true, onClick: () => save([i]) }] });

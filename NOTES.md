@@ -297,3 +297,7 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
   store's hours that day). Special and closed days are shaded.
 - The details go under the list, on a page of their own (a 2-page PDF, or a second picture), or are left out. Kept in
   this browser. The sheet is fitted to Letter, Legal or Tabloid as before.
+
+### Availability colours
+
+On Staff › Day by day and the printed availability list: green can work, red can't (Off), yellow call or arrange first (the day's Call or arrange first box, or a note like Emergency or If you ask), black not given (the day editor's Not given choice, `{ k: 'unk' }`; Check the schedule warns about shifts on such a day). The printed list has a key under the table.

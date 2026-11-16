@@ -167,7 +167,7 @@
     h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · Schedule Availability and Contact Information: details`), availDetails());
   const AL_CSS = `
         .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
-        /* printers leave out background colours unless told to keep them: the black Off boxes, green days and yellow rows need them */
+        /* printers leave out background colours unless told to keep them: the coloured days and yellow rows need them */
         .al-sheet, .al-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .al-sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .al-sheet th, .al-sheet td { font-size: 9pt; padding: 1px 3px; }
@@ -184,9 +184,13 @@
         .al-tick, .al-postop { padding: 1px 0 !important; text-align: center; }
         .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
         .al-box.on { background: #000; color: #fff; }
-        .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
-        .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-        .al-day.hl { background: #ffc000; }
+        /* green can work, red can't, yellow call or arrange first, black not given */
+        .al-day { border: 1px solid #000; text-align: center; background: #c6e0b4; font-size: 10pt; height: 18px; }
+        .al-day.off { background: #ff7c7c !important; color: #000 !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .al-day.hl { background: #ffff00; }
+        .al-day.none { background: #000 !important; color: #fff !important; }
+        .al-key { display: flex; justify-content: flex-end; gap: 14px; margin-top: 4px; font-size: 8.5pt; }
+        .al-key span { display: inline-block; width: 22px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 4px; }
         .al-day div { line-height: 1.15; }
         .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
         /* the details: two small tables side by side, then two more */
@@ -229,6 +233,7 @@
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
+      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first'], ['#000', 'Not given']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;

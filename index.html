@@ -113,10 +113,11 @@ table.trained tbody tr:hover td { background: var(--accent-soft); }
 .avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
 .avcell.sys { opacity: 0.6; font-style: italic; }
 .avcell .avline { display: block; white-space: nowrap; }
-.avcell.none { background: var(--panel); color: var(--muted); }
-.avcell.on { background: #e2f0d9; color: #1c2330; }
-.avcell.off { background: #111; color: #fff; }
-.avcell.hl { background: #ffc000; color: #1c2330; }
+/* availability: green can work, red can't, yellow call or arrange first, black not given */
+.avcell.none { background: #000; color: #fff; }
+.avcell.on { background: #c6e0b4; color: #1c2330; }
+.avcell.off { background: #ff7c7c; color: #000; font-weight: 700; }
+.avcell.hl { background: #ffff00; color: #1c2330; }
 .avcell:hover { outline: 2px solid var(--accent); }
 .staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 /* the staff table: compact time pickers so every column fits */
@@ -931,7 +932,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const PARTS = [['am', 'AM'], ['mid', 'MID'], ['pm', 'PM']];
   const partsOf = (p) => (Array.isArray(p.parts) && p.parts.length ? p.parts : ['am', 'mid', 'pm']);
   // Day-by-day availability (the availability and contact list): p.avail[0–6] (Monday first) is null (not given: the
-  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note', note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
+  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note' | 'unk' (not given: black on the list), note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
   // In 'times', '+' ranges are when they can work and '-' ranges when they can't; where they overlap, can't wins.
   // With no '+' range, they can work any time apart from the '-' ranges. OPEN and CLOSE stand for the opening and closing time.
   const OPEN = -1, CLOSE = 9999;
@@ -945,7 +946,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const realMin = (m, close) => (m === OPEN ? DAY_START : m === CLOSE ? DAY_END : m);
   function avText(a) {
     if (!a) return '';
-    if (a.k === 'any') return 'Any'; if (a.k === 'off') return 'Off'; if (a.k === 'note') return a.note || '';
+    if (a.k === 'any') return 'Any'; if (a.k === 'off') return 'Off'; if (a.k === 'unk') return 'Not given'; if (a.k === 'note') return a.note || '';
     const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
     const word = (x) => `${endWord(x[0])} - ${endWord(x[1])}`;
     return (plus.length ? plus.map(word).join(' / ') : 'Any') + (minus.length ? ` (not ${minus.map(word).join(', ')})` : '');
@@ -989,6 +990,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
+      if (a.k === 'unk') return `${first} has not given availability for ${dayName(d)}s`;
       if (a.k === 'note') {
         if (/emergenc/i.test(a.note || '')) return `${first} is only available for emergencies on ${dayName(d)}s`;
         const win = { Mornings: [DAY_START, plan.midStart], Afternoons: [plan.midStart, plan.pmStart], Evenings: [plan.pmStart, DAY_END] }[a.note];
@@ -1793,7 +1795,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         toast(`${p.name} is under Former staff. Their details are kept.`);
       } }] });
   }
-  const avClass = (a) => (!a ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|morning|afternoon|evening/i.test(a.note || '')) ? 'hl' : 'on');
+  // the colours of a day: green can work, red can't, yellow call or arrange first (marked, or a note like Emergency or
+  // If you ask), black not given
+  const avClass = (a) => (!a || a.k === 'unk' ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|if you ask|call|arrange/i.test(a.note || '')) ? 'hl' : 'on');
   // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
   function availEditor(p, i) {
     const cur = JSON.parse(JSON.stringify(avOf(p, i) || avFromSets(p, i)));
@@ -1804,7 +1808,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const hl = h('input', { type: 'checkbox', checked: !!cur.hl });
     const draw = () => {
       box.replaceChildren(...[
-        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
+        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note'], ['unk', 'Not given']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
         kind === 'note' ? h('div', { class: 'inline' }, AV_NOTES.map((n) => h('button', { type: 'button', class: 'btn sm' + (note === n ? ' primary' : ''), onclick: () => { note = n; draw(); } }, n)),
           h('input', { class: 'input', value: AV_NOTES.includes(note) ? '' : note, placeholder: 'or your own words', style: { width: '160px' }, oninput: (e) => { if (e.target.value.trim()) note = e.target.value.trim(); } })) : null,
         kind === 'times' ? h('div', { class: 'grid', style: { gap: '6px' } },
@@ -1814,13 +1818,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
             h('button', { type: 'button', class: 'btn sm ghost', title: 'Take this range away', disabled: ranges.length < 2, onclick: () => { ranges.splice(j, 1); draw(); } }, '×'))),
           h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([OPEN, CLOSE, '+']); draw(); } }, '+ Can work'), h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([720, 780, '-']); draw(); } }, '+ Can’t work')),
           h('p', { class: 'hint' }, 'Where a can’t-work range overlaps a can-work range, can’t wins. With no can-work range, they can work any time apart from the can’t-work ranges.')) : null,
-        h('label', { class: 'check' }, hl, ' Highlight this day (orange on the list)')].filter(Boolean));
+        h('label', { class: 'check' }, hl, ' Call or arrange first (yellow on the list)')].filter(Boolean));
     };
     draw();
     const entry = () => (kind === 'times' ? { k: 'times', r: ranges.map((r) => [r[0], r[1], r[2] === '-' ? '-' : '+']) } : kind === 'note' ? { k: 'note', note } : { k: kind });
     const save = (days) => change(() => { if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map((_, k) => avFromSets(p, k)); days.forEach((k) => { p.avail[k] = { ...entry(), ...(hl.checked ? { hl: true } : {}) }; }); });
     modal({ title: `${p.name} · ${WEEKDAYS[i]}`, body: box, wide: true, actions: [
-      { label: 'Not given', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
+      { label: 'Use the weekday / weekend settings', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
       { label: i >= 5 ? 'Same for the weekend' : 'Same for weekdays', onClick: () => save(i >= 5 ? [5, 6] : [0, 1, 2, 3, 4]) },
       { label: 'Same every day', onClick: () => save([0, 1, 2, 3, 4, 5, 6]) },
       { label: 'Save', primary: true, onClick: () => save([i]) }] });
@@ -2059,7 +2063,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · Schedule Availability and Contact Information: details`), availDetails());
   const AL_CSS = `
         .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
-        /* printers leave out background colours unless told to keep them: the black Off boxes, green days and yellow rows need them */
+        /* printers leave out background colours unless told to keep them: the coloured days and yellow rows need them */
         .al-sheet, .al-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .al-sheet table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .al-sheet th, .al-sheet td { font-size: 9pt; padding: 1px 3px; }
@@ -2076,9 +2080,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-tick, .al-postop { padding: 1px 0 !important; text-align: center; }
         .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
         .al-box.on { background: #000; color: #fff; }
-        .al-day { border: 1px solid #000; text-align: center; background: #e2f0d9; font-size: 10pt; height: 18px; }
-        .al-day.off { background: #000 !important; color: #fff !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-        .al-day.hl { background: #ffc000; }
+        /* green can work, red can't, yellow call or arrange first, black not given */
+        .al-day { border: 1px solid #000; text-align: center; background: #c6e0b4; font-size: 10pt; height: 18px; }
+        .al-day.off { background: #ff7c7c !important; color: #000 !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .al-day.hl { background: #ffff00; }
+        .al-day.none { background: #000 !important; color: #fff !important; }
+        .al-key { display: flex; justify-content: flex-end; gap: 14px; margin-top: 4px; font-size: 8.5pt; }
+        .al-key span { display: inline-block; width: 22px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 4px; }
         .al-day div { line-height: 1.15; }
         .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
         /* the details: two small tables side by side, then two more */
@@ -2121,6 +2129,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
+      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first'], ['#000', 'Not given']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;

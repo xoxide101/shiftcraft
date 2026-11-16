@@ -106,10 +106,11 @@ table.trained tbody tr:hover td { background: var(--accent-soft); }
 .avcell { width: 100%; min-width: 74px; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; line-height: 1.15; }
 .avcell.sys { opacity: 0.6; font-style: italic; }
 .avcell .avline { display: block; white-space: nowrap; }
-.avcell.none { background: var(--panel); color: var(--muted); }
-.avcell.on { background: #e2f0d9; color: #1c2330; }
-.avcell.off { background: #111; color: #fff; }
-.avcell.hl { background: #ffc000; color: #1c2330; }
+/* availability: green can work, red can't, yellow call or arrange first, black not given */
+.avcell.none { background: #000; color: #fff; }
+.avcell.on { background: #c6e0b4; color: #1c2330; }
+.avcell.off { background: #ff7c7c; color: #000; font-weight: 700; }
+.avcell.hl { background: #ffff00; color: #1c2330; }
 .avcell:hover { outline: 2px solid var(--accent); }
 .staff-tabs { margin: 10px 0 2px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 /* the staff table: compact time pickers so every column fits */

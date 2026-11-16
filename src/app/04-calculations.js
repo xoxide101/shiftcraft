@@ -21,7 +21,7 @@
   const PARTS = [['am', 'AM'], ['mid', 'MID'], ['pm', 'PM']];
   const partsOf = (p) => (Array.isArray(p.parts) && p.parts.length ? p.parts : ['am', 'mid', 'pm']);
   // Day-by-day availability (the availability and contact list): p.avail[0–6] (Monday first) is null (not given: the
-  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note', note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
+  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note' | 'unk' (not given: black on the list), note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
   // In 'times', '+' ranges are when they can work and '-' ranges when they can't; where they overlap, can't wins.
   // With no '+' range, they can work any time apart from the '-' ranges. OPEN and CLOSE stand for the opening and closing time.
   const OPEN = -1, CLOSE = 9999;
@@ -35,7 +35,7 @@
   const realMin = (m, close) => (m === OPEN ? DAY_START : m === CLOSE ? DAY_END : m);
   function avText(a) {
     if (!a) return '';
-    if (a.k === 'any') return 'Any'; if (a.k === 'off') return 'Off'; if (a.k === 'note') return a.note || '';
+    if (a.k === 'any') return 'Any'; if (a.k === 'off') return 'Off'; if (a.k === 'unk') return 'Not given'; if (a.k === 'note') return a.note || '';
     const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
     const word = (x) => `${endWord(x[0])} - ${endWord(x[1])}`;
     return (plus.length ? plus.map(word).join(' / ') : 'Any') + (minus.length ? ` (not ${minus.map(word).join(', ')})` : '');
@@ -79,6 +79,7 @@
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
+      if (a.k === 'unk') return `${first} has not given availability for ${dayName(d)}s`;
       if (a.k === 'note') {
         if (/emergenc/i.test(a.note || '')) return `${first} is only available for emergencies on ${dayName(d)}s`;
         const win = { Mornings: [DAY_START, plan.midStart], Afternoons: [plan.midStart, plan.pmStart], Evenings: [plan.pmStart, DAY_END] }[a.note];
