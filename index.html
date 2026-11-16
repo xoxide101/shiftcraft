@@ -1031,7 +1031,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const shiftsOf = (p, d) => shiftsOn(d).filter((x) => x.staffId === p.id).sort((a, b) => a.start - b.start);
   const AV_NOTES = ['Mornings', 'Afternoons', 'Evenings', 'Emergency', 'If you ask'];
   const avDay = (d) => (parseIso(d).getDay() + 6) % 7;
-  const avOf = (p, i) => (Array.isArray(p.avail) && p.avail[i]) || null;
+  // a day's own entry; a plain Any (green, nothing else) gives way when the person has hours or Some days lines set on
+  // the Weekdays / Weekend tab, so those show (clicking a day green used to save Any, which hid them)
+  const avOf = (p, i) => {
+    const a = (Array.isArray(p.avail) && p.avail[i]) || null;
+    if (a && a.k === 'any' && !a.hl && (linesOn(p, i).length || setOf(p, i >= 5 ? 'we' : 'wk').from != null)) return null;
+    return a;
+  };
   const offOn = (p, d) => { const a = avOf(p, avDay(d)); return a ? a.k === 'off' : !!(p.off && p.off[avDay(d)]); };
   const clockShort = (m) => { const h24 = Math.floor(m / 60) % 24, mm = m % 60; return `${h24 % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${h24 < 12 ? 'am' : 'pm'}`; };
   const endWord = (m) => (m === OPEN ? 'Open' : m === CLOSE ? 'Close' : clockShort(m));
