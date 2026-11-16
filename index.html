@@ -433,7 +433,8 @@ table.cal td.cal-day { padding: 0; }
 .cal-span:hover { filter: brightness(1.12); }
 @media print { .cal-span { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 /* signs by the date: end of period boxes the date (it may run over the cell's edge); the others are small pictures */
-.cal-num.eop, .cal-eop-key { outline: 2px solid #fff; outline-offset: 2px; border-radius: 2px; position: relative; z-index: 3; }
+.cal-num.eop, .cal-eop-key { outline: 2px solid #fff; outline-offset: 0; border-radius: 2px; position: relative; z-index: 3; }
+.cal-num.eop { line-height: 16px; padding: 0 4px; min-width: 22px; }
 .cal-eop-key { display: inline-block; font-weight: 700; font-size: 12px; padding: 0 4px; margin: 0 4px; }
 .cal-mark { border: 0; background: none; padding: 0 1px; cursor: pointer; line-height: 0; color: var(--fg); }
 .cal-mark-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; }
