@@ -159,14 +159,23 @@
     // 3 · store events
     const ev = eventsIn(a, b).filter((x) => (!o.show || o.show.event) && !holEvent(x)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
     const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
-      ev.map((x) => tr(x.movedFrom ? 'al-dspecial' : '', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title + (x.movedFrom ? ` (moved from ${shortDate(x.movedFrom)}: closed)` : ''), x.note || '')), 'No events.');
+      (o.condense === false ? ev : ev.filter((x, i) => !x.series || ev.findIndex((y) => y.series && y.series.id === x.series.id) === i)).map((x) => {
+        const at = x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : '';
+        if (o.condense !== false && x.series) { // one line: how it repeats, and the times moved before a closed holiday
+          const all = ev.filter((y) => y.series && y.series.id === x.series.id), mv = all.filter((y) => y.movedFrom);
+          const sr = x.series.repeat, dn = +x.series.from.slice(8), on = sr.unit === 'week' && !(sr.days && sr.days.length) ? ` on ${dayName(x.series.from, 'short')}` : sr.unit === 'month' ? ` on the ${dn}${[11, 12, 13].includes(dn) ? 'th' : ['th', 'st', 'nd', 'rd'][dn % 10] || 'th'}` : '';
+          return tr(mv.length ? 'al-dspecial' : '', N.ev(x), `${repeatText({ ...sr, until: '' }).replace(/^every/, 'Every')}${on}${sr.until ? ' until ' + shortDate(sr.until) : ''}${at}`, x.title + (mv.length ? ` (moved: ${mv.map((y) => `${dayName(y.from, 'short')} ${shortDate(y.from)} for ${shortDate(y.movedFrom)}`).join('; ')}, closed)` : ''), x.note || '');
+        }
+        return tr(x.movedFrom ? 'al-dspecial' : '', N.ev(x), datesOnly(x) + at, x.title + (x.movedFrom ? ` (moved from ${shortDate(x.movedFrom)}: closed)` : ''), x.note || '');
+      }), 'No events.');
     // 4 · holidays, with the store's hours on them
     // the list's holidays, and events that are holidays (ticked, or named like one); one row a day and name
     const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x, type: holEventType(x) })), ...holidaysFrom(a, 60).filter((x) => x.date <= b && !eventsOn(x.date).some((e) => e.replaces === x.name)).map((x) => ({ ...x, type: NATIONAL.has(x.name) ? 'national' : 'local' }))]
       .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holLike(y.name, x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
     const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
       hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name + (x.type === 'local' ? ' (local)' : ''), s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
-    return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
+    const tb = o.tables || {};
+    return h('div', { class: 'al-details' }, [tb.hours !== false ? hours : null, tb.timeoff !== false ? timeOff : null, tb.events !== false ? events : null, tb.holidays !== false ? holidays : null].filter(Boolean));
   }
   const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' + (availDet.mode === 'bw' ? ' al-bw' : '') }, h('style', null, AL_CSS),
     h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · Schedule Availability and Contact Information: details`), availDetails());
@@ -200,6 +209,7 @@
         .al-id { font-weight: 400; font-size: 7.5pt; color: #444; }
         /* the details: two small tables side by side, then two more */
         .al-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; align-items: start; }
+        .al-dbox { break-inside: avoid; page-break-inside: avoid; }
         .al-dbox table { table-layout: fixed; }
         .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; }
         .al-dbox thead th { background: #d9d9d9; font-weight: 700; }

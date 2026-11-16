@@ -359,7 +359,7 @@
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
-        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the details go: store hours, time off, events, holidays)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print the calendar: pick what goes on the paper', () => calPrintDialog())))),
       h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
         show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
@@ -437,25 +437,46 @@
         more.length && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, more.map((it) => supNum(numOf(it))).join(',')) : null,
         bottom));
     })));
-    main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
+    main.append(h('div', { class: 'card cal-card' + calpClass() }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       (() => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
         // and the heads up: something moved to the day before a closed holiday (a white circle)
         const moved = shown.some((it) => it.kind === 'event' && it.x.movedFrom && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start);
         return used.size || moved ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l)),
           moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Heads up: moved to the day before a closed holiday') : null) : null; })(),
-      h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+      h('p', { class: 'hint no-print', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
     // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
     // each entry with the number it has on the month; under the month or on a page of their own
     if (notesWhere !== 'off') main.append(h('div', { class: 'cal-pnotes al-sheet' + (notesWhere === 'separate' ? ' sep' : '') }, h('style', null, AL_CSS),
       h('h3', null, `Details · ${monthLabel(cal.ym)}`),
-      availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
+      availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, tables: calp.tables, condense: calp.condense, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
     main.append(usualHoursCard());
   }
   // the Calendar's print button: where the numbered notes go, then print
-  function calPrintMenu(x, y) {
-    const go = (v) => () => { setNotesWhere(v); render(); setTimeout(() => window.print(), 80); };
-    popMenu(x, y, 'Print the calendar', [['Details under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Details on a page of their own', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No details (no numbers)', go('off'), notesWhere === 'off' ? 'on' : '']]);
+  // ---------- Printing the Calendar: a window to pick what goes on the paper ----------
+  // On the month: store hours by the date, time off bars, events, signs, holidays, the legend. The details: under the
+  // month, on a page of their own, or none; which tables; repeating events on one line each. Kept in this browser.
+  const CALP_KEY = 'shiftcraft-cal-print';
+  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true }, tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
+  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; } catch (e) { /* blocked */ }
+  const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
+  const calpClass = () => Object.keys(calp.grid).filter((k) => !calp.grid[k]).map((k) => ' cp-no-' + k).join('');
+  function calPrintDialog() {
+    const grid = JSON.parse(JSON.stringify(calp.grid)), tables = { ...calp.tables };
+    let where = notesWhere, condense = calp.condense;
+    const tick = (obj, k, label) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!obj[k], onchange: (e) => { obj[k] = e.target.checked; } }), ' ' + label);
+    const cols = (...kids) => h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 18px' } }, kids);
+    const cond = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: condense, onchange: (e) => { condense = e.target.checked; } }), ' Repeating events on one line each (Produce · every week on Mon–Sat)');
+    const tablesBox = h('div', { class: 'grid', style: { gap: '6px', display: where === 'off' ? 'none' : '' } },
+      cols(tick(tables, 'hours', 'Store hours'), tick(tables, 'timeoff', 'Time off'), tick(tables, 'events', 'Events'), tick(tables, 'holidays', 'Holidays')), cond);
+    const whereSeg = calSeg('Details', [['page', 'Under the month'], ['separate', 'On a page of their own'], ['off', 'None']], where, (v) => { where = v; tablesBox.style.display = v === 'off' ? 'none' : ''; });
+    modal({ title: `Print the calendar · ${monthLabel(cal.ym)}`, body: [
+      h('div', { class: 'field' }, h('span', null, 'On the month'),
+        cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'))),
+      h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
+      tablesBox,
+      h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks: requests, approved, store hours, events, holidays). The schedule calendar (who works each day) is in Print & share › Calendar.')],
+    actions: [{ label: 'Cancel' }, { label: 'Print…', primary: true, onClick: () => { Object.assign(calp.grid, grid); Object.assign(calp.tables, tables); calp.condense = condense; calpSave(); setNotesWhere(where); render(); setTimeout(() => window.print(), 80); } }] });
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {
