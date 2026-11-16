@@ -157,7 +157,7 @@
     const timeOff = box(`Time off · ${span}`, ['26%', '30%', '20%', ''], ['Who', 'When', 'Why', 'Note'],
       off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : t.status === 'denied' ? 'al-ddenied' : '', N.to(p, t), p.name, timeOffWhen(t), timeOffLabel(t) + (t.status === 'denied' ? ' (denied)' : ''), t.note || '')), 'Nobody has time off.');
     // 3 · store events
-    const ev = (plan.events || []).filter((x) => on(x) && (!o.show || o.show.event)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
+    const ev = eventsIn(a, b).filter(() => !o.show || o.show.event).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
     const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
       ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them

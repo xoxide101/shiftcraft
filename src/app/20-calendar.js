@@ -4,13 +4,33 @@
   // plan.specialHours = [{ id, from, to, name, closed, open, close, note, ics? }]
   //   Store hours for a holiday (or any day): they take the place of the usual opening hours on those days. closed =
   //   shut all day. Check schedule points out shifts on a closed day, and shifts well outside the special hours.
-  // plan.events = [{ id, from, to, title, hours: null | [start, end], note, ics? }]
-  //   Notes and information for a day (a delivery, a meeting, an inspection, a promotion). They change nothing.
+  // plan.events = [{ id, from, to, title, hours: null | [start, end], note, ics?, repeat?, skip? }]
+  //   Store events: notes and information for a day (end of period, payday, a delivery, a meeting, an inspection).
+  //   They change nothing. repeat = { every: n, unit: 'day' | 'week' | 'month' | 'mlast' (the month's last day) | 'year',
+  //   until: '' | last date }, counted from the first day (from); skip = [first days of times left out].
   // Time off stays on each person (p.timeOff, 19-time-off.js). The Calendar tab shows all three a month at a time or as
   // a list to search and sort, and they go out to and come in from other calendars as iCal (.ics) files (20-ical.js).
   // ics: the UID an entry had in a calendar file it came from, so bringing the same file in again updates it.
   const specialOn = (d) => (plan.specialHours || []).filter((x) => x.from <= d && d <= x.to).slice(-1)[0] || null;
-  const eventsOn = (d) => (plan.events || []).filter((x) => x.from <= d && d <= x.to).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
+  // ---------- Repeating events ----------
+  // eventsIn(a, b): the events on any day from a to b, a repeating one once for each time, as its own copy
+  // ({ ...x, from, to, series: the stored event, occ: that time's first day })
+  const REPEAT_UNITS = [['day', 'day', 'days'], ['week', 'week', 'weeks'], ['month', 'month', 'months'], ['mlast', 'month, on its last day', 'months, on the last day'], ['year', 'year', 'years']];
+  const dayDiff = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 864e5);
+  const monthStep = (d, n, last) => { const [y, m, dd] = d.split('-').map(Number), dim = new Date(y, m + n, 0).getDate(); return iso(new Date(y, m - 1 + n, last ? dim : Math.min(dd, dim))); };
+  function repeatStarts(x, a, b) {
+    const r = x.repeat, n = Math.max(1, r.every | 0), len = dayDiff(x.from, x.to), out = [];
+    const at = (k) => (r.unit === 'day' ? addDays(x.from, k * n) : r.unit === 'week' ? addDays(x.from, k * n * 7) : r.unit === 'year' ? monthStep(x.from, k * n * 12) : monthStep(x.from, k * n, r.unit === 'mlast'));
+    const most = { day: 1, week: 7, year: 366 }[r.unit] || 31; // start a little before a: never past it
+    for (let k = Math.max(0, Math.floor((dayDiff(x.from, a) - len) / (most * n)) - 2), i = 0; i < 3000; i++, k++) {
+      const s = at(k); if (s > b || (r.until && s > r.until)) break;
+      if (addDays(s, len) >= a && !(x.skip || []).includes(s)) out.push(s);
+    }
+    return out;
+  }
+  const repeatText = (r) => { const u = REPEAT_UNITS.find(([k]) => k === r.unit) || REPEAT_UNITS[1], n = Math.max(1, r.every | 0); return `every ${n === 1 ? u[1] : n === 2 && r.unit === 'week' ? 'other week' : n + ' ' + u[2]}${r.until ? ' until ' + shortDate(r.until) : ''}`; };
+  const eventsIn = (a, b) => (plan.events || []).flatMap((x) => (x.repeat ? repeatStarts(x, a, b).map((s) => ({ ...x, from: s, to: addDays(s, dayDiff(x.from, x.to)), series: x, occ: s })) : x.from <= b && x.to >= a ? [x] : []));
+  const eventsOn = (d) => eventsIn(d, d).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
   // ---------- Usual store hours, Monday to Sunday ----------
   // plan.hours.days = 7 entries, Monday first: { open, close } | { closed: true } | null (not set). One list, edited on the
   // Calendar and on Company & Location alike. Older plans had plan.hours.wk / .we (weekdays / weekend): those fill the
@@ -129,52 +149,75 @@
   }
 
   // ---------- Events: notes and information for a day ----------
-  function eventDialog(x, preset) {
+  // x: the stored event (a repeating one: occ = the time clicked, which Skip leaves out)
+  function eventDialog(x, preset, occ) {
     const at = (preset && preset.from) || ui.day;
     const cur = x || { from: at, to: at, title: '', hours: null, note: '', ...(preset || {}) };
     const title = h('input', { class: 'input', value: cur.title || '', placeholder: 'e.g. Truck delivery · Health inspection · Team meeting · Sidewalk sale', maxLength: 120 });
+    const picks = h('div', { class: 'inline', style: { gap: '4px' } }, ['End of period', 'Payday', 'Inventory', 'Truck delivery', 'Meeting'].map((t) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { title.value = t; title.focus(); } }, t)));
     const from = dateIn(cur.from), to = dateIn(cur.to);
+    // repeats: never, every week, every other week, every month, or every n days / weeks / months / years, until a day or not
+    const r0 = cur.repeat || null;
+    let rep = !r0 ? 'none' : r0.every === 1 && r0.unit === 'week' ? 'w1' : r0.every === 2 && r0.unit === 'week' ? 'w2' : r0.every === 1 && r0.unit === 'month' ? 'm1' : 'other';
+    const every = h('input', { class: 'input', type: 'number', min: 1, max: 99, value: r0 ? r0.every : 1, style: { width: '70px' }, 'aria-label': 'Every how many' });
+    const unit = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Days, weeks, months or years' }, REPEAT_UNITS.map(([k, , pl]) => h('option', { value: k, selected: (r0 ? r0.unit : 'week') === k }, pl)));
+    const until = dateIn((r0 && r0.until) || '');
+    const repSeg = calSeg('Repeats', [['none', 'Never'], ['w1', 'Every week'], ['w2', 'Every other week'], ['m1', 'Every month'], ['other', 'Other…']], rep, (v) => { rep = v; sync(); });
+    const otherRow = h('div', { class: 'inline' }, h('span', null, 'Every'), every, unit);
+    const untilRow = fieldOf('Until (leave empty for no end)', until);
+    const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
+    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
     let allDay = !cur.hours;
     const seg = calSeg('When in the day', [[true, 'All day'], [false, 'At a time']], allDay, (v) => { allDay = v; sync(); });
     const a = timePicker(cur.hours ? cur.hours[0] : 540, 'Starts'), b = timePicker(cur.hours ? cur.hours[1] : 600, 'Ends');
     const hoursRow = pair2(fieldOf('From', a), fieldOf('Until', b));
     const note = h('textarea', { class: 'input', rows: 3, maxLength: 500, placeholder: 'Anything to know: who is coming, what to get ready, a phone number…' }, cur.note || '');
-    const sync = () => { if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : ''; };
-    [from, to].forEach((e) => e.addEventListener('input', sync));
+    const sync = () => {
+      if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : '';
+      const r = ruleOf(); otherRow.style.display = rep === 'other' ? '' : 'none'; untilRow.style.display = nextInfo.style.display = r ? '' : 'none';
+      if (r && from.value) { const t = iso(new Date()), a = from.value > t ? from.value : t, s = repeatStarts({ from: from.value, to: to.value || from.value, repeat: r, skip: cur.skip }, a, addDays(a, 1200)).slice(0, 6);
+        nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}`; }
+    };
+    [from, to, every, until].forEach((e) => e.addEventListener('input', sync)); unit.addEventListener('change', sync);
     sync();
     const actions = [{ label: 'Cancel' }];
-    if (x) actions.unshift({ label: 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.events = plan.events.filter((y) => y.id !== x.id); if (!plan.events.length) delete plan.events; }); toast('Event deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
+    if (x) actions.unshift({ label: x.repeat ? 'Delete every time' : 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.events = plan.events.filter((y) => y.id !== x.id); if (!plan.events.length) delete plan.events; }); toast('Event deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
+    if (x && x.repeat && occ) actions.splice(1, 0, { label: `Skip ${shortDate(occ)} only`, left: true, onClick: () => { change(() => { const s = (plan.events || []).find((y) => y.id === x.id); if (s) s.skip = [...(s.skip || []), occ].sort(); }); toast(`${x.title} on ${shortDate(occ)} is left out. You can undo this.`, { label: 'Undo', fn: undo }); } });
     actions.push({ label: x ? 'Save' : 'Add event', primary: true, onClick: () => {
       const t = title.value.replace(/\s+/g, ' ').trim();
       if (!t) { toast('Give the event a name.'); title.focus(); return false; }
       if (!from.value) { toast('Pick the day.'); return false; }
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
-      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}) };
+      const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
+      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}),
+        ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
       change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
-      toast(`${e.title}: ${timeOffWhen(e)}.`);
+      toast(`${e.title}: ${timeOffWhen(e)}${r ? ', ' + repeatText(r) : ''}.`);
     } });
-    modal({ title: x ? `Event · ${x.title}` : 'Event or note for a day', body: [
-      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Extra information for a day. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
-      fieldOf('What', title), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
-      h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow, fieldOf('Notes', note)], actions });
+    sync();
+    modal({ title: x ? `Store event · ${x.title}` : 'Store event or note for a day', body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
+      fieldOf('What', title), picks, pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
+      h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
   }
 
   // ---------- Everything on the calendar, as one list ----------
   const CAL_KIND = { timeoff: 'Time off', special: 'Store hours', event: 'Event' };
-  function calItems() {
+  function calItems(a, b) {
     const out = [];
     plan.staff.filter((p) => !p.left).forEach((p) => (p.timeOff || []).forEach((t) => out.push({ kind: 'timeoff', status: t.status, from: t.from, to: t.to, hours: t.hours, who: p.name, title: TIME_OFF_WHY[t.why] || 'Time off', note: t.note || '', p, t })));
     (plan.specialHours || []).forEach((x) => out.push({ kind: 'special', status: x.closed ? 'closed' : 'open', from: x.from, to: x.to, hours: null, who: '', title: x.name || 'Special hours', note: x.note || '', x }));
-    (plan.events || []).forEach((x) => out.push({ kind: 'event', status: '', from: x.from, to: x.to, hours: x.hours, who: '', title: x.title, note: x.note || '', x }));
+    eventsIn(a, b).forEach((x) => out.push({ kind: 'event', status: '', from: x.from, to: x.to, hours: x.hours, who: '', title: x.title, note: x.note || '', x }));
     return out;
   }
-  const calOpen = (it) => (it.kind === 'timeoff' ? timeOffDialog(it.p, it.t) : it.kind === 'special' ? specialDialog(it.x) : eventDialog(it.x));
+  const calOpen = (it) => (it.kind === 'timeoff' ? timeOffDialog(it.p, it.t) : it.kind === 'special' ? specialDialog(it.x) : eventDialog(it.x.series || it.x, null, it.x.occ));
   const calHours = (it) => (it.kind === 'special' ? specialText(it.x) : it.hours ? `${clock(it.hours[0])} – ${clock(it.hours[1])}` : 'All day');
   const calStatus = (it) => (it.kind === 'timeoff' ? TIME_OFF_STATUS[it.status] || '' : it.kind === 'special' ? (it.x.closed ? 'Closed' : 'Special hours') : '');
   const calWhat = (it) => (it.kind === 'timeoff' ? `${it.who} · ${it.title}` : it.title);
   const calText = (it) => [CAL_KIND[it.kind], it.who, it.title, it.note, calHours(it), calStatus(it), datesOnly(it), it.from, it.to, it.kind === 'timeoff' && it.status === 'requested' ? 'request' : ''].join(' ').toLowerCase();
-  const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
-  const calChipText = (it) => (it.kind === 'special' ? `${specialShort(it.x)} · ${it.title}` : it.kind === 'event' ? `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
+  const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, it.kind === 'event' && it.x.repeat ? 'Repeats ' + repeatText(it.x.repeat) : '', calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
+  const calChipText = (it) => (it.kind === 'special' ? `${specialShort(it.x)} · ${it.title}` : it.kind === 'event' ? `${it.x.repeat ? '↻ ' : ''}${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
     : `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.title}${it.hours ? ` ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
   const calChip = (it) => h('button', { type: 'button', class: `cal-chip ${it.kind} ${it.status}`, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } }, calChipText(it));
   const calOrder = (a, b) => ['special', 'event', 'timeoff'].indexOf(a.kind) - ['special', 'event', 'timeoff'].indexOf(b.kind) || (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1) || calWhat(a).localeCompare(calWhat(b));
@@ -190,7 +233,7 @@
 
   // ---------- One day: everything on it, and adding to it ----------
   function dayDialog(d) {
-    const its = calItems().filter((it) => it.from <= d && d <= it.to).sort(calOrder);
+    const its = calItems(d, d).filter((it) => it.from <= d && d <= it.to).sort(calOrder);
     const r = regularHours(d), sp = specialOn(d);
     let m;
     const add = (fn) => () => { m.close(); fn(); };
@@ -214,8 +257,9 @@
   // ---------- The Calendar tab ----------
   function calendarView(main) {
     if (!cal.ym) cal.ym = ui.day.slice(0, 7);
-    const today = iso(new Date());
-    const items = calItems(), shown = items.filter(calShown);
+    const today = iso(new Date()), g0 = mondayOf(cal.ym + '-01'), g1 = addDays(g0, 41);
+    // repeating events: each time in the month shown and a year either side of today (the list)
+    const items = calItems(g0 < addDays(today, -366) ? g0 : addDays(today, -366), g1 > addDays(today, 366) ? g1 : addDays(today, 366)), shown = items.filter(calShown);
     const [yy, mm] = cal.ym.split('-').map(Number), mFirst = cal.ym + '-01', mLast = iso(new Date(yy, mm, 0));
     const toMonth = (n) => { cal.ym = iso(new Date(yy, mm - 1 + n, 1)).slice(0, 7); render(); };
     const search = h('input', { class: 'input', type: 'search', id: 'cal-q', value: cal.q, placeholder: 'Search: a name, holiday, reason, note, “request”…', 'aria-label': 'Search the calendar', style: { width: '300px', maxWidth: '100%' } });

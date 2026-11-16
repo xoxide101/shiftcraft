@@ -59,6 +59,6 @@
     const num = (key, text) => (book ? ' ' + supNum(book.add(key, text)) : '');
     const today = iso(new Date()), until = addDays(today, 56), on = (x) => x.to >= today && x.from <= until;
     const sp = (plan.specialHours || []).filter(on).map((x) => `${datesOnly(x)}: ${x.name || 'special hours'} – ${x.closed ? 'closed' : `open ${clockShort(x.open)}–${clockShort(x.close)}`}${num(noteKey.sp(x), noteSpecial(x))}`);
-    const ev = (plan.events || []).filter(on).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}${num(noteKey.ev(x), noteEvent(x))}`);
+    const ev = eventsIn(today, until).map((x) => `${datesOnly(x)}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}: ${x.title}${num(noteKey.ev(x), noteEvent(x))}`);
     return { sp, ev };
   }

@@ -17,10 +17,15 @@
   const icsAt = (d, m) => `${icsDay(d)}T${String(Math.floor(m / 60)).padStart(2, '0')}${String(m % 60).padStart(2, '0')}00`;
   const ICS_STATUS = { requested: 'TENTATIVE', approved: 'CONFIRMED', denied: 'CANCELLED' };
 
-  function icsEvent({ uidOf, from, to, hours, summary, desc, cats, status, x }) {
+  function icsEvent({ uidOf, from, to, hours, summary, desc, cats, status, x, repeat, skip }) {
     const L = ['BEGIN:VEVENT', `UID:${uidOf}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')}`];
-    if (hours) { L.push(`DTSTART:${icsAt(from, hours[0])}`, `DTEND:${icsAt(from, hours[1])}`); if (to > from) L.push(`RRULE:FREQ=DAILY;COUNT=${timeOffDays({ from, to })}`); }
+    if (hours) { L.push(`DTSTART:${icsAt(from, hours[0])}`, `DTEND:${icsAt(from, hours[1])}`); if (to > from && !repeat) L.push(`RRULE:FREQ=DAILY;COUNT=${timeOffDays({ from, to })}`); }
     else L.push(`DTSTART;VALUE=DATE:${icsDay(from)}`, `DTEND;VALUE=DATE:${icsDay(addDays(to, 1))}`);
+    // a repeating store event: its rule, and the times left out
+    if (repeat) {
+      L.push(`RRULE:FREQ=${{ day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', mlast: 'MONTHLY', year: 'YEARLY' }[repeat.unit] || 'WEEKLY'};INTERVAL=${Math.max(1, repeat.every | 0)}${repeat.unit === 'mlast' ? ';BYMONTHDAY=-1' : ''}${repeat.until ? ';UNTIL=' + icsDay(repeat.until) : ''}`);
+      (skip || []).forEach((d) => L.push(hours ? `EXDATE:${icsAt(d, hours[0])}` : `EXDATE;VALUE=DATE:${icsDay(d)}`));
+    }
     L.push(`SUMMARY:${icsEsc(summary)}`);
     if (desc) L.push(`DESCRIPTION:${icsEsc(desc)}`);
     if (cats) L.push(`CATEGORIES:${icsEsc(cats)}`);
@@ -43,7 +48,7 @@
     [who, range].forEach((e) => e.addEventListener('change', () => sync()));
     const info = h('p', { class: 'hint', style: { margin: '6px 0 0' } });
     const gather = () => {
-      const out = [], up = range.value === 'upcoming', bare = cN.c.checked, keep = (x) => !up || x.to >= today;
+      const out = [], up = range.value === 'upcoming', bare = cN.c.checked, keep = (x) => !up || x.to >= today || !!(x.repeat && (!x.repeat.until || x.repeat.until >= today));
       const want = { requested: cR.c.checked, approved: cA.c.checked, denied: cD.c.checked };
       people.filter((p) => !who.value || p.id === who.value).forEach((p) => (p.timeOff || []).filter((t) => want[t.status] && keep(t)).forEach((t) => {
         const label = bare ? 'Time off' : TIME_OFF_WHY[t.why] || 'Time off', cover = t.cover && staffById(t.cover);
@@ -55,7 +60,7 @@
       if (cS.c.checked) (plan.specialHours || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: null,
         summary: `${x.name || 'Special hours'}: ${x.closed ? 'store closed' : `store open ${clock(x.open)} – ${clock(x.close)}`}`, desc: bare ? '' : x.note, cats: 'Store hours',
         x: { KIND: 'special', ID: x.id, NAME: x.name, CLOSED: x.closed ? '1' : '0', OPEN: x.open, CLOSE: x.close, NOTE: bare ? '' : x.note } })));
-      if (cE.c.checked) (plan.events || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: x.hours, summary: x.title, desc: bare ? '' : x.note, cats: 'Event',
+      if (cE.c.checked) (plan.events || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: x.hours, summary: x.title, desc: bare ? '' : x.note, cats: 'Event', repeat: x.repeat, skip: x.skip,
         x: { KIND: 'event', ID: x.id, TITLE: x.title, NOTE: bare ? '' : x.note } })));
       return out;
     };

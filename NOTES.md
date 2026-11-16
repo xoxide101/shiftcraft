@@ -307,3 +307,7 @@ Changing a day's colour from the cell: on Day by day and in the Weekdays / Weeke
 ### Calendar printout details
 
 The Calendar tab's print button: Details under the month, Details on a page of their own, or No details (no numbers). The details are the availability list's four tables (`availDetails(range, { num, show })`) for the weeks the month shows: store hours, time off, events, holidays, each entry with a # column holding the number its chip carries on the month, and only what the Calendar's ticks show (Requests, Approved, Denied struck through, Store hours, Events). They replace the old numbered notes list there.
+
+### Store events and repeating events
+
+The event window (Calendar › + Event) is for store events, not people: quick names (End of period, Payday, Inventory, Truck delivery, Meeting) and Repeats: Never, Every week, Every other week, Every month, or Other (every n days / weeks / months / months on the last day / years), counted from the First day, with an optional Until. It lists the next times as you choose. Stored as `event.repeat = { every, unit, until }` and `event.skip = [dates]`; `eventsIn(a, b)` gives each time as its own copy (`series`, `occ`) and everything that lists events uses it (Calendar, Schedule, Week, printouts, the availability details). Clicking one time opens the whole series: Save changes every time, Skip <date> only leaves that one out, Delete every time removes it. Repeating chips show ↻. iCal export writes RRULE / EXDATE.
