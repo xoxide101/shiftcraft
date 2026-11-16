@@ -2975,9 +2975,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const chipN = (it) => { const c = calChip(it); if (notesWhere !== 'off') c.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' ')); return c; };
     const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
     const MAX = 6;
-    // time off over several days: one bar a person a week, running across their days off (name and dates), in lanes
+    // time off: one bar a person a week, running across their days off (name and dates), in lanes
     // so two never overlap; every day of that week keeps the lanes' room, so the bars line up
-    const multi = (it) => it.kind === 'timeoff' && it.from < it.to;
+    const multi = (it) => it.kind === 'timeoff'; // every day off, one day or more, is a bar (lined up with the others)
     const spans = Array.from({ length: weeks }, (_, w) => {
       const w0 = addDays(start, w * 7), w1 = addDays(w0, 6), lanes = [];
       shown.filter((it) => multi(it) && it.from <= w1 && it.to >= w0).sort((a, b) => a.from.localeCompare(b.from) || b.to.localeCompare(a.to)).forEach((it) => {
@@ -2988,7 +2988,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     });
     const spanBar = (seg) => {
       const it = seg.it, el = h('button', { type: 'button', class: `cal-span ${it.status}`, style: { width: `calc(${seg.n} * (100% + 9px) - 9px)` }, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } },
-        `${it.status === 'requested' ? '? ' : ''}${it.who} · ${datesOnly(it)}`);
+        `${it.status === 'requested' ? '? ' : ''}${it.who} · ${datesOnly(it)}${it.hours ? `, ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
       if (notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' '));
       return el;
     };
