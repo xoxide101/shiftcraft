@@ -2059,31 +2059,34 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   try { const c = JSON.parse(localStorage.getItem(AVD_KEY) || '{}'); if (['page', 'separate', 'off'].includes(c.where)) availDet.where = c.where; if (AVAIL_RANGES.some(([k]) => k === c.range)) availDet.range = c.range; } catch (e) { /* blocked */ }
   const saveAvailDet = () => { try { localStorage.setItem(AVD_KEY, JSON.stringify(availDet)); } catch (e) { /* blocked */ } };
   const availRange = () => { const mon = mondayOf(iso(new Date())), r = availDet.range, start = r.startsWith('this') ? mon : addDays(mon, 7), n = { this: 1, next1: 1, this2: 2, next2: 2, next4: 4, next8: 8 }[r] || 1; return [start, addDays(start, n * 7 - 1)]; };
-  function availDetails() {
-    const [a, b] = availRange(), on = (x) => x.from <= b && x.to >= a, span = a.slice(0, 4) === b.slice(0, 4) ? `${shortDate(a)} – ${shortDate(b)}` : `${shortDate(a)}, ${a.slice(0, 4)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
-    const box = (title, cols, head, rows, none) => h('div', { class: 'al-dbox' }, h('table', null, h('colgroup', null, cols.map((w) => h('col', w ? { style: { width: w } } : null))),
+  // also the Calendar's printout: range = its weeks, o.num = the note numbers its entries carry (a # column), o.show =
+  // the Calendar's ticks (requested, approved, denied, special, event): only what it shows is listed (denied struck through)
+  function availDetails(range = availRange(), o = {}) {
+    const [a, b] = range, on = (x) => x.from <= b && x.to >= a, span = a.slice(0, 4) === b.slice(0, 4) ? `${shortDate(a)} – ${shortDate(b)}` : `${shortDate(a)}, ${a.slice(0, 4)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
+    const box = (title, cols, head, rows, none) => (o.num ? ((cols = ['6%', ...cols]), (head = ['#', ...head])) : 0, h('div', { class: 'al-dbox' }, h('table', null, h('colgroup', null, cols.map((w) => h('col', w ? { style: { width: w } } : null))),
       h('thead', null, h('tr', null, h('th', { colspan: head.length, class: 'al-dtitle' }, title)), h('tr', null, head.map((x) => h('th', null, x)))),
-      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'al-dnone' }, none)))));
-    const tr = (cls, ...cells) => h('tr', { class: cls || '' }, cells.map((c) => h('td', null, c)));
+      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'al-dnone' }, none))))));
+    const tr = (cls, n, ...cells) => h('tr', { class: cls || '' }, (o.num ? [n || '', ...cells] : cells).map((c) => h('td', null, c)));
+    const N = { sp: (x) => (o.num ? o.num.sp(x) : ''), to: (p, t) => (o.num ? o.num.to(p, t) : ''), ev: (x) => (o.num ? o.num.ev(x) : '') };
     const hrsOf = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
     // 1 · store hours: the usual week, then special hours in these weeks
-    const wk = usualWeek(), sp = (plan.specialHours || []).filter(on).sort((x, y) => x.from.localeCompare(y.from));
+    const wk = usualWeek(), sp = (plan.specialHours || []).filter((x) => on(x) && (!o.show || o.show.special)).sort((x, y) => x.from.localeCompare(y.from));
     const hours = box(`Store hours · ${span}`, ['34%', '26%', ''], ['Day', 'Hours', 'Note'],
       // the usual week with alike days together (Mon – Thu 7am–9pm), then special hours
-      [...(() => { const out = []; for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(wk[j + 1]) === usualText(wk[i])) j++; out.push(tr(wk[i] && wk[i].closed ? 'al-dclosed' : '', WEEKDAYS[i] + (j > i ? ' – ' + WEEKDAYS[j] : ''), usualText(wk[i]).replace(/^closed$/, 'Closed'), 'Usual hours')); i = j + 1; } return out; })(),
-        ...sp.map((x) => tr('al-dspecial' + (x.closed ? ' al-dclosed' : ''), datesOnly(x), hrsOf(x), (x.name || 'Special hours') + (x.note ? ' — ' + x.note : '')))], 'Not set (Company & Location).');
+      [...(() => { const out = []; for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(wk[j + 1]) === usualText(wk[i])) j++; out.push(tr(wk[i] && wk[i].closed ? 'al-dclosed' : '', '', WEEKDAYS[i] + (j > i ? ' – ' + WEEKDAYS[j] : ''), usualText(wk[i]).replace(/^closed$/, 'Closed'), 'Usual hours')); i = j + 1; } return out; })(),
+        ...sp.map((x) => tr('al-dspecial' + (x.closed ? ' al-dclosed' : ''), N.sp(x), datesOnly(x), hrsOf(x), (x.name || 'Special hours') + (x.note ? ' — ' + x.note : '')))], 'Not set (Company & Location).');
     // 2 · time off (approved and asked for) with its notes
-    const off = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).filter((t) => t.status !== 'denied' && on(t)).map((t) => ({ p, t }))).sort((x, y) => x.t.from.localeCompare(y.t.from) || x.p.name.localeCompare(y.p.name));
+    const off = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).filter((t) => (o.show ? o.show[t.status] : t.status !== 'denied') && on(t)).map((t) => ({ p, t }))).sort((x, y) => x.t.from.localeCompare(y.t.from) || x.p.name.localeCompare(y.p.name));
     const timeOff = box(`Time off · ${span}`, ['26%', '30%', '20%', ''], ['Who', 'When', 'Why', 'Note'],
-      off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : '', p.name, timeOffWhen(t), timeOffLabel(t), t.note || '')), 'Nobody has time off.');
+      off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : t.status === 'denied' ? 'al-ddenied' : '', N.to(p, t), p.name, timeOffWhen(t), timeOffLabel(t) + (t.status === 'denied' ? ' (denied)' : ''), t.note || '')), 'Nobody has time off.');
     // 3 · store events
-    const ev = (plan.events || []).filter(on).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
+    const ev = (plan.events || []).filter((x) => on(x) && (!o.show || o.show.event)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
     const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
-      ev.map((x) => tr('', datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
+      ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them
     const hol = holidaysFrom(a, 60).filter((x) => x.date <= b);
     const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
-      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
   }
   const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' }, h('style', null, AL_CSS),
@@ -2126,6 +2129,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-dspecial td { font-weight: 700; background: #fff2cc; }
         .al-dclosed td { background: #f4cccc; }
         .al-dasked td { font-style: italic; }
+        .al-ddenied td { color: #777; text-decoration: line-through; }
       `;
   function availabilitySheet(where = availDet.where) {
     const now = new Date(), pad = (n) => String(n).padStart(2, '0');
@@ -2815,7 +2819,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
-        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the numbered notes go)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the details go: store hours, time off, events, holidays)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
       h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
         show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
@@ -2856,14 +2860,17 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
-    if (notesWhere !== 'off' && pbook.list.length) main.append(h('div', { class: 'cal-pnotes' + (notesWhere === 'separate' ? ' sep' : '') }, h('h3', null, `Notes · ${monthLabel(cal.ym)}`),
-      h('div', { class: 'cal-pnlist' }, pbook.list.map((n) => h('div', null, h('b', null, n.n + '. '), n.text)))));
+    // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
+    // each entry with the number it has on the month; under the month or on a page of their own
+    if (notesWhere !== 'off') main.append(h('div', { class: 'cal-pnotes al-sheet' + (notesWhere === 'separate' ? ' sep' : '') }, h('style', null, AL_CSS),
+      h('h3', null, `Details · ${monthLabel(cal.ym)}`),
+      availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
     main.append(usualHoursCard());
   }
   // the Calendar's print button: where the numbered notes go, then print
   function calPrintMenu(x, y) {
     const go = (v) => () => { setNotesWhere(v); render(); setTimeout(() => window.print(), 80); };
-    popMenu(x, y, 'Print the calendar', [['Numbered notes under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Numbered notes on a separate page', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No numbered notes', go('off'), notesWhere === 'off' ? 'on' : '']]);
+    popMenu(x, y, 'Print the calendar', [['Details under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Details on a page of their own', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No details (no numbers)', go('off'), notesWhere === 'off' ? 'on' : '']]);
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {

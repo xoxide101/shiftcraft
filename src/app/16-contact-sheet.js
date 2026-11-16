@@ -136,31 +136,34 @@
   try { const c = JSON.parse(localStorage.getItem(AVD_KEY) || '{}'); if (['page', 'separate', 'off'].includes(c.where)) availDet.where = c.where; if (AVAIL_RANGES.some(([k]) => k === c.range)) availDet.range = c.range; } catch (e) { /* blocked */ }
   const saveAvailDet = () => { try { localStorage.setItem(AVD_KEY, JSON.stringify(availDet)); } catch (e) { /* blocked */ } };
   const availRange = () => { const mon = mondayOf(iso(new Date())), r = availDet.range, start = r.startsWith('this') ? mon : addDays(mon, 7), n = { this: 1, next1: 1, this2: 2, next2: 2, next4: 4, next8: 8 }[r] || 1; return [start, addDays(start, n * 7 - 1)]; };
-  function availDetails() {
-    const [a, b] = availRange(), on = (x) => x.from <= b && x.to >= a, span = a.slice(0, 4) === b.slice(0, 4) ? `${shortDate(a)} – ${shortDate(b)}` : `${shortDate(a)}, ${a.slice(0, 4)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
-    const box = (title, cols, head, rows, none) => h('div', { class: 'al-dbox' }, h('table', null, h('colgroup', null, cols.map((w) => h('col', w ? { style: { width: w } } : null))),
+  // also the Calendar's printout: range = its weeks, o.num = the note numbers its entries carry (a # column), o.show =
+  // the Calendar's ticks (requested, approved, denied, special, event): only what it shows is listed (denied struck through)
+  function availDetails(range = availRange(), o = {}) {
+    const [a, b] = range, on = (x) => x.from <= b && x.to >= a, span = a.slice(0, 4) === b.slice(0, 4) ? `${shortDate(a)} – ${shortDate(b)}` : `${shortDate(a)}, ${a.slice(0, 4)} – ${shortDate(b)}, ${b.slice(0, 4)}`;
+    const box = (title, cols, head, rows, none) => (o.num ? ((cols = ['6%', ...cols]), (head = ['#', ...head])) : 0, h('div', { class: 'al-dbox' }, h('table', null, h('colgroup', null, cols.map((w) => h('col', w ? { style: { width: w } } : null))),
       h('thead', null, h('tr', null, h('th', { colspan: head.length, class: 'al-dtitle' }, title)), h('tr', null, head.map((x) => h('th', null, x)))),
-      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'al-dnone' }, none)))));
-    const tr = (cls, ...cells) => h('tr', { class: cls || '' }, cells.map((c) => h('td', null, c)));
+      h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'al-dnone' }, none))))));
+    const tr = (cls, n, ...cells) => h('tr', { class: cls || '' }, (o.num ? [n || '', ...cells] : cells).map((c) => h('td', null, c)));
+    const N = { sp: (x) => (o.num ? o.num.sp(x) : ''), to: (p, t) => (o.num ? o.num.to(p, t) : ''), ev: (x) => (o.num ? o.num.ev(x) : '') };
     const hrsOf = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
     // 1 · store hours: the usual week, then special hours in these weeks
-    const wk = usualWeek(), sp = (plan.specialHours || []).filter(on).sort((x, y) => x.from.localeCompare(y.from));
+    const wk = usualWeek(), sp = (plan.specialHours || []).filter((x) => on(x) && (!o.show || o.show.special)).sort((x, y) => x.from.localeCompare(y.from));
     const hours = box(`Store hours · ${span}`, ['34%', '26%', ''], ['Day', 'Hours', 'Note'],
       // the usual week with alike days together (Mon – Thu 7am–9pm), then special hours
-      [...(() => { const out = []; for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(wk[j + 1]) === usualText(wk[i])) j++; out.push(tr(wk[i] && wk[i].closed ? 'al-dclosed' : '', WEEKDAYS[i] + (j > i ? ' – ' + WEEKDAYS[j] : ''), usualText(wk[i]).replace(/^closed$/, 'Closed'), 'Usual hours')); i = j + 1; } return out; })(),
-        ...sp.map((x) => tr('al-dspecial' + (x.closed ? ' al-dclosed' : ''), datesOnly(x), hrsOf(x), (x.name || 'Special hours') + (x.note ? ' — ' + x.note : '')))], 'Not set (Company & Location).');
+      [...(() => { const out = []; for (let i = 0; i < 7;) { let j = i; while (j < 6 && usualText(wk[j + 1]) === usualText(wk[i])) j++; out.push(tr(wk[i] && wk[i].closed ? 'al-dclosed' : '', '', WEEKDAYS[i] + (j > i ? ' – ' + WEEKDAYS[j] : ''), usualText(wk[i]).replace(/^closed$/, 'Closed'), 'Usual hours')); i = j + 1; } return out; })(),
+        ...sp.map((x) => tr('al-dspecial' + (x.closed ? ' al-dclosed' : ''), N.sp(x), datesOnly(x), hrsOf(x), (x.name || 'Special hours') + (x.note ? ' — ' + x.note : '')))], 'Not set (Company & Location).');
     // 2 · time off (approved and asked for) with its notes
-    const off = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).filter((t) => t.status !== 'denied' && on(t)).map((t) => ({ p, t }))).sort((x, y) => x.t.from.localeCompare(y.t.from) || x.p.name.localeCompare(y.p.name));
+    const off = plan.staff.filter((p) => !p.left).flatMap((p) => (p.timeOff || []).filter((t) => (o.show ? o.show[t.status] : t.status !== 'denied') && on(t)).map((t) => ({ p, t }))).sort((x, y) => x.t.from.localeCompare(y.t.from) || x.p.name.localeCompare(y.p.name));
     const timeOff = box(`Time off · ${span}`, ['26%', '30%', '20%', ''], ['Who', 'When', 'Why', 'Note'],
-      off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : '', p.name, timeOffWhen(t), timeOffLabel(t), t.note || '')), 'Nobody has time off.');
+      off.map(({ p, t }) => tr(t.status === 'requested' ? 'al-dasked' : t.status === 'denied' ? 'al-ddenied' : '', N.to(p, t), p.name, timeOffWhen(t), timeOffLabel(t) + (t.status === 'denied' ? ' (denied)' : ''), t.note || '')), 'Nobody has time off.');
     // 3 · store events
-    const ev = (plan.events || []).filter(on).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
+    const ev = (plan.events || []).filter((x) => on(x) && (!o.show || o.show.event)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
     const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
-      ev.map((x) => tr('', datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
+      ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them
     const hol = holidaysFrom(a, 60).filter((x) => x.date <= b);
     const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
-      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
   }
   const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' }, h('style', null, AL_CSS),
@@ -203,6 +206,7 @@
         .al-dspecial td { font-weight: 700; background: #fff2cc; }
         .al-dclosed td { background: #f4cccc; }
         .al-dasked td { font-style: italic; }
+        .al-ddenied td { color: #777; text-decoration: line-through; }
       `;
   function availabilitySheet(where = availDet.where) {
     const now = new Date(), pad = (n) => String(n).padStart(2, '0');

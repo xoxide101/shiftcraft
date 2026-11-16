@@ -303,3 +303,7 @@ The wand in the title bar's quick buttons and the Start button, first on the Sch
 On Staff › Day by day and the printed availability list: green can work, red can't (Off), yellow call or arrange first (the day's Call or arrange first box, or a note like Emergency or If you ask), black not given (the day editor's Not given choice, `{ k: 'unk' }`), shown only on the Staff screens: the printed list leaves that day an empty white box and Check the schedule says nothing about it. The printed list has a key (green, red, yellow) under the table.
 
 Changing a day's colour from the cell: on Day by day and in the Weekdays / Weekend tabs' Daily availability column (was Not available), a click goes green › yellow › red › black › green and a right-click menu picks one, edits the hours, or goes back to the weekday / weekend settings (`setAv`, `cycleAv`, `avMenu`). Only that day becomes its own; red and black keep the day's hours in `was`, so going back to green restores them.
+
+### Calendar printout details
+
+The Calendar tab's print button: Details under the month, Details on a page of their own, or No details (no numbers). The details are the availability list's four tables (`availDetails(range, { num, show })`) for the weeks the month shows: store hours, time off, events, holidays, each entry with a # column holding the number its chip carries on the month, and only what the Calendar's ticks show (Requests, Approved, Denied struck through, Store hours, Events). They replace the old numbered notes list there.

@@ -232,7 +232,7 @@
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
-        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the numbered notes go)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
+        h('span', { class: 'no-print' }, ibs(ib('print', 'Print what you see (choose where the details go: store hours, time off, events, holidays)', (e) => { const r = e.currentTarget.getBoundingClientRect(); calPrintMenu(r.left, r.bottom + 4); })))),
       h('div', { class: 'inline no-print', style: { marginTop: '10px', gap: '14px' } }, search,
         show('requested', 'Requests', (it) => it.kind === 'timeoff' && it.status === 'requested', 'Time off asked for, still to approve'),
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
@@ -273,14 +273,17 @@
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
-    if (notesWhere !== 'off' && pbook.list.length) main.append(h('div', { class: 'cal-pnotes' + (notesWhere === 'separate' ? ' sep' : '') }, h('h3', null, `Notes · ${monthLabel(cal.ym)}`),
-      h('div', { class: 'cal-pnlist' }, pbook.list.map((n) => h('div', null, h('b', null, n.n + '. '), n.text)))));
+    // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
+    // each entry with the number it has on the month; under the month or on a page of their own
+    if (notesWhere !== 'off') main.append(h('div', { class: 'cal-pnotes al-sheet' + (notesWhere === 'separate' ? ' sep' : '') }, h('style', null, AL_CSS),
+      h('h3', null, `Details · ${monthLabel(cal.ym)}`),
+      availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
     main.append(usualHoursCard());
   }
   // the Calendar's print button: where the numbered notes go, then print
   function calPrintMenu(x, y) {
     const go = (v) => () => { setNotesWhere(v); render(); setTimeout(() => window.print(), 80); };
-    popMenu(x, y, 'Print the calendar', [['Numbered notes under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Numbered notes on a separate page', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No numbered notes', go('off'), notesWhere === 'off' ? 'on' : '']]);
+    popMenu(x, y, 'Print the calendar', [['Details under the month', go('page'), notesWhere === 'page' ? 'on' : ''], ['Details on a page of their own', go('separate'), notesWhere === 'separate' ? 'on' : ''], ['No details (no numbers)', go('off'), notesWhere === 'off' ? 'on' : '']]);
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {
