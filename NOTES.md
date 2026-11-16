@@ -341,3 +341,5 @@ The Calendar's print button opens a window (`calPrintDialog`, kept in this brows
 Detail tables read what it is, then when, then the details: Events = Event (its sign and name) · When · Details (moved before a closed holiday, the note); Holidays = Holiday · Date · Store.
 
 Schedule › Unscheduled: instead of "not available", each name says why in red: the all-day time off's reason (Vacation, Personal (asked)…) or OFF day (their availability); a free person whose usual shift is outside the hours they gave says "out of range" in orange. Too many hours: "O32" (over a 32 h max) when their usual shift today would take them past their Max h/wk; orange, red when they are already at or over it (the tip gives the hours).
+
+Availability with Some days lines (a yes/no switch): Any time ticked = fully open, lines limit nothing; adding a Some days line unticks Any time, and from then on a line's days allow the line's hours and the hours row under the usual shift, joined (`linesWins`). The usual shift itself only presets the fill, never availability. Day by day entries still win over everything.

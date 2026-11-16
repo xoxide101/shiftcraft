@@ -44,10 +44,19 @@
   // Weekdays or Weekend tab. On a day that has lines, they are the hours the person can work (each line one stretch, so
   // 7am–11am and 4pm–9pm is a split day) in place of the tab's usual available hours; the day-by-day list still wins.
   const linesOn = (p, i) => (Array.isArray(p.lines) ? p.lines.filter((l) => Array.isArray(l.days) && l.days.includes(i) && l.to > l.from) : []).sort((a, b) => a.from - b.from);
+  // The hours someone can work on a day with Some days lines: the lines and the hours on their tab (the row under
+  // the usual shift), joined. The usual shift itself only presets the fill. With Any time still ticked (older plans;
+  // adding a line now unticks it) nothing limits them: null.
+  const linesWins = (p, i) => {
+    const L = linesOn(p, i); if (!L.length) return null;
+    const st = setOf(p, i >= 5 ? 'we' : 'wk'); if (st.from == null || st.to == null) return null;
+    return [...L.map((l) => [l.from, l.to]), [st.from, st.to]].sort((x, y) => x[0] - y[0]).reduce((out, x) => { const last = out[out.length - 1]; if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]); else out.push([...x]); return out; }, []);
+  };
   // the usual weekday / weekend settings, as a day-by-day entry (to start the list from)
   function avFromSets(p, i) {
     if (p.off && p.off[i]) return { k: 'off' };
-    const L = linesOn(p, i); if (L.length) return { k: 'times', r: L.map((l) => [l.from, l.to, '+']) };
+    if (linesOn(p, i).length && setOf(p, i >= 5 ? 'we' : 'wk').from == null) return { k: 'any' };
+    const L = linesWins(p, i); if (L) return { k: 'times', r: L.map(([f, t]) => [f, t, '+']) };
     const st = setOf(p, i >= 5 ? 'we' : 'wk');
     if (st.from != null && st.to != null) return { k: 'times', r: [[st.from, st.to, '+']] };
     if (st.parts.length === 3) return { k: 'any' };
@@ -90,8 +99,9 @@
       const hitMinus = minus.some((x) => s.start < realMin(x[1]) && s.end > realMin(x[0]));
       return inPlus && !hitMinus ? '' : `${first} is available ${avText(a)} on ${dayName(d)}s`;
     }
-    const L = linesOn(p, avDay(d));
-    if (L.length) return L.some((l) => s.start >= l.from && s.end <= l.to) ? '' : `${first} is available ${L.map((l) => `${clock(l.from)} – ${clock(l.to)}`).join(' and ')} on ${dayName(d)}s`;
+    if (linesOn(p, avDay(d)).length && setFor(p, d).from == null) return ''; // Any time: open
+    const L = linesWins(p, avDay(d));
+    if (L) return L.some(([f, t]) => s.start >= f && s.end <= t) ? '' : `${first} is available ${L.map(([f, t]) => `${clock(f)} – ${clock(t)}`).join(' and ')} on ${dayName(d)}s`;
     const st = setFor(p, d), parts = st.parts;
     if (st.from != null && st.to != null && (s.start < st.from || s.end > st.to)) return `${first} is only available ${clock(st.from)} – ${clock(st.to)} on ${partWord(isWkend(d) ? 'we' : 'wk')}`;
     if (parts.length === 3) return '';
