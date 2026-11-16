@@ -455,6 +455,10 @@ table.cal td.cal-day { padding: 0; }
   .cal-mark.urgent .cal-mark-ic { background: #000 !important; border-color: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cal-chip.urgent { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.cal-heads { padding: 0; }
+.cal-mark.urgent.cal-heads .cal-mark-ic { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 21px; height: 21px; padding: 0; font-weight: 800; font-size: 13px; line-height: 1; color: #c2410c; vertical-align: middle; }
+.cal-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+@media print { .cal-mark.urgent.cal-heads .cal-mark-ic { color: #fff !important; } }
 </style>
 </head>
 <body>
@@ -3082,7 +3086,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
       (() => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
-        return used.size ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l))) : null; })(),
+        // and the heads up: something moved to the day before a closed holiday (a white circle)
+        const moved = shown.some((it) => it.kind === 'event' && it.x.movedFrom && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start);
+        return used.size || moved ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l)),
+          moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Heads up: moved to the day before a closed holiday') : null) : null; })(),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
     // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
     // each entry with the number it has on the month; under the month or on a page of their own
