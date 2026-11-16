@@ -323,3 +323,7 @@ Holiday kinds: `x.holiday` = 'national' (national or state) or 'local' (business
 Time off over several days (Calendar month): one dark orange bar a person a week, running across their days off, with the name and dates (requests dashed, denied struck through). The week's bars are put in lanes so none overlap, and every day of that week keeps the lanes' room (empty `.cal-lane`), so the bars line up; the bar starts in its first day's cell and is `n` cells wide. Single days off stay ordinary entries.
 
 Built-in holidays can be changed: clicking one's bar opens the event window with its name and kind filled in; saving makes your own event (`replaces: the built-in name`) that shows in its place that day whatever you call it (name, kind, notes all yours), and the details tables list yours instead.
+
+### Signs by the date
+
+Store events can show as a sign by the date instead of an entry (`event.mark`, or from the name; the event window's Sign by the date list): End of period puts a box around the date (white on screen, black printed; it may run over the cell's edge), and Payday (money), Truck delivery (truck), Inventory (clipboard), Insurance enrollment (shield) and Meeting (person at a podium) are small coloured pictures next to the date. A key under the month lists the signs that month uses. Clicking a sign opens its event; printed, each sign keeps its number for the details. The plan check on loading keeps an event's repeat, skip, holiday, mark and replaces (it used to drop them).

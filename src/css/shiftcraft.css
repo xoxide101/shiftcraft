@@ -425,3 +425,17 @@ table.cal td.cal-day { padding: 0; }
 .cal-span.denied { background: transparent; color: var(--muted); border-color: var(--line); text-decoration: line-through; }
 .cal-span:hover { filter: brightness(1.12); }
 @media print { .cal-span { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+/* signs by the date: end of period boxes the date (it may run over the cell's edge); the others are small pictures */
+.cal-num.eop, .cal-eop-key { outline: 2px solid #fff; outline-offset: 2px; border-radius: 2px; position: relative; z-index: 3; }
+.cal-eop-key { display: inline-block; font-weight: 700; font-size: 12px; padding: 0 4px; margin: 0 4px; }
+.cal-mark { border: 0; background: none; padding: 0 1px; cursor: pointer; line-height: 0; color: var(--fg); }
+.cal-mark-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; }
+.cal-mark-ic.payday { color: #2fbf71; } .cal-mark-ic.truck { color: #f08c2e; } .cal-mark-ic.inventory { color: #3fb7c9; }
+.cal-mark-ic.insurance { color: #5b9cf0; } .cal-mark-ic.meeting { color: #b48cf2; }
+.cal-mark:hover { filter: brightness(1.25); }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 12px; align-items: center; }
+@media print {
+  .cal-num.eop, .cal-eop-key { outline-color: #000 !important; }
+  .cal-mark-ic, .cal-mark-ic.payday, .cal-mark-ic.truck, .cal-mark-ic.inventory, .cal-mark-ic.insurance, .cal-mark-ic.meeting { color: #000 !important; }
+  .cal-legend { color: #000; }
+}

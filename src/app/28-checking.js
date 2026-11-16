@@ -10,7 +10,13 @@
     { const okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s), okh = (a) => Array.isArray(a) && Number.isFinite(a[0]) && Number.isFinite(a[1]) && a[1] > a[0];
       const ics = (x) => (typeof x.ics === 'string' && x.ics ? { ics: x.ics.slice(0, 300) } : {}), to = (x) => (okd(x.to) && x.to >= x.from ? x.to : x.from);
       if (p.hours && p.hours.days !== undefined) p.hours = { days: Array.from({ length: 7 }, (_, i) => { const x = Array.isArray(p.hours.days) ? p.hours.days[i] : null; return !x ? null : x.closed ? { closed: true } : Number.isFinite(x.open) && Number.isFinite(x.close) && x.close > x.open ? { open: x.open, close: x.close } : null; }) };
-      if (p.events !== undefined) { p.events = Array.isArray(p.events) ? p.events.filter((x) => x && okd(x.from)).map((x) => ({ id: x.id || uid(), from: x.from, to: to(x), title: String(x.title || 'Event').slice(0, 120), hours: okh(x.hours) ? [x.hours[0], x.hours[1]] : null, note: String(x.note || '').slice(0, 500), ...ics(x) })) : []; if (!p.events.length) delete p.events; }
+      if (p.events !== undefined) { p.events = Array.isArray(p.events) ? p.events.filter((x) => x && okd(x.from)).map((x) => ({ id: x.id || uid(), from: x.from, to: to(x), title: String(x.title || 'Event').slice(0, 120), hours: okh(x.hours) ? [x.hours[0], x.hours[1]] : null, note: String(x.note || '').slice(0, 500), ...ics(x),
+        // repeating (every n days / weeks / months / years, until a day), the times left out, holiday kind, sign by the date, the built-in holiday it stands for
+        ...(x.repeat && ['day', 'week', 'month', 'mlast', 'year'].includes(x.repeat.unit) ? { repeat: { every: Math.max(1, Math.min(99, x.repeat.every | 0)), unit: x.repeat.unit, until: okd(x.repeat.until) ? x.repeat.until : '' } } : {}),
+        ...(x.repeat && Array.isArray(x.skip) && x.skip.some(okd) ? { skip: x.skip.filter(okd) } : {}),
+        ...(['national', 'local', false, true].includes(x.holiday) ? { holiday: x.holiday } : {}),
+        ...(typeof x.mark === 'string' && /^[a-z]{1,20}$/.test(x.mark) ? { mark: x.mark } : {}),
+        ...(typeof x.replaces === 'string' && x.replaces ? { replaces: x.replaces.slice(0, 80) } : {}) })) : []; if (!p.events.length) delete p.events; }
       if (p.specialHours !== undefined) { p.specialHours = Array.isArray(p.specialHours) ? p.specialHours.filter((x) => x && okd(x.from)).map((x) => { const open = Number.isFinite(x.open) ? x.open : 600; return { id: x.id || uid(), from: x.from, to: to(x), name: String(x.name || '').slice(0, 80), closed: !!x.closed, open, close: Number.isFinite(x.close) && x.close > open ? x.close : open + 60, note: String(x.note || '').slice(0, 300), ...ics(x) }; }) : []; if (!p.specialHours.length) delete p.specialHours; } }
     const ids = new Set();
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {

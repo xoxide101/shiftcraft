@@ -116,6 +116,19 @@
   const holEvent = (x) => !!holEventType(x);
   const holSpecial = (x) => !!holSpecialType(x);
 
+  // ---------- Marks: store events shown as a sign by the date instead of an entry ----------
+  // End of period: a box around the date. The others: a small picture next to the date (a truck, a clipboard…), with a
+  // key under the month. x.mark on an event: a key below, 'none' (an ordinary entry), or missing (from its name).
+  const CAL_MARKS = [
+    ['period', 'End of period', /\bend of (the )?(pay ?)?(period|month)\b|\beop\b/i, ''],
+    ['payday', 'Payday', /\bpay ?day\b|\bpayroll\b/i, '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9h.01M18 15h.01"/>'],
+    ['truck', 'Truck delivery', /\btruck\b|\bdelivery\b/i, '<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6" cy="17.5" r="1.9"/><circle cx="17" cy="17.5" r="1.9"/>'],
+    ['inventory', 'Inventory', /\binventory\b/i, '<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/><path d="M8.5 10h7M8.5 14h7M8.5 18h4"/>'],
+    ['insurance', 'Insurance enrollment', /\binsurance\b|\benrol?lment\b|\bbenefits\b/i, '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M12 9v6M9 12h6"/>'],
+    ['meeting', 'Meeting', /\bmeeting\b/i, '<circle cx="12" cy="4.6" r="2.1"/><path d="M8.6 11.5c0-2 1.5-3.6 3.4-3.6s3.4 1.6 3.4 3.6"/><path d="M5 11.5h14l-2 3H7z"/><path d="M9.5 14.5v6h5v-6M8 20.5h8"/>']];
+  const markOf = (x) => (x.mark === 'none' ? '' : x.mark && CAL_MARKS.some(([k]) => k === x.mark) ? x.mark : (CAL_MARKS.find(([, , re]) => re.test(x.title || '')) || [''])[0]);
+  const markSvg = (k) => { const m = CAL_MARKS.find(([kk]) => kk === k), s = h('span', { class: 'cal-mark-ic ' + k }); s.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${m ? m[3] : ''}</svg>`; return s; };
+
   // a row of buttons where one is pressed (like the Status buttons on Time off)
   function calSeg(label, options, value, pick) {
     const seg = h('div', { class: 'seg', role: 'group', 'aria-label': label }, options.map(([v, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(value === v),
@@ -177,7 +190,7 @@
     const at = (preset && preset.from) || ui.day;
     const cur = x || { from: at, to: at, title: '', hours: null, note: '', ...(preset || {}) };
     const title = h('input', { class: 'input', value: cur.title || '', placeholder: 'e.g. Truck delivery · Health inspection · Team meeting · Sidewalk sale', maxLength: 120 });
-    const picks = h('div', { class: 'inline', style: { gap: '4px' } }, ['End of period', 'Payday', 'Inventory', 'Truck delivery', 'Meeting'].map((t) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { title.value = t; title.focus(); } }, t)));
+    const picks = h('div', { class: 'inline', style: { gap: '4px' } }, ['End of period', 'Payday', 'Inventory', 'Truck delivery', 'Insurance enrollment', 'Meeting'].map((t) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { title.value = t; title.focus(); } }, t)));
     const from = dateIn(cur.from), to = dateIn(cur.to);
     // repeats: never, every week, every other week, every month, or every n days / weeks / months / years, until a day or not
     const r0 = cur.repeat || null;
@@ -190,6 +203,8 @@
     const untilRow = fieldOf('Until (leave empty for no end)', until);
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
     const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
+    const markSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Sign by the date' }, h('option', { value: '' }, 'From the name'), h('option', { value: 'none', selected: cur.mark === 'none' }, 'None (an entry)'),
+      CAL_MARKS.map(([k, l]) => h('option', { value: k, selected: cur.mark === k }, k === 'period' ? 'End of period (a box around the date)' : l)));
     const holNow = holEventType({ ...cur, from: cur.from || at, title: cur.title || '' });
     const holSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Holiday' }, HOL_KINDS.map(([k, l]) => h('option', { value: k, selected: holNow === k }, l)));
     let allDay = !cur.hours;
@@ -215,7 +230,7 @@
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
       const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
       const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}), ...(cur.replaces ? { replaces: cur.replaces } : {}),
-        ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}),
+        ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}), ...(markSel.value ? { mark: markSel.value } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
       change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
       toast(`${e.title}: ${timeOffWhen(e)}${r ? ', ' + repeatText(r) : ''}.`);
@@ -224,7 +239,7 @@
     modal({ title: x ? `Store event · ${x.title}` : cur.replaces ? `Holiday · ${cur.replaces}` : 'Store event or note for a day', body: [
       cur.replaces && !x ? h('p', { class: 'hint', style: { marginTop: 0 } }, `${cur.replaces} comes from the built-in holiday list. Change its name, kind or details and save: your version shows in its place on ${longDate(cur.from)}.`) : null,
       h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
-      fieldOf('What', title), picks, fieldOf('Holiday (a solid bar along the bottom of the day on the Calendar)', holSel), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      fieldOf('What', title), picks, pair2(fieldOf('Holiday (a solid bar along the bottom of the day)', holSel), fieldOf('Sign by the date', markSel)), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
       h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
       h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
   }
@@ -353,7 +368,8 @@
       const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? it.x.name || 'Holiday' : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, type: it.kind === 'special' ? holSpecialType(it.x) : holEventType(it.x) })),
         ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.some(([n, loose]) => holLike(n, b.name, loose))).map((b) => ({ label: b.name, type: b.type })))]
         .sort((x, y) => (x.type === 'national') - (y.type === 'national'));
-      const rest = its.filter((it) => !holIts.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
+      const marked = its.filter((it) => it.kind === 'event' && !holIts.includes(it) && markOf(it.x)), eop = marked.find((it) => markOf(it.x) === 'period');
+      const rest = its.filter((it) => !holIts.includes(it) && !marked.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
       const topAll = [...rest.filter((it) => it.kind !== 'event'), ...evs.slice(3)], room = Math.max(1, MAX - evShow.length - bars.length - spans[w].length), topShow = topAll.length > room ? topAll.slice(0, room - 1) : topAll, more = topAll.slice(topShow.length);
       const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
         bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else eventDialog(null, { from: d, to: d, title: b.label, holiday: b.type, replaces: b.label }); } }, b.label);
@@ -362,7 +378,10 @@
         // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
         h('div', { class: 'cal-in', style: { paddingBottom: (evShow.length * 20 + bars.length * 19 + 5) + 'px' } },
         h('div', { class: 'cal-head' },
-          h('button', { type: 'button', class: 'cal-num', title: `${longDate(d)}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
+          h('button', { type: 'button', class: 'cal-num' + (eop ? ' eop' : ''), title: `${longDate(d)}${eop ? ' · ' + eop.title : ''}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
+          eop && notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(eop))) : null,
+          // the signs next to the date (payday, truck, inventory, insurance, meeting)
+          marked.filter((it) => it !== eop).map((it) => h('button', { type: 'button', class: 'cal-mark', title: calTip(it), 'aria-label': it.title, onclick: (e) => { e.stopPropagation(); calOpen(it); } }, markSvg(markOf(it.x)), notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(it))) : null)),
           n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
@@ -379,6 +398,8 @@
     })));
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
+      (() => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
+        return used.size ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l))) : null; })(),
       h('p', { class: 'hint', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
     // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
     // each entry with the number it has on the month; under the month or on a page of their own
