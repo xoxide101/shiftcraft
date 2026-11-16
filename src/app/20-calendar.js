@@ -4,7 +4,8 @@
   // plan.specialHours = [{ id, from, to, name, closed, open, close, note, ics? }]
   //   Store hours for a holiday (or any day): they take the place of the usual opening hours on those days. closed =
   //   shut all day. Check schedule points out shifts on a closed day, and shifts well outside the special hours.
-  // plan.events = [{ id, from, to, title, hours: null | [start, end], note, ics?, repeat?, skip? }]
+  // plan.events = [{ id, from, to, title, hours: null | [start, end], note, ics?, repeat?, skip?, holiday?, replaces? }]
+  //   replaces: the built-in holiday this event is your own version of (its name), shown in its place whatever it is called.
   //   Store events: notes and information for a day (end of period, payday, a delivery, a meeting, an inspection).
   //   They change nothing. repeat = { every: n, unit: 'day' | 'week' | 'month' | 'mlast' (the month's last day) | 'year',
   //   until: '' | last date }, counted from the first day (from); skip = [first days of times left out].
@@ -213,14 +214,15 @@
       if (!from.value) { toast('Pick the day.'); return false; }
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
       const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
-      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}),
+      const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}), ...(cur.replaces ? { replaces: cur.replaces } : {}),
         ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
       change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
       toast(`${e.title}: ${timeOffWhen(e)}${r ? ', ' + repeatText(r) : ''}.`);
     } });
     sync();
-    modal({ title: x ? `Store event · ${x.title}` : 'Store event or note for a day', body: [
+    modal({ title: x ? `Store event · ${x.title}` : cur.replaces ? `Holiday · ${cur.replaces}` : 'Store event or note for a day', body: [
+      cur.replaces && !x ? h('p', { class: 'hint', style: { marginTop: 0 } }, `${cur.replaces} comes from the built-in holiday list. Change its name, kind or details and save: your version shows in its place on ${longDate(cur.from)}.`) : null,
       h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
       fieldOf('What', title), picks, fieldOf('Holiday (a solid bar along the bottom of the day on the Calendar)', holSel), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
       h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
@@ -347,14 +349,14 @@
       const n = planDays().includes(d) ? shiftsOn(d).length : 0;
       // holidays: special hours or events that are one, then the list's own (unless an entry that day has its name)
       const isHol = (it) => (it.kind === 'special' ? holSpecial(it.x) : it.kind === 'event' ? holEvent(it.x) : false);
-      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = [...eventsOn(d).map((x) => [x.title]), ...(sp ? [[sp.name, true]] : [])];
+      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = [...eventsOn(d).flatMap((x) => [[x.title], ...(x.replaces ? [[x.replaces]] : [])]), ...(sp ? [[sp.name, true]] : [])];
       const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? it.x.name || 'Holiday' : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, type: it.kind === 'special' ? holSpecialType(it.x) : holEventType(it.x) })),
         ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.some(([n, loose]) => holLike(n, b.name, loose))).map((b) => ({ label: b.name, type: b.type })))]
         .sort((x, y) => (x.type === 'national') - (y.type === 'national'));
       const rest = its.filter((it) => !holIts.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
       const topAll = [...rest.filter((it) => it.kind !== 'event'), ...evs.slice(3)], room = Math.max(1, MAX - evShow.length - bars.length - spans[w].length), topShow = topAll.length > room ? topAll.slice(0, room - 1) : topAll, more = topAll.slice(topShow.length);
       const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
-        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to see the day`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else dayDialog(d); } }, b.label);
+        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else eventDialog(null, { from: d, to: d, title: b.label, holiday: b.type, replaces: b.label }); } }, b.label);
           if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
       return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
         // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
