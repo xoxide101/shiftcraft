@@ -1084,7 +1084,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
-    const sch = schoolIssue(p, d, s); if (sch) return sch;
+    // school is a note about the person (In school), not hours they can't work: it never limits a shift
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
@@ -1699,8 +1699,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // ---------- Staff ----------
   let staffTab = 'wk';
   try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
-  // a day-by-day cell as lines: the hours (each stretch its own line), what they can’t do, and school class times
-  // noSchool: leave out the class times (the printed list: the school tab has them)
+  // a day-by-day cell as lines: the hours (each stretch its own line) and what they can’t do
   const avCellLines = (p, i, a, noSchool) => {
     const out = [];
     if (a && a.k === 'times') {
@@ -1709,9 +1708,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
       minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
     } else out.push(avText(a));
-    const sc = p.school, today = iso(new Date());
-    if (!noSchool && !(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
-      sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
+    // (school is a note about the person only: its class times are not shown here and limit nothing)
     return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
   };
   function staffView(main) {
@@ -1851,7 +1848,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for more hours on the days you pick (adding one unticks Any time): on those days they can work the line’s hours and the hours above (11am–12pm on Tue and Thu as well as 1:30pm–9pm). Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
-      school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. During the term, class hours are hours they can’t work, so a shift over them gets the ! mark. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
+      school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. It is a note about the person (In school, and when): it does not limit when they can work and gives no warnings; their hours are set on the Weekdays, Weekend and Day by day tabs. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
       contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
