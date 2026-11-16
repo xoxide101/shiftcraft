@@ -60,10 +60,11 @@
           return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${pk === 'am' ? 'opening to ' + clock(plan.midStart) : pk === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to closing'} on ${partWord(k)} (click to change)`,
             onclick: () => change(() => { const next = on ? st.parts.filter((x) => x !== pk) : [...st.parts, pk]; setSet(p, k, { parts: next.length ? next : st.parts }); }) }, l);
         }))),
-        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days not available' }, dayIdx.map((i) => {
-          const on = !!(p.off && p.off[i]), wd = WEEKDAYS[i];
-          return h('button', { type: 'button', class: 'dt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Not available' : 'Available'} on ${wd}s (click to change)`,
-            onclick: () => change(() => { p.off = Array.from({ length: 7 }, (_, x) => !!(p.off && p.off[x])); p.off[i] = !p.off[i]; }) }, k === 'we' ? wd.slice(0, 3) : wd[0]);
+        // daily availability: each day's colour, the same as Day by day (click goes green › yellow › red › black; right-click picks)
+        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Daily availability' }, dayIdx.map((i) => {
+          const a = avOf(p, i) || avFromSets(p, i), c = avClass(a), wd = WEEKDAYS[i];
+          return h('button', { type: 'button', class: 'dt av-' + c, title: `${wd}: ${(AV_STATES.find(([s]) => s === c) || [])[1] || ''}${avText(a) ? ' · ' + avText(a) : ''}. Click to change the colour; right-click to pick one or edit the hours.`,
+            onclick: () => cycleAv(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, k === 'we' ? wd.slice(0, 3) : wd[0]);
         }))),
       ];
     };
@@ -98,7 +99,7 @@
     } else if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
-        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change.`, onclick: () => availEditor(p, i) }, avCellLines(p, i, a))); }),
+        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change the colour (green, yellow, red, black); right-click to pick one or edit the hours.`, onclick: () => cycleAv(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, avCellLines(p, i, a))); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
         h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
@@ -125,7 +126,7 @@
       });
     } else {
       const k = staffTab;
-      head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift · hours they can work`, 'Can work', 'Not available', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
+      head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift · hours they can work`, 'Can work', 'Daily availability', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
       rows = people.flatMap((p) => {
         const extra = [];
         if (k === 'wk') {
@@ -148,7 +149,7 @@
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
-    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for other hours on the days you pick (two lines make a split day), and only those lines can be removed. Can work: AM, MID, PM. Not available: click the days they can’t work (red). Untick Active for people who are away.',
+    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for other hours on the days you pick (two lines make a split day), and only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
       school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. During the term, class hours are hours they can’t work, so a shift over them gets the ! mark. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
@@ -208,6 +209,27 @@
   // the colours of a day: green can work, red can't, yellow call or arrange first (marked, or a note like Emergency or
   // If you ask), black not given
   const avClass = (a) => (!a || a.k === 'unk' ? 'none' : a.k === 'off' ? 'off' : a.hl || (a.k === 'note' && /emergenc|if you ask|call|arrange/i.test(a.note || '')) ? 'hl' : 'on');
+  // A day's colour, straight from the cell: a click goes green › yellow › red › black › green, a right-click picks one.
+  // The hours or note are kept: red and black remember what the day was (was), so going back to green brings it back.
+  const AV_STATES = [['on', 'Available (green)'], ['hl', 'Call or arrange first (yellow)'], ['off', 'Unavailable (red)'], ['none', 'Not given (black)']];
+  function setAv(p, i, st) {
+    change(() => {
+      if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map(() => null);
+      const cur = p.avail[i] || avFromSets(p, i);
+      if (p.off && p.off[i]) p.off[i] = false; // the day's own colour says it now
+      let base = cur.was ? { ...cur.was } : cur.k === 'off' || cur.k === 'unk' ? { k: 'any' } : { ...cur };
+      delete base.hl; delete base.was;
+      if (st === 'on' && avClass(base) === 'hl') base = { k: 'any' }; // a note like If you ask is yellow by itself
+      p.avail[i] = st === 'on' ? base : st === 'hl' ? { ...base, hl: true } : { k: st === 'off' ? 'off' : 'unk', ...(base.k !== 'any' ? { was: base } : {}) };
+    });
+  }
+  const cycleAv = (p, i) => { const c = avClass(avOf(p, i) || avFromSets(p, i)), k = AV_STATES.findIndex(([s]) => s === c); setAv(p, i, AV_STATES[(k + 1) % 4][0]); };
+  function avMenu(p, i, x, y) {
+    const c = avClass(avOf(p, i) || avFromSets(p, i));
+    popMenu(x, y, `${p.name} · ${WEEKDAYS[i]}`, [...AV_STATES.map(([s, l]) => [l, () => setAv(p, i, s), c === s ? 'on' : '']),
+      ['Edit the hours or note…', () => availEditor(p, i)],
+      ...(avOf(p, i) ? [['Use the weekday / weekend settings', () => change(() => { p.avail[i] = null; if (p.avail.every((v) => !v)) delete p.avail; })]] : [])]);
+  }
   // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
   function availEditor(p, i) {
     const cur = JSON.parse(JSON.stringify(avOf(p, i) || avFromSets(p, i)));

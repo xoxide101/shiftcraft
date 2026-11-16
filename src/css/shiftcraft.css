@@ -120,6 +120,11 @@ table.t td .inline { gap: 4px; }
 table.t td .check.small { font-size: 12px; }
 .daytoggles button.dt { min-width: 26px; width: auto; padding: 0 5px; }
 .daytoggles button.dt.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+/* daily availability: green, yellow, red, black */
+.daytoggles button.dt.av-on { background: #c6e0b4; border-color: #8fbf73; color: #1c2330; }
+.daytoggles button.dt.av-hl { background: #ffff00; border-color: #c9c900; color: #1c2330; }
+.daytoggles button.dt.av-off { background: #ff7c7c; border-color: #e05050; color: #000; font-weight: 700; }
+.daytoggles button.dt.av-none { background: #000; border-color: #666; color: #fff; }
 .daytoggles button.pt.on { background: var(--good); border-color: var(--good); color: #fff; }
 .chip.na { opacity: .6; border-style: dashed; }
 .chip.na small::after { content: " · not available"; color: var(--bad); font-weight: 600; }
