@@ -83,7 +83,10 @@
       if (o.layout === 'cards') { const [pw, ph] = pageSize(), ppl = cardPeople(o.range), [cc, rr] = cardGrid(pw, ph, ppl.length), per = cc * rr, pages = Math.max(1, Math.ceil(ppl.length / per)); return Array.from({ length: pages }, (_, k) => ({ people: ppl.slice(k * per, (k + 1) * per), page: k + 1, pages, total: ppl.length })); }
       return o.range === 'all' ? Array.from({ length: plan.weeks }, (_, k) => k) : [weekOf(PD)];
     };
-    const draw = (item, opts) => (o.layout === 'cards' ? drawContactCards(item, opts) : o.layout === 'timeline' ? (o.range === 'weektile' ? drawWeekTiles(item, opts) : drawDaySheet(item, opts)) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
+    // every page gets the decorations laid over it (29-decorations.js), for the days it shows
+    const decoRange = (item) => { if (typeof item === 'string') { const m = mondayOf(item); return o.range === 'day' ? [item, item] : [m, addDays(m, 6)]; } if (typeof item === 'number') { const ds = weekDays(item); return [ds[0], ds[6]]; } if (item && item.start) return [item.start, addDays(item.start, item.weeks * 7 - 1)]; const m = mondayOf(iso(new Date())); return [m, addDays(m, 6)]; };
+    const draw = (item, opts) => { const [a, b] = decoRange(item); return decorateSurface(drawRaw(item, opts), a, b, opts.dpi); };
+    const drawRaw = (item, opts) => (o.layout === 'cards' ? drawContactCards(item, opts) : o.layout === 'timeline' ? (o.range === 'weektile' ? drawWeekTiles(item, opts) : drawDaySheet(item, opts)) : o.layout === 'calendar' ? drawCalendarSheet(item, opts) : drawWeekSheet(item, opts));
     const nameOf = (item) => (o.layout === 'cards' ? `${[plan.company, plan.location].filter(Boolean).join(' - ') || 'Team'} - contact cards${item.pages > 1 ? ' ' + item.page : ''}` : o.layout === 'timeline' ? (o.range === 'weektile' ? `${baseName(item, addDays(item, 6))} week timeline` : `${baseName(item, item)} timeline`) : o.layout === 'calendar' ? `${baseName(item.start, addDays(item.start, item.weeks * 7 - 1))} calendar` : baseName(...weekRange(item)));
     const RANGES = {
       avail: () => [['all', 'Everyone: one landscape page']],
@@ -113,20 +116,21 @@
         h('div', { class: 'inline' }, h('b', { class: 'small', style: { minWidth: '190px' } }, 'Cards per page:'), fitSel), addrInUse() ? null : h('span', { class: 'hint small' }, 'Address is set to not in use (Company & Location › Contact details we keep).'));
     };
     const sel = (key, options, label) => {
-      const s = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
+      const s = h('select', { class: 'input', onchange: () => { if (key === 'layout' && s.value === 'pretty') { md.close(); ui.tab = 'calendar'; persist(); render(); setTimeout(() => calPrintDialog(), 60); return; } // Calendar 2: the Calendar tab's own print window
+        o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
       return h('label', { class: 'field' }, h('span', null, label), s);
     };
     function build() {
       if (!RANGES[o.layout]) o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
+      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows: who works, high detail)'], ['pretty', 'Calendar 2: the month, pretty (holidays, time off, signs)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
         const ds = (key, opts, label) => { const x = h('select', { class: 'input', 'aria-label': label, onchange: () => { availDet[key] = x.value; saveAvailDet(); update(); } }, opts.map(([v, l]) => h('option', { value: v, selected: availDet[key] === v }, l))); return h('label', { class: 'field' }, h('span', null, label), x); };
         checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'));
         return; }
       // (nulls left out: replaceChildren would write them as the word “null”)
       box.replaceChildren(...[
-        sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
+        sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['calendar', 'Calendar (weeks as rows: who works, high detail)'], ['pretty', 'Calendar 2: the month, pretty (holidays, time off, signs)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
         o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
         o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
@@ -160,7 +164,7 @@
       preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
     };
     build();
-    modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, size, preview, pagePrev],
+    const md = modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, decoControls(() => update()), size, preview, pagePrev],
       actions: [{ label: 'Cancel' },
         { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {

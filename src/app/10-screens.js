@@ -36,7 +36,7 @@
         h('b', null, String(w + 1)), h('span', { class: 'muted small' }, ` ${shortDate(days[0])}–${parseIso(days[6]).getMonth() === parseIso(days[0]).getMonth() ? parseIso(days[6]).getDate() : shortDate(days[6])}`));
     }));
     const days = h('div', { class: 'days' }, weekDays(weekOf(ui.day)).map((d) => h('button', { class: 'day', 'aria-current': String(d === ui.day), onclick: () => { ui.day = d; persist(); render(); } },
-      h('b', null, `${dayName(d, 'short')} ${parseIso(d).getDate()}`), h('small', null, `${hrs(dayHours(d))} h · ${shiftsOn(d).length} ppl`))));
+      h('b', null, `${dayName(d, 'short')} ${parseIso(d).getDate()}`, ' ', eventsOn(d).filter((x) => markOf(x) && markOf(x) !== 'period' && !holEvent(x)).map((x) => h('span', { class: 'cal-wksign' + (x.movedFrom ? ' urgent' : ''), title: x.title }, markSvg(markOf(x))))), h('small', null, `${hrs(dayHours(d))} h · ${shiftsOn(d).length} ppl`)))); // the day's signs by its name
     return [weeks, days];
   }
 

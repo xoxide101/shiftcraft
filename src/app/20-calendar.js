@@ -450,6 +450,8 @@
     if (notesWhere !== 'off') main.append(h('div', { class: 'cal-pnotes al-sheet' + (notesWhere === 'separate' ? ' sep' : '') }, h('style', null, AL_CSS),
       h('h3', null, `Details · ${monthLabel(cal.ym)}`),
       availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, tables: calp.tables, condense: calp.condense, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
+    // printed: the decorations for these weeks, over every page
+    { const ov = decoOverlay(start, addDays(start, weeks * 7 - 1)); if (ov) main.append(ov); }
     main.append(usualHoursCard());
   }
   // the Calendar's print button: where the numbered notes go, then print
@@ -475,6 +477,7 @@
         cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'))),
       h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
       tablesBox,
+      h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => render())),
       h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks: requests, approved, store hours, events, holidays). The schedule calendar (who works each day) is in Print & share › Calendar.')],
     actions: [{ label: 'Cancel' }, { label: 'Print…', primary: true, onClick: () => { Object.assign(calp.grid, grid); Object.assign(calp.tables, tables); calp.condense = condense; calpSave(); setNotesWhere(where); render(); setTimeout(() => window.print(), 80); } }] });
   }
@@ -514,17 +517,26 @@
   function calStrip(d) {
     const sp = specialOn(d), ev = eventsOn(d), shut = !sp && usualOn(d) && usualOn(d).closed;
     if (!sp && !ev.length && !shut) return null;
-    return h('div', { class: 'cal-strip' },
-      shut ? h('button', { type: 'button', class: 'cal-chip special closed', title: `The store is usually closed on ${WEEKDAYS[dayIdx(d)]}s\nClick to see the usual hours`, onclick: () => { calGo(); setTimeout(() => $('#cal-usual')?.scrollIntoView({ block: 'center' }), 50); } }, `Store closed (usual on ${WEEKDAYS[dayIdx(d)]}s)`) : null,
-      sp ? h('button', { type: 'button', class: 'cal-chip special' + (sp.closed ? ' closed' : ''), title: `Special store hours${sp.note ? '\nNote: ' + sp.note : ''}\nClick to see or change them`, onclick: () => specialDialog(sp) },
-        `${sp.closed ? 'Store closed' : `Store open ${clock(sp.open)} – ${clock(sp.close)}`} · ${sp.name || 'special hours'}`) : null,
-      ev.map((x) => h('button', { type: 'button', class: 'cal-chip event', title: `Event${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => eventDialog(x) }, `${x.hours ? `${clockShort(x.hours[0])}–${clockShort(x.hours[1])} ` : ''}${x.title}`)));
+    const signed = ev.filter((x) => markOf(x) && !holEvent(x)), plain = ev.filter((x) => !signed.includes(x));
+    const open = (x) => eventDialog(x.series || x, null, x.occ);
+    return h('div', { class: 'cal-strip-wrap' },
+      // the day's signs on a line of their own: what happens today (produce, the truck, payday…), in words
+      signed.length ? h('div', { class: 'cal-signs' }, signed.map((x) => { const k = markOf(x);
+        return h('button', { type: 'button', class: 'cal-sign' + (x.movedFrom ? ' urgent' : ''), title: `${x.title}${x.hours ? ` · ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''}${x.movedFrom ? `\nMoved here from ${dayName(x.movedFrom, 'short')} ${shortDate(x.movedFrom)}: the store is closed that day` : ''}${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => open(x) },
+          k === 'period' ? h('span', { class: 'cal-eop-key' }, String(parseIso(d).getDate())) : markSvg(k), ` ${x.title}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}`); })) : null,
+      shut || sp || plain.length ? h('div', { class: 'cal-strip' },
+        shut ? h('button', { type: 'button', class: 'cal-chip special closed', title: `The store is usually closed on ${WEEKDAYS[dayIdx(d)]}s\nClick to see the usual hours`, onclick: () => { calGo(); setTimeout(() => $('#cal-usual')?.scrollIntoView({ block: 'center' }), 50); } }, `Store closed (usual on ${WEEKDAYS[dayIdx(d)]}s)`) : null,
+        sp ? h('button', { type: 'button', class: 'cal-chip special' + (sp.closed ? ' closed' : ''), title: `Special store hours${sp.note ? '\nNote: ' + sp.note : ''}\nClick to see or change them`, onclick: () => specialDialog(sp) },
+          `${sp.closed ? 'Store closed' : `Store open ${clock(sp.open)} – ${clock(sp.close)}`} · ${sp.name || 'special hours'}`) : null,
+        plain.map((x) => h('button', { type: 'button', class: 'cal-chip event', title: `Event${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => open(x) }, `${x.hours ? `${clockShort(x.hours[0])}–${clockShort(x.hours[1])} ` : ''}${x.title}`))) : null);
   }
-  // a small line under the day in the Week's heading
+  // a small line under the day in the Week's heading: special hours, the day's signs (small pictures), other events
   function calMark(d) {
     const sp = specialOn(d), ev = eventsOn(d), shut = !sp && usualOn(d) && usualOn(d).closed;
     if (!sp && !ev.length && !shut) return null;
-    if (shut && !ev.length) return h('div', { class: 'cal-mark', title: 'The store is usually closed this day' }, h('span', { class: 'bad' }, 'Closed'));
-    const tip = [sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()}` : '', ...ev.map((x) => `${x.hours ? clockShort(x.hours[0]) + ' ' : ''}${x.title}`)].filter(Boolean).join('\n');
-    return h('div', { class: 'cal-mark', title: tip }, sp ? h('span', { class: sp.closed ? 'bad' : 'warn' }, specialShort(sp)) : null, sp && ev.length ? ' · ' : '', ev.length ? `★ ${ev.length}` : '');
+    if (shut && !ev.length) return h('div', { class: 'cal-wkmark', title: 'The store is usually closed this day' }, h('span', { class: 'bad' }, 'Closed'));
+    const signed = ev.filter((x) => markOf(x) && !holEvent(x)), rest = ev.length - signed.length;
+    const tip = [sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()}` : '', ...ev.map((x) => `${x.hours ? clockShort(x.hours[0]) + ' ' : ''}${x.title}${x.movedFrom ? ' (moved here: closed ' + shortDate(x.movedFrom) + ')' : ''}`)].filter(Boolean).join('\n');
+    return h('div', { class: 'cal-wkmark', title: tip }, sp ? h('span', { class: sp.closed ? 'bad' : 'warn' }, specialShort(sp)) : null, sp && ev.length ? ' · ' : '',
+      signed.map((x) => h('span', { class: 'cal-wksign' + (x.movedFrom ? ' urgent' : '') }, markOf(x) === 'period' ? h('span', { class: 'cal-eop-key small' }, 'EOP') : markSvg(markOf(x)))), rest ? ` ★ ${rest}` : '');
   }

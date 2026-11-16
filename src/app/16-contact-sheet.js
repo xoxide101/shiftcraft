@@ -306,6 +306,7 @@
     const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
     const g = c.getContext('2d'); if (!g) throw new Error('too big');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    { const m = mondayOf(iso(new Date())); decorateSurface(c, m, addDays(m, 6), dpi); } // the decorations, laid over
     return { canvas: c, svg, pg, sheet: sh };
   }
   // A one-page PDF holding a JPEG picture of the page, wIn × hIn inches: written by hand (header, catalogue, page, image,
