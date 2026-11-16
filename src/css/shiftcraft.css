@@ -440,3 +440,11 @@ table.cal td.cal-day { padding: 0; }
   .cal-mark-ic, .cal-mark-ic.payday, .cal-mark-ic.truck, .cal-mark-ic.inventory, .cal-mark-ic.insurance, .cal-mark-ic.meeting, .cal-mark-ic.produce { color: #000 !important; }
   .cal-legend { color: #000; }
 }
+/* moved off a closed holiday to the day before: inverted, urgent (a solid white circle with the sign in it) */
+.cal-mark.urgent .cal-mark-ic { display: inline-block; background: #fff; border: 2px solid #fff; border-radius: 50%; padding: 2px; line-height: 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.cal-mark.urgent .cal-mark-ic svg { width: 15px; height: 15px; stroke-width: 2.4; vertical-align: 0; }
+.cal-chip.urgent { background: #fff !important; color: #000 !important; font-weight: 700; border-color: #fff; }
+@media print {
+  .cal-mark.urgent .cal-mark-ic { background: #000 !important; border-color: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cal-chip.urgent { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

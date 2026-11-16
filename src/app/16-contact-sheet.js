@@ -159,7 +159,7 @@
     // 3 · store events
     const ev = eventsIn(a, b).filter((x) => (!o.show || o.show.event) && !holEvent(x)).sort((x, y) => x.from.localeCompare(y.from) || (x.hours ? x.hours[0] : -1) - (y.hours ? y.hours[0] : -1));
     const events = box(`Events · ${span}`, ['34%', '30%', ''], ['When', 'Event', 'Note'],
-      ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
+      ev.map((x) => tr(x.movedFrom ? 'al-dspecial' : '', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title + (x.movedFrom ? ` (moved from ${shortDate(x.movedFrom)}: closed)` : ''), x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them
     // the list's holidays, and events that are holidays (ticked, or named like one); one row a day and name
     const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x, type: holEventType(x) })), ...holidaysFrom(a, 60).filter((x) => x.date <= b && !eventsOn(x.date).some((e) => e.replaces === x.name)).map((x) => ({ ...x, type: NATIONAL.has(x.name) ? 'national' : 'local' }))]

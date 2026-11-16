@@ -44,7 +44,24 @@
   // the days as short runs: Mon–Sat, or Wed, Sat
   const dayRuns = (days) => { const d = [...new Set(days)].sort(), out = []; for (let i = 0; i < d.length;) { let j = i; while (j + 1 < d.length && d[j + 1] === d[j] + 1) j++; const A = WEEKDAYS[d[i]].slice(0, 3), B = WEEKDAYS[d[j]].slice(0, 3); out.push(j - i >= 2 ? `${A}–${B}` : j > i ? `${A}, ${B}` : A); i = j + 1; } return out.join(', '); };
   const repeatText = (r) => { const u = REPEAT_UNITS.find(([k]) => k === r.unit) || REPEAT_UNITS[1], n = Math.max(1, r.every | 0); return `every ${n === 1 ? u[1] : n === 2 && r.unit === 'week' ? 'other week' : n + ' ' + u[2]}${r.unit === 'week' && Array.isArray(r.days) && r.days.length ? ' on ' + dayRuns(r.days) : ''}${r.until ? ' until ' + shortDate(r.until) : ''}`; };
-  const eventsIn = (a, b) => (plan.events || []).flatMap((x) => (x.repeat ? repeatStarts(x, a, b).map((s) => ({ ...x, from: s, to: addDays(s, dayDiff(x.from, x.to)), series: x, occ: s })) : x.from <= b && x.to >= a ? [x] : []));
+  // A one-day repeating event (produce, the truck, payday…) that falls on a day the store is closed for special hours
+  // (a holiday: Thanksgiving) moves to the open day before it, marked movedFrom (shown inverted: urgent). If that day
+  // already has it, that one is marked instead (a double order). End of period stays on its date.
+  const shutForHoliday = (d) => { const sp = specialOn(d); return !!(sp && sp.closed); };
+  const openOn = (d) => { const st = storeHoursOn(d); return !st || !st.closed; };
+  const eventsIn = (a, b) => (plan.events || []).flatMap((x) => {
+    if (!x.repeat) return x.from <= b && x.to >= a ? [x] : [];
+    const len = dayDiff(x.from, x.to), mv = len === 0 && markOf(x) !== 'period', out = [];
+    for (const s of repeatStarts(x, a, mv ? addDays(b, 7) : b)) {
+      let d = s, moved = '';
+      if (mv && shutForHoliday(s)) { d = addDays(s, -1); for (let i = 0; i < 7 && !openOn(d); i++) d = addDays(d, -1); moved = s; }
+      if (addDays(d, len) < a || d > b) continue;
+      const there = out.find((o) => o.from === d);
+      if (there) { if (moved && !there.movedFrom) there.movedFrom = moved; continue; }
+      out.push({ ...x, from: d, to: addDays(d, len), series: x, occ: moved || s, ...(moved ? { movedFrom: moved } : {}) });
+    }
+    return out.sort((p, q) => p.from.localeCompare(q.from));
+  });
   const eventsOn = (d) => eventsIn(d, d).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
   // ---------- Usual store hours, Monday to Sunday ----------
   // plan.hours.days = 7 entries, Monday first: { open, close } | { closed: true } | null (not set). One list, edited on the
@@ -282,10 +299,10 @@
   const calStatus = (it) => (it.kind === 'timeoff' ? TIME_OFF_STATUS[it.status] || '' : it.kind === 'special' ? (it.x.closed ? 'Closed' : 'Special hours') : '');
   const calWhat = (it) => (it.kind === 'timeoff' ? `${it.who} · ${it.title}` : it.title);
   const calText = (it) => [CAL_KIND[it.kind], it.who, it.title, it.note, calHours(it), calStatus(it), datesOnly(it), it.from, it.to, it.kind === 'timeoff' && it.status === 'requested' ? 'request' : ''].join(' ').toLowerCase();
-  const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, it.kind === 'event' && it.x.repeat ? 'Repeats ' + repeatText(it.x.repeat) : '', calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
+  const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, it.x && it.x.movedFrom ? `Moved here from ${dayName(it.x.movedFrom, 'short')} ${shortDate(it.x.movedFrom)}: the store is closed that day` : '', it.kind === 'event' && it.x.repeat ? 'Repeats ' + repeatText(it.x.repeat) : '', calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
   const calChipText = (it) => (it.kind === 'special' ? it.title /* the hours (or Closed) are by the date */ : it.kind === 'event' ? `${it.x.repeat ? '↻ ' : ''}${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
     : `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.title}${it.hours ? ` ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
-  const calChip = (it) => h('button', { type: 'button', class: `cal-chip ${it.kind} ${it.status}`, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } }, calChipText(it));
+  const calChip = (it) => h('button', { type: 'button', class: `cal-chip ${it.kind} ${it.status}${it.x && it.x.movedFrom ? ' urgent' : ''}`, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } }, calChipText(it));
   const calOrder = (a, b) => ['special', 'event', 'timeoff'].indexOf(a.kind) - ['special', 'event', 'timeoff'].indexOf(b.kind) || (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1) || calWhat(a).localeCompare(calWhat(b));
 
   // what the Calendar shows (kept in this browser, and in Save everything with the other choices)
@@ -405,7 +422,7 @@
           h('button', { type: 'button', class: 'cal-num' + (eop ? ' eop' : ''), title: `${longDate(d)}${eop ? ' · ' + eop.title : ''}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
           eop && notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(eop))) : null,
           // the signs next to the date (payday, truck, inventory, insurance, meeting)
-          marked.filter((it) => it !== eop).map((it) => h('button', { type: 'button', class: 'cal-mark', title: calTip(it), 'aria-label': it.title, onclick: (e) => { e.stopPropagation(); calOpen(it); } }, markSvg(markOf(it.x)), notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(it))) : null)),
+          marked.filter((it) => it !== eop).map((it) => h('button', { type: 'button', class: 'cal-mark' + (it.x.movedFrom ? ' urgent' : ''), title: calTip(it), 'aria-label': it.title, onclick: (e) => { e.stopPropagation(); calOpen(it); } }, markSvg(markOf(it.x)), notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(it))) : null)),
           n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
