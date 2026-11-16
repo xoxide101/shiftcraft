@@ -23,7 +23,7 @@
     else L.push(`DTSTART;VALUE=DATE:${icsDay(from)}`, `DTEND;VALUE=DATE:${icsDay(addDays(to, 1))}`);
     // a repeating store event: its rule, and the times left out
     if (repeat) {
-      L.push(`RRULE:FREQ=${{ day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', mlast: 'MONTHLY', year: 'YEARLY' }[repeat.unit] || 'WEEKLY'};INTERVAL=${Math.max(1, repeat.every | 0)}${repeat.unit === 'mlast' ? ';BYMONTHDAY=-1' : ''}${repeat.until ? ';UNTIL=' + icsDay(repeat.until) : ''}`);
+      L.push(`RRULE:FREQ=${{ day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', mlast: 'MONTHLY', year: 'YEARLY' }[repeat.unit] || 'WEEKLY'};INTERVAL=${Math.max(1, repeat.every | 0)}${repeat.unit === 'mlast' ? ';BYMONTHDAY=-1' : ''}${repeat.unit === 'week' && Array.isArray(repeat.days) && repeat.days.length ? ';BYDAY=' + repeat.days.map((d) => ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'][d]).join(',') : ''}${repeat.until ? ';UNTIL=' + icsDay(repeat.until) : ''}`);
       (skip || []).forEach((d) => L.push(hours ? `EXDATE:${icsAt(d, hours[0])}` : `EXDATE;VALUE=DATE:${icsDay(d)}`));
     }
     L.push(`SUMMARY:${icsEsc(summary)}`);
@@ -126,12 +126,13 @@
       else {
         const unit = { DAILY: 'day', WEEKLY: 'week', MONTHLY: r.BYMONTHDAY === '-1' ? 'mlast' : 'month', YEARLY: 'year' }[r.FREQ], every = Math.max(1, Math.min(99, parseInt(r.INTERVAL, 10) || 1));
         // kept as it is when it is one day a week / month / year; several weekdays (BYDAY=MO,WE) or "the 2nd Tuesday" are not
-        const odd = (r.FREQ === 'WEEKLY' && r.BYDAY && r.BYDAY.split(',').length > 1) || (r.FREQ === 'MONTHLY' && r.BYDAY) || (r.FREQ === 'YEARLY' && r.BYDAY);
+        const wd = r.FREQ === 'WEEKLY' && r.BYDAY ? r.BYDAY.split(',').map((x) => ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].indexOf(x.trim().toUpperCase())) : null;
+        const odd = (wd && wd.some((x) => x < 0)) || (r.FREQ === 'MONTHLY' && r.BYDAY) || (r.FREQ === 'YEARLY' && r.BYDAY);
         if (unit && !odd) {
           let until = '';
           if (r.UNTIL) { const u = icsWhen(r.UNTIL); if (u) until = u.d; }
-          else if (r.COUNT) { const all = repeatStarts({ from, to: from, repeat: { every, unit, until: '' } }, from, addDays(from, 366 * 40)); until = all[Math.max(1, +r.COUNT) - 1] || ''; }
-          rule = { every, unit, until };
+          else if (r.COUNT) { const all = repeatStarts({ from, to: from, repeat: { every, unit, until: '', ...(wd && wd.length ? { days: wd } : {}) } }, from, addDays(from, 366 * 40)); until = all[Math.max(1, +r.COUNT) - 1] || ''; }
+          rule = { every, unit, until, ...(wd && wd.length ? { days: [...new Set(wd)].sort() } : {}) };
           skip = String(e.EXDATE || '').split(',').map((v) => icsWhen(v.trim())).filter(Boolean).map((w) => w.d);
           repeat = repeatText(rule);
         } else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';

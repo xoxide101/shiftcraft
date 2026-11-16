@@ -21,6 +21,18 @@
   const monthStep = (d, n, last) => { const [y, m, dd] = d.split('-').map(Number), dim = new Date(y, m + n, 0).getDate(); return iso(new Date(y, m - 1 + n, last ? dim : Math.min(dd, dim))); };
   function repeatStarts(x, a, b) {
     const r = x.repeat, n = Math.max(1, r.every | 0), len = dayDiff(x.from, x.to), out = [];
+    // every week (or every n weeks) on some days: repeat.days = [0–6], Monday first (produce Monday to Saturday)
+    if (r.unit === 'week' && Array.isArray(r.days) && r.days.length) {
+      const w0 = mondayOf(x.from), days = [...new Set(r.days)].filter((d) => d >= 0 && d <= 6).sort();
+      for (let k = Math.max(0, Math.floor((dayDiff(w0, a) - len) / (7 * n)) - 1), i = 0; i < 3000; i++, k++) {
+        const ws = addDays(w0, k * n * 7); if (ws > b || (r.until && ws > r.until)) break;
+        for (const d of days) {
+          const s = addDays(ws, d); if (s < x.from || s > b || (r.until && s > r.until)) continue;
+          if (addDays(s, len) >= a && !(x.skip || []).includes(s)) out.push(s);
+        }
+      }
+      return out;
+    }
     const at = (k) => (r.unit === 'day' ? addDays(x.from, k * n) : r.unit === 'week' ? addDays(x.from, k * n * 7) : r.unit === 'year' ? monthStep(x.from, k * n * 12) : monthStep(x.from, k * n, r.unit === 'mlast'));
     const most = { day: 1, week: 7, year: 366 }[r.unit] || 31; // start a little before a: never past it
     for (let k = Math.max(0, Math.floor((dayDiff(x.from, a) - len) / (most * n)) - 2), i = 0; i < 3000; i++, k++) {
@@ -29,7 +41,9 @@
     }
     return out;
   }
-  const repeatText = (r) => { const u = REPEAT_UNITS.find(([k]) => k === r.unit) || REPEAT_UNITS[1], n = Math.max(1, r.every | 0); return `every ${n === 1 ? u[1] : n === 2 && r.unit === 'week' ? 'other week' : n + ' ' + u[2]}${r.until ? ' until ' + shortDate(r.until) : ''}`; };
+  // the days as short runs: Mon–Sat, or Wed, Sat
+  const dayRuns = (days) => { const d = [...new Set(days)].sort(), out = []; for (let i = 0; i < d.length;) { let j = i; while (j + 1 < d.length && d[j + 1] === d[j] + 1) j++; const A = WEEKDAYS[d[i]].slice(0, 3), B = WEEKDAYS[d[j]].slice(0, 3); out.push(j - i >= 2 ? `${A}–${B}` : j > i ? `${A}, ${B}` : A); i = j + 1; } return out.join(', '); };
+  const repeatText = (r) => { const u = REPEAT_UNITS.find(([k]) => k === r.unit) || REPEAT_UNITS[1], n = Math.max(1, r.every | 0); return `every ${n === 1 ? u[1] : n === 2 && r.unit === 'week' ? 'other week' : n + ' ' + u[2]}${r.unit === 'week' && Array.isArray(r.days) && r.days.length ? ' on ' + dayRuns(r.days) : ''}${r.until ? ' until ' + shortDate(r.until) : ''}`; };
   const eventsIn = (a, b) => (plan.events || []).flatMap((x) => (x.repeat ? repeatStarts(x, a, b).map((s) => ({ ...x, from: s, to: addDays(s, dayDiff(x.from, x.to)), series: x, occ: s })) : x.from <= b && x.to >= a ? [x] : []));
   const eventsOn = (d) => eventsIn(d, d).sort((a, b) => (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1));
   // ---------- Usual store hours, Monday to Sunday ----------
@@ -201,10 +215,17 @@
     const until = dateIn((r0 && r0.until) || '');
     const repSeg = calSeg('Repeats', [['none', 'Never'], ['w1', 'Every week'], ['w2', 'Every other week'], ['m1', 'Every month'], ['other', 'Other…']], rep, (v) => { rep = v; sync(); });
     const otherRow = h('div', { class: 'inline' }, h('span', null, 'Every'), every, unit);
+    // weekly: the days it happens (several: produce Monday to Saturday, the truck Wednesday and Saturday)
+    let wdays = r0 && Array.isArray(r0.days) && r0.days.length ? [...r0.days] : null; // null: the first day's weekday
+    const dayBtns = h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days it happens' });
+    const drawDays = () => { const on = wdays || (from.value ? [dayIdx(from.value)] : []); dayBtns.replaceChildren(...WEEKDAYS.map((w, i) => h('button', { type: 'button', class: 'dt use' + (on.includes(i) ? ' on' : ''), 'aria-pressed': String(on.includes(i)), title: w,
+      onclick: () => { const cur2 = wdays || (from.value ? [dayIdx(from.value)] : []); const next = cur2.includes(i) ? cur2.filter((x) => x !== i) : [...cur2, i]; wdays = next.length ? next.sort() : cur2; sync(); } }, w.slice(0, 3)))); };
+    const daysRow = h('div', { class: 'field' }, h('span', null, 'On these days'), dayBtns);
     const untilRow = h('div', { class: 'field' }, h('span', null, 'Stop after (optional: empty keeps repeating)'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, until,
       h('button', { type: 'button', class: 'btn sm ghost', title: 'Empty it: keep repeating', 'aria-label': 'Empty the stop date', onclick: () => { until.value = ''; sync(); } }, '×')));
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
-    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value && until.value > from.value ? until.value : '' }); // a stop on or before the first day is ignored
+    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value && until.value > from.value ? until.value : '',
+      ...((rep === 'w1' || rep === 'w2' || (rep === 'other' && unit.value === 'week')) && wdays && !(wdays.length === 1 && from.value && wdays[0] === dayIdx(from.value)) ? { days: [...wdays] } : {}) }); // a stop on or before the first day is ignored
     const markSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Sign by the date' }, h('option', { value: '' }, 'From the name'), h('option', { value: 'none', selected: cur.mark === 'none' }, 'None (an entry)'),
       CAL_MARKS.map(([k, l]) => h('option', { value: k, selected: cur.mark === k }, k === 'period' ? 'End of period (a box around the date)' : l)));
     const holNow = holEventType({ ...cur, from: cur.from || at, title: cur.title || '' });
@@ -217,6 +238,7 @@
     const sync = () => {
       if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : '';
       const r = ruleOf(); otherRow.style.display = rep === 'other' ? '' : 'none'; untilRow.style.display = nextInfo.style.display = r ? '' : 'none';
+      daysRow.style.display = r && r.unit === 'week' ? '' : 'none'; drawDays();
       if (r && from.value) { const t = iso(new Date()), a = from.value > t ? from.value : t, s = repeatStarts({ from: from.value, to: to.value || from.value, repeat: r, skip: cur.skip }, a, addDays(a, 1200)).slice(0, 6);
         nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}${until.value && until.value <= from.value ? ' (The stop date is on or before the first day, so it is left out.)' : ''}`; }
     };
@@ -243,7 +265,7 @@
       h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
       fieldOf('What', title), picks, pair2(fieldOf('Holiday (a solid bar along the bottom of the day)', holSel), fieldOf('Sign by the date', markSel)), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
       h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
-      h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
+      h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, daysRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
   }
 
   // ---------- Everything on the calendar, as one list ----------
