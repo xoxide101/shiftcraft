@@ -2834,9 +2834,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const until = dateIn((r0 && r0.until) || '');
     const repSeg = calSeg('Repeats', [['none', 'Never'], ['w1', 'Every week'], ['w2', 'Every other week'], ['m1', 'Every month'], ['other', 'Other…']], rep, (v) => { rep = v; sync(); });
     const otherRow = h('div', { class: 'inline' }, h('span', null, 'Every'), every, unit);
-    const untilRow = fieldOf('Until (leave empty for no end)', until);
+    const untilRow = h('div', { class: 'field' }, h('span', null, 'Stop after (optional: empty keeps repeating)'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, until,
+      h('button', { type: 'button', class: 'btn sm ghost', title: 'Empty it: keep repeating', 'aria-label': 'Empty the stop date', onclick: () => { until.value = ''; sync(); } }, '×')));
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
-    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
+    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value && until.value > from.value ? until.value : '' }); // a stop on or before the first day is ignored
     const markSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Sign by the date' }, h('option', { value: '' }, 'From the name'), h('option', { value: 'none', selected: cur.mark === 'none' }, 'None (an entry)'),
       CAL_MARKS.map(([k, l]) => h('option', { value: k, selected: cur.mark === k }, k === 'period' ? 'End of period (a box around the date)' : l)));
     const holNow = holEventType({ ...cur, from: cur.from || at, title: cur.title || '' });
@@ -2850,9 +2851,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : '';
       const r = ruleOf(); otherRow.style.display = rep === 'other' ? '' : 'none'; untilRow.style.display = nextInfo.style.display = r ? '' : 'none';
       if (r && from.value) { const t = iso(new Date()), a = from.value > t ? from.value : t, s = repeatStarts({ from: from.value, to: to.value || from.value, repeat: r, skip: cur.skip }, a, addDays(a, 1200)).slice(0, 6);
-        nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}`; }
+        nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}${until.value && until.value <= from.value ? ' (The stop date is on or before the first day, so it is left out.)' : ''}`; }
     };
-    [from, to, every, until].forEach((e) => e.addEventListener('input', sync)); unit.addEventListener('change', sync);
+    [from, to, every, until].forEach((e) => { e.addEventListener('input', sync); e.addEventListener('change', sync); }); unit.addEventListener('change', sync);
     sync();
     const actions = [{ label: 'Cancel' }];
     if (x) actions.unshift({ label: x.repeat ? 'Delete every time' : 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.events = plan.events.filter((y) => y.id !== x.id); if (!plan.events.length) delete plan.events; }); toast('Event deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
@@ -2862,7 +2863,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (!t) { toast('Give the event a name.'); title.focus(); return false; }
       if (!from.value) { toast('Pick the day.'); return false; }
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
-      const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
+      const r = ruleOf();
       const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}), ...(cur.replaces ? { replaces: cur.replaces } : {}),
         ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}), ...(markSel.value ? { mark: markSel.value } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
@@ -3234,6 +3235,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const m = icsLine(raw); if (!m) return;
       if (m.name === 'BEGIN') { if (!cur && m.value.trim().toUpperCase() === 'VEVENT') { cur = { _p: {} }; depth = 0; } else if (cur) depth++; return; }
       if (m.name === 'END') { if (!cur) return; if (depth === 0 && m.value.trim().toUpperCase() === 'VEVENT') { evs.push(cur); cur = null; } else depth--; return; }
+      if (cur && depth === 0 && m.name === 'EXDATE') { cur.EXDATE = (cur.EXDATE ? cur.EXDATE + ',' : '') + m.value; return; }
       if (cur && depth === 0 && !(m.name in cur)) { cur[m.name] = m.value; cur._p[m.name] = m.params; }
     });
     return evs;
@@ -3256,15 +3258,27 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (endD > s.d && !(endD === addDays(s.d, 1) && endT === 0)) { if (s.t === 0 && endT === 0) to = addDays(endD, -1); else to = endD; } // over several days: whole days
       else { const a = Math.min(snap(s.t), 1410), b = endD > s.d ? 1425 : Math.min(snap(endT), 1425); hours = [a, Math.max(a + 15, b)]; }
     }
-    let repeat = '';
+    let repeat = '', rule = null, skip = [];
     if (e.RRULE) {
       const r = Object.fromEntries(e.RRULE.split(';').map((kv) => kv.split('=')).map(([k, v]) => [String(k).toUpperCase(), v]));
       if (r.FREQ === 'DAILY' && (!r.INTERVAL || r.INTERVAL === '1') && (r.COUNT || r.UNTIL) && from === to) { if (r.COUNT) to = addDays(from, Math.max(1, +r.COUNT) - 1); else { const u = icsWhen(r.UNTIL); if (u) to = u.d; } }
-      else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
+      else {
+        const unit = { DAILY: 'day', WEEKLY: 'week', MONTHLY: r.BYMONTHDAY === '-1' ? 'mlast' : 'month', YEARLY: 'year' }[r.FREQ], every = Math.max(1, Math.min(99, parseInt(r.INTERVAL, 10) || 1));
+        // kept as it is when it is one day a week / month / year; several weekdays (BYDAY=MO,WE) or "the 2nd Tuesday" are not
+        const odd = (r.FREQ === 'WEEKLY' && r.BYDAY && r.BYDAY.split(',').length > 1) || (r.FREQ === 'MONTHLY' && r.BYDAY) || (r.FREQ === 'YEARLY' && r.BYDAY);
+        if (unit && !odd) {
+          let until = '';
+          if (r.UNTIL) { const u = icsWhen(r.UNTIL); if (u) until = u.d; }
+          else if (r.COUNT) { const all = repeatStarts({ from, to: from, repeat: { every, unit, until: '' } }, from, addDays(from, 366 * 40)); until = all[Math.max(1, +r.COUNT) - 1] || ''; }
+          rule = { every, unit, until };
+          skip = String(e.EXDATE || '').split(',').map((v) => icsWhen(v.trim())).filter(Boolean).map((w) => w.d);
+          repeat = repeatText(rule);
+        } else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
+      }
     }
     if (to < from) to = from;
     const X = (k) => (e['X-SHIFTCRAFT-' + k] != null ? icsUnesc(e['X-SHIFTCRAFT-' + k]).trim() : '');
-    return { uid: (e.UID || '').trim(), id: X('ID').replace(/[^\w-]/g, '').slice(0, 40), kind: X('KIND'), from, to, hours, repeat,
+    return { uid: (e.UID || '').trim(), id: X('ID').replace(/[^\w-]/g, '').slice(0, 40), kind: X('KIND'), from, to, hours, repeat, rule, skip,
       summary: icsUnesc(e.SUMMARY).replace(/\s+/g, ' ').trim(), desc: icsUnesc(e.DESCRIPTION).trim(), cancelled: String(e.STATUS || '').trim().toUpperCase() === 'CANCELLED',
       person: X('PERSON'), why: X('WHY'), status: X('STATUS'), paid: X('PAID'), note: X('NOTE'), name: X('NAME'), title: X('TITLE'), closed: X('CLOSED'), open: parseInt(X('OPEN'), 10), close: parseInt(X('CLOSE'), 10) };
   }
@@ -3309,6 +3323,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function icalImportDialog(text, fileName) {
     const today = iso(new Date());
     const found = icsParse(text).map(icsItem).filter(Boolean).sort((a, b) => a.from.localeCompare(b.from));
+    const upcoming = (it) => it.to >= today || !!(it.rule && (!it.rule.until || it.rule.until >= today));
     if (!found.length) { toast(`No calendar entries found in ${fileName}.`); return; }
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     let defStatus = 'requested';
@@ -3316,16 +3331,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const ex = icsFind(it);
       const already = !ex && ((plan.events || []).some((x) => x.from === it.from && x.title.toLowerCase() === it.summary.toLowerCase())
         || (plan.specialHours || []).some((x) => x.from === it.from && (x.name || '').toLowerCase() === (it.name || it.summary).toLowerCase()));
-      const tick = h('input', { type: 'checkbox', checked: !already && it.to >= today, 'aria-label': 'Bring this one in' });
+      const tick = h('input', { type: 'checkbox', checked: !already && upcoming(it), 'aria-label': 'Bring this one in' });
       const as = h('select', { class: 'input', 'aria-label': 'Add as' },
         h('option', { value: 'event' }, 'Event (a note for the day)'), h('option', { value: 'closed' }, 'Store closed'), h('option', { value: 'special' }, 'Store open other hours'),
         h('optgroup', { label: 'Time off for' }, people.map((p) => h('option', { value: 'off:' + p.id }, p.name))));
       as.value = icsGuess(it, ex);
       if (!as.value) as.value = 'event';
-      const state = ex ? h('span', { class: 'small good' }, 'Updates the one in ShiftCraft') : already ? h('span', { class: 'small muted' }, 'Looks already there') : it.to < today ? h('span', { class: 'small muted' }, 'Past') : h('span', { class: 'small' }, 'New');
+      const state = ex ? h('span', { class: 'small good' }, 'Updates the one in ShiftCraft') : already ? h('span', { class: 'small muted' }, 'Looks already there') : !upcoming(it) ? h('span', { class: 'small muted' }, 'Past') : h('span', { class: 'small' }, 'New');
       const tr = h('tr', null, h('td', { class: 'c' }, tick), h('td', { class: 'nowrap small' }, timeOffWhen(it)),
         h('td', { style: { minWidth: '240px' } }, h('b', null, it.summary || '(no title)'), it.desc ? h('div', { class: 'small muted', style: { maxWidth: '320px', whiteSpace: 'pre-line', overflow: 'hidden', maxHeight: '3.4em' } }, it.desc) : null,
-          it.repeat ? h('div', { class: 'small warn' }, `Repeats ${it.repeat}: only this first one comes in`) : null),
+          it.rule ? h('div', { class: 'small good' }, `↻ Repeats ${it.repeat} (as an event)`) : it.repeat ? h('div', { class: 'small warn' }, `Repeats ${it.repeat}: only this first one comes in`) : null),
         h('td', null, as), h('td', { class: 'nowrap' }, state));
       return { it, ex, tick, as, tr };
     });
@@ -3334,7 +3349,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     modal({ title: `Import calendar · ${fileName}`, wide: true, body: [
       h('p', { class: 'hint', style: { marginTop: 0 } }, `${found.length} entr${found.length === 1 ? 'y' : 'ies'} found${found.length > rows.length ? ` (the first ${rows.length} are shown)` : ''}. Tick the ones to bring in and say what each one is: an event, the store closed or open other hours (a holiday), or time off for someone. A name in the entry picks the person.`),
       h('div', { class: 'inline' }, h('span', { class: 'small' }, 'Tick:'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => true) }, 'All'),
-        h('button', { type: 'button', class: 'btn sm', onclick: () => pick((r) => r.it.to >= today) }, 'Now and coming up'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => false) }, 'None'),
+        h('button', { type: 'button', class: 'btn sm', onclick: () => pick((r) => upcoming(r.it)) }, 'Now and coming up'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => false) }, 'None'),
         h('span', { class: 'spacer' }), h('span', { class: 'small' }, 'Time off that doesn’t say is'), seg),
       h('div', { class: 'table-wrap', style: { maxHeight: '52vh', overflow: 'auto', marginTop: '8px' } }, h('table', { class: 't compact' },
         h('thead', null, h('tr', null, h('th', { class: 'c' }, 'In'), h('th', null, 'When'), h('th', null, 'Entry'), h('th', null, 'Add as'), h('th', null, ''))), h('tbody', null, rows.map((r) => r.tr)))),
@@ -3354,7 +3369,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           const id = ex ? ex.x.id : it.id || uid(), ics = it.uid && !it.uid.endsWith('@shiftcraft') ? { ics: it.uid.slice(0, 300) } : {};
           const note = (it.note || it.desc || '').slice(0, 300);
           const v = as.value;
-          if (v === 'event') { (plan.events = plan.events || []).push({ id, from: it.from, to: it.to, title: (it.title || it.summary || 'Event').slice(0, 120), hours: it.hours, note: (it.note || it.desc || '').slice(0, 500), ...ics }); n.event++; }
+          if (v === 'event') { (plan.events = plan.events || []).push({ id, from: it.from, to: it.to, title: (it.title || it.summary || 'Event').slice(0, 120), hours: it.hours, note: (it.note || it.desc || '').slice(0, 500), ...ics, ...(it.rule ? { repeat: it.rule, ...(it.skip.length ? { skip: it.skip } : {}) } : {}) }); n.event++; }
           else if (v === 'closed' || v === 'special') {
             const r = regularHours(it.from) || { open: 600, close: 960 };
             const open = Number.isFinite(it.open) ? it.open : it.hours ? it.hours[0] : r.open, close = Number.isFinite(it.close) && it.close > open ? it.close : it.hours ? it.hours[1] : Math.max(r.close, open + 60);
@@ -3897,7 +3912,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (p.hours && p.hours.days !== undefined) p.hours = { days: Array.from({ length: 7 }, (_, i) => { const x = Array.isArray(p.hours.days) ? p.hours.days[i] : null; return !x ? null : x.closed ? { closed: true } : Number.isFinite(x.open) && Number.isFinite(x.close) && x.close > x.open ? { open: x.open, close: x.close } : null; }) };
       if (p.events !== undefined) { p.events = Array.isArray(p.events) ? p.events.filter((x) => x && okd(x.from)).map((x) => ({ id: x.id || uid(), from: x.from, to: to(x), title: String(x.title || 'Event').slice(0, 120), hours: okh(x.hours) ? [x.hours[0], x.hours[1]] : null, note: String(x.note || '').slice(0, 500), ...ics(x),
         // repeating (every n days / weeks / months / years, until a day), the times left out, holiday kind, sign by the date, the built-in holiday it stands for
-        ...(x.repeat && ['day', 'week', 'month', 'mlast', 'year'].includes(x.repeat.unit) ? { repeat: { every: Math.max(1, Math.min(99, x.repeat.every | 0)), unit: x.repeat.unit, until: okd(x.repeat.until) ? x.repeat.until : '' } } : {}),
+        ...(x.repeat && ['day', 'week', 'month', 'mlast', 'year'].includes(x.repeat.unit) ? { repeat: { every: Math.max(1, Math.min(99, x.repeat.every | 0)), unit: x.repeat.unit, until: okd(x.repeat.until) && x.repeat.until > x.from ? x.repeat.until : '' } } : {}), // a stop on or before the first day is left out
         ...(x.repeat && Array.isArray(x.skip) && x.skip.some(okd) ? { skip: x.skip.filter(okd) } : {}),
         ...(['national', 'local', false, true].includes(x.holiday) ? { holiday: x.holiday } : {}),
         ...(typeof x.mark === 'string' && /^[a-z]{1,20}$/.test(x.mark) ? { mark: x.mark } : {}),

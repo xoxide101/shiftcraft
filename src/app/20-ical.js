@@ -96,6 +96,7 @@
       const m = icsLine(raw); if (!m) return;
       if (m.name === 'BEGIN') { if (!cur && m.value.trim().toUpperCase() === 'VEVENT') { cur = { _p: {} }; depth = 0; } else if (cur) depth++; return; }
       if (m.name === 'END') { if (!cur) return; if (depth === 0 && m.value.trim().toUpperCase() === 'VEVENT') { evs.push(cur); cur = null; } else depth--; return; }
+      if (cur && depth === 0 && m.name === 'EXDATE') { cur.EXDATE = (cur.EXDATE ? cur.EXDATE + ',' : '') + m.value; return; }
       if (cur && depth === 0 && !(m.name in cur)) { cur[m.name] = m.value; cur._p[m.name] = m.params; }
     });
     return evs;
@@ -118,15 +119,27 @@
       if (endD > s.d && !(endD === addDays(s.d, 1) && endT === 0)) { if (s.t === 0 && endT === 0) to = addDays(endD, -1); else to = endD; } // over several days: whole days
       else { const a = Math.min(snap(s.t), 1410), b = endD > s.d ? 1425 : Math.min(snap(endT), 1425); hours = [a, Math.max(a + 15, b)]; }
     }
-    let repeat = '';
+    let repeat = '', rule = null, skip = [];
     if (e.RRULE) {
       const r = Object.fromEntries(e.RRULE.split(';').map((kv) => kv.split('=')).map(([k, v]) => [String(k).toUpperCase(), v]));
       if (r.FREQ === 'DAILY' && (!r.INTERVAL || r.INTERVAL === '1') && (r.COUNT || r.UNTIL) && from === to) { if (r.COUNT) to = addDays(from, Math.max(1, +r.COUNT) - 1); else { const u = icsWhen(r.UNTIL); if (u) to = u.d; } }
-      else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
+      else {
+        const unit = { DAILY: 'day', WEEKLY: 'week', MONTHLY: r.BYMONTHDAY === '-1' ? 'mlast' : 'month', YEARLY: 'year' }[r.FREQ], every = Math.max(1, Math.min(99, parseInt(r.INTERVAL, 10) || 1));
+        // kept as it is when it is one day a week / month / year; several weekdays (BYDAY=MO,WE) or "the 2nd Tuesday" are not
+        const odd = (r.FREQ === 'WEEKLY' && r.BYDAY && r.BYDAY.split(',').length > 1) || (r.FREQ === 'MONTHLY' && r.BYDAY) || (r.FREQ === 'YEARLY' && r.BYDAY);
+        if (unit && !odd) {
+          let until = '';
+          if (r.UNTIL) { const u = icsWhen(r.UNTIL); if (u) until = u.d; }
+          else if (r.COUNT) { const all = repeatStarts({ from, to: from, repeat: { every, unit, until: '' } }, from, addDays(from, 366 * 40)); until = all[Math.max(1, +r.COUNT) - 1] || ''; }
+          rule = { every, unit, until };
+          skip = String(e.EXDATE || '').split(',').map((v) => icsWhen(v.trim())).filter(Boolean).map((w) => w.d);
+          repeat = repeatText(rule);
+        } else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
+      }
     }
     if (to < from) to = from;
     const X = (k) => (e['X-SHIFTCRAFT-' + k] != null ? icsUnesc(e['X-SHIFTCRAFT-' + k]).trim() : '');
-    return { uid: (e.UID || '').trim(), id: X('ID').replace(/[^\w-]/g, '').slice(0, 40), kind: X('KIND'), from, to, hours, repeat,
+    return { uid: (e.UID || '').trim(), id: X('ID').replace(/[^\w-]/g, '').slice(0, 40), kind: X('KIND'), from, to, hours, repeat, rule, skip,
       summary: icsUnesc(e.SUMMARY).replace(/\s+/g, ' ').trim(), desc: icsUnesc(e.DESCRIPTION).trim(), cancelled: String(e.STATUS || '').trim().toUpperCase() === 'CANCELLED',
       person: X('PERSON'), why: X('WHY'), status: X('STATUS'), paid: X('PAID'), note: X('NOTE'), name: X('NAME'), title: X('TITLE'), closed: X('CLOSED'), open: parseInt(X('OPEN'), 10), close: parseInt(X('CLOSE'), 10) };
   }
@@ -171,6 +184,7 @@
   function icalImportDialog(text, fileName) {
     const today = iso(new Date());
     const found = icsParse(text).map(icsItem).filter(Boolean).sort((a, b) => a.from.localeCompare(b.from));
+    const upcoming = (it) => it.to >= today || !!(it.rule && (!it.rule.until || it.rule.until >= today));
     if (!found.length) { toast(`No calendar entries found in ${fileName}.`); return; }
     const people = sortStaff(plan.staff.filter((p) => !p.left));
     let defStatus = 'requested';
@@ -178,16 +192,16 @@
       const ex = icsFind(it);
       const already = !ex && ((plan.events || []).some((x) => x.from === it.from && x.title.toLowerCase() === it.summary.toLowerCase())
         || (plan.specialHours || []).some((x) => x.from === it.from && (x.name || '').toLowerCase() === (it.name || it.summary).toLowerCase()));
-      const tick = h('input', { type: 'checkbox', checked: !already && it.to >= today, 'aria-label': 'Bring this one in' });
+      const tick = h('input', { type: 'checkbox', checked: !already && upcoming(it), 'aria-label': 'Bring this one in' });
       const as = h('select', { class: 'input', 'aria-label': 'Add as' },
         h('option', { value: 'event' }, 'Event (a note for the day)'), h('option', { value: 'closed' }, 'Store closed'), h('option', { value: 'special' }, 'Store open other hours'),
         h('optgroup', { label: 'Time off for' }, people.map((p) => h('option', { value: 'off:' + p.id }, p.name))));
       as.value = icsGuess(it, ex);
       if (!as.value) as.value = 'event';
-      const state = ex ? h('span', { class: 'small good' }, 'Updates the one in ShiftCraft') : already ? h('span', { class: 'small muted' }, 'Looks already there') : it.to < today ? h('span', { class: 'small muted' }, 'Past') : h('span', { class: 'small' }, 'New');
+      const state = ex ? h('span', { class: 'small good' }, 'Updates the one in ShiftCraft') : already ? h('span', { class: 'small muted' }, 'Looks already there') : !upcoming(it) ? h('span', { class: 'small muted' }, 'Past') : h('span', { class: 'small' }, 'New');
       const tr = h('tr', null, h('td', { class: 'c' }, tick), h('td', { class: 'nowrap small' }, timeOffWhen(it)),
         h('td', { style: { minWidth: '240px' } }, h('b', null, it.summary || '(no title)'), it.desc ? h('div', { class: 'small muted', style: { maxWidth: '320px', whiteSpace: 'pre-line', overflow: 'hidden', maxHeight: '3.4em' } }, it.desc) : null,
-          it.repeat ? h('div', { class: 'small warn' }, `Repeats ${it.repeat}: only this first one comes in`) : null),
+          it.rule ? h('div', { class: 'small good' }, `↻ Repeats ${it.repeat} (as an event)`) : it.repeat ? h('div', { class: 'small warn' }, `Repeats ${it.repeat}: only this first one comes in`) : null),
         h('td', null, as), h('td', { class: 'nowrap' }, state));
       return { it, ex, tick, as, tr };
     });
@@ -196,7 +210,7 @@
     modal({ title: `Import calendar · ${fileName}`, wide: true, body: [
       h('p', { class: 'hint', style: { marginTop: 0 } }, `${found.length} entr${found.length === 1 ? 'y' : 'ies'} found${found.length > rows.length ? ` (the first ${rows.length} are shown)` : ''}. Tick the ones to bring in and say what each one is: an event, the store closed or open other hours (a holiday), or time off for someone. A name in the entry picks the person.`),
       h('div', { class: 'inline' }, h('span', { class: 'small' }, 'Tick:'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => true) }, 'All'),
-        h('button', { type: 'button', class: 'btn sm', onclick: () => pick((r) => r.it.to >= today) }, 'Now and coming up'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => false) }, 'None'),
+        h('button', { type: 'button', class: 'btn sm', onclick: () => pick((r) => upcoming(r.it)) }, 'Now and coming up'), h('button', { type: 'button', class: 'btn sm', onclick: () => pick(() => false) }, 'None'),
         h('span', { class: 'spacer' }), h('span', { class: 'small' }, 'Time off that doesn’t say is'), seg),
       h('div', { class: 'table-wrap', style: { maxHeight: '52vh', overflow: 'auto', marginTop: '8px' } }, h('table', { class: 't compact' },
         h('thead', null, h('tr', null, h('th', { class: 'c' }, 'In'), h('th', null, 'When'), h('th', null, 'Entry'), h('th', null, 'Add as'), h('th', null, ''))), h('tbody', null, rows.map((r) => r.tr)))),
@@ -216,7 +230,7 @@
           const id = ex ? ex.x.id : it.id || uid(), ics = it.uid && !it.uid.endsWith('@shiftcraft') ? { ics: it.uid.slice(0, 300) } : {};
           const note = (it.note || it.desc || '').slice(0, 300);
           const v = as.value;
-          if (v === 'event') { (plan.events = plan.events || []).push({ id, from: it.from, to: it.to, title: (it.title || it.summary || 'Event').slice(0, 120), hours: it.hours, note: (it.note || it.desc || '').slice(0, 500), ...ics }); n.event++; }
+          if (v === 'event') { (plan.events = plan.events || []).push({ id, from: it.from, to: it.to, title: (it.title || it.summary || 'Event').slice(0, 120), hours: it.hours, note: (it.note || it.desc || '').slice(0, 500), ...ics, ...(it.rule ? { repeat: it.rule, ...(it.skip.length ? { skip: it.skip } : {}) } : {}) }); n.event++; }
           else if (v === 'closed' || v === 'special') {
             const r = regularHours(it.from) || { open: 600, close: 960 };
             const open = Number.isFinite(it.open) ? it.open : it.hours ? it.hours[0] : r.open, close = Number.isFinite(it.close) && it.close > open ? it.close : it.hours ? it.hours[1] : Math.max(r.close, open + 60);

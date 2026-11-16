@@ -200,9 +200,10 @@
     const until = dateIn((r0 && r0.until) || '');
     const repSeg = calSeg('Repeats', [['none', 'Never'], ['w1', 'Every week'], ['w2', 'Every other week'], ['m1', 'Every month'], ['other', 'Other…']], rep, (v) => { rep = v; sync(); });
     const otherRow = h('div', { class: 'inline' }, h('span', null, 'Every'), every, unit);
-    const untilRow = fieldOf('Until (leave empty for no end)', until);
+    const untilRow = h('div', { class: 'field' }, h('span', null, 'Stop after (optional: empty keeps repeating)'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, until,
+      h('button', { type: 'button', class: 'btn sm ghost', title: 'Empty it: keep repeating', 'aria-label': 'Empty the stop date', onclick: () => { until.value = ''; sync(); } }, '×')));
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
-    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
+    const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value && until.value > from.value ? until.value : '' }); // a stop on or before the first day is ignored
     const markSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Sign by the date' }, h('option', { value: '' }, 'From the name'), h('option', { value: 'none', selected: cur.mark === 'none' }, 'None (an entry)'),
       CAL_MARKS.map(([k, l]) => h('option', { value: k, selected: cur.mark === k }, k === 'period' ? 'End of period (a box around the date)' : l)));
     const holNow = holEventType({ ...cur, from: cur.from || at, title: cur.title || '' });
@@ -216,9 +217,9 @@
       if (to.value && from.value && to.value < from.value) to.value = from.value; if (!to.value) to.value = from.value; hoursRow.style.display = allDay ? 'none' : '';
       const r = ruleOf(); otherRow.style.display = rep === 'other' ? '' : 'none'; untilRow.style.display = nextInfo.style.display = r ? '' : 'none';
       if (r && from.value) { const t = iso(new Date()), a = from.value > t ? from.value : t, s = repeatStarts({ from: from.value, to: to.value || from.value, repeat: r, skip: cur.skip }, a, addDays(a, 1200)).slice(0, 6);
-        nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}`; }
+        nextInfo.textContent = `Starts ${shortDate(from.value)}, ${repeatText(r)}. ${s.length ? 'Next: ' + s.map((d) => `${dayName(d, 'short')} ${shortDate(d)}`).join(', ') + (s.length === 6 ? ' …' : '') : 'No more times.'}${until.value && until.value <= from.value ? ' (The stop date is on or before the first day, so it is left out.)' : ''}`; }
     };
-    [from, to, every, until].forEach((e) => e.addEventListener('input', sync)); unit.addEventListener('change', sync);
+    [from, to, every, until].forEach((e) => { e.addEventListener('input', sync); e.addEventListener('change', sync); }); unit.addEventListener('change', sync);
     sync();
     const actions = [{ label: 'Cancel' }];
     if (x) actions.unshift({ label: x.repeat ? 'Delete every time' : 'Delete', danger: true, left: true, onClick: () => { change(() => { plan.events = plan.events.filter((y) => y.id !== x.id); if (!plan.events.length) delete plan.events; }); toast('Event deleted. You can undo this.', { label: 'Undo', fn: undo }); } });
@@ -228,7 +229,7 @@
       if (!t) { toast('Give the event a name.'); title.focus(); return false; }
       if (!from.value) { toast('Pick the day.'); return false; }
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
-      const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
+      const r = ruleOf();
       const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}), ...(cur.replaces ? { replaces: cur.replaces } : {}),
         ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}), ...(markSel.value ? { mark: markSel.value } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
