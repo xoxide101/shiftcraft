@@ -185,7 +185,7 @@
         .al-box { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; border-radius: 2px; margin: 0 1px; font-size: 9px; line-height: 12px; text-align: center; vertical-align: middle; }
         .al-box.on { background: #000; color: #fff; }
         /* green can work, red can't, yellow call or arrange first, black not given */
-        .al-day { border: 1px solid #000; text-align: center; background: #c6e0b4; font-size: 10pt; height: 18px; }
+        .al-day { border: 1px solid #000; text-align: center; background: #5cc98b; font-size: 10pt; height: 18px; }
         .al-day.off { background: #ff7c7c !important; color: #000 !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffff00; }
         .al-day.none { background: #fff !important; }
@@ -233,7 +233,7 @@
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
-      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
+      h('div', { class: 'al-key' }, [['#5cc98b', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;
