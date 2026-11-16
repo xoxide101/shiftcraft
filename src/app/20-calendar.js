@@ -88,10 +88,18 @@
   const HOLIDAYS = [
     ['New Year’s Day', (y) => `${y}-01-01`, true], ['Martin Luther King Jr. Day', (y) => nthDay(y, 0, 1, 3)], ['Presidents’ Day', (y) => nthDay(y, 1, 1, 3)],
     ['Easter Sunday', easterOf, true], ['Mother’s Day', (y) => nthDay(y, 4, 0, 2)], ['Memorial Day', (y) => nthDay(y, 4, 1, -1)], ['Father’s Day', (y) => nthDay(y, 5, 0, 3)],
-    ['Juneteenth', (y) => `${y}-06-19`], ['Independence Day', (y) => `${y}-07-04`], ['Labor Day', (y) => nthDay(y, 8, 1, 1)], ['Halloween', (y) => `${y}-10-31`],
+    ['Valentine’s Day', (y) => `${y}-02-14`], ['St. Patrick’s Day', (y) => `${y}-03-17`], ['Juneteenth', (y) => `${y}-06-19`], ['Independence Day', (y) => `${y}-07-04`], ['Labor Day', (y) => nthDay(y, 8, 1, 1)], ['Columbus Day', (y) => nthDay(y, 9, 1, 2)], ['Halloween', (y) => `${y}-10-31`], ['Veterans Day', (y) => `${y}-11-11`],
     ['Thanksgiving', (y) => nthDay(y, 10, 4, 4), true], ['Black Friday', (y) => addDays(nthDay(y, 10, 4, 4), 1)], ['Christmas Eve', (y) => `${y}-12-24`],
     ['Christmas Day', (y) => `${y}-12-25`, true], ['New Year’s Eve', (y) => `${y}-12-31`]];
   const holidaysFrom = (d, n = 18) => { const y = +d.slice(0, 4); return [y, y + 1].flatMap((yy) => HOLIDAYS.map(([name, fn, closed]) => ({ name, date: fn(yy), closed: !!closed }))).filter((x) => x.date >= d).sort((a, b) => a.date.localeCompare(b.date)).slice(0, n); };
+
+  // ---------- Holidays on the month: a solid bar along the bottom of the day ----------
+  // A holiday is one from the list above, an event or special hours named like one on that day, or an event ticked as a
+  // holiday (x.holiday; unticked = false keeps a holiday-named event an ordinary event).
+  const holKey = (s) => String(s || '').toLowerCase().replace(/[’']s?\b/g, '').replace(/\bday\b/g, '').replace(/[^a-z]/g, '');
+  const builtinOn = (d) => HOLIDAYS.map(([name, fn, closed]) => ({ name, date: fn(+d.slice(0, 4)), closed: !!closed })).filter((x) => x.date === d);
+  const holEvent = (x) => (x.holiday != null ? !!x.holiday : builtinOn(x.from).some((b) => holKey(b.name) === holKey(x.title)));
+  const holSpecial = (x) => (x.holiday != null ? !!x.holiday : daysFrom(x.from, dayDiff(x.from, x.to) + 1).some((d) => builtinOn(d).some((b) => holKey(b.name) === holKey(x.name))));
 
   // a row of buttons where one is pressed (like the Status buttons on Time off)
   function calSeg(label, options, value, pick) {
@@ -167,6 +175,7 @@
     const untilRow = fieldOf('Until (leave empty for no end)', until);
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
     const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
+    const holTick = h('input', { type: 'checkbox', checked: holEvent({ ...cur, from: cur.from || at, title: cur.title || '' }) });
     let allDay = !cur.hours;
     const seg = calSeg('When in the day', [[true, 'All day'], [false, 'At a time']], allDay, (v) => { allDay = v; sync(); });
     const a = timePicker(cur.hours ? cur.hours[0] : 540, 'Starts'), b = timePicker(cur.hours ? cur.hours[1] : 600, 'Ends');
@@ -190,6 +199,7 @@
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
       const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
       const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}),
+        ...(holTick.checked !== builtinOn(from.value).some((bb) => holKey(bb.name) === holKey(t)) ? { holiday: holTick.checked } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
       change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
       toast(`${e.title}: ${timeOffWhen(e)}${r ? ', ' + repeatText(r) : ''}.`);
@@ -197,7 +207,7 @@
     sync();
     modal({ title: x ? `Store event · ${x.title}` : 'Store event or note for a day', body: [
       h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
-      fieldOf('What', title), picks, pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      fieldOf('What', title), picks, h('label', { class: 'check' }, holTick, ' A holiday (a solid bar along the bottom of the day on the Calendar)'), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
       h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
       h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
   }
@@ -282,7 +292,8 @@
         show('approved', 'Approved', (it) => it.kind === 'timeoff' && it.status === 'approved', 'Approved time off'),
         show('denied', 'Denied', (it) => it.kind === 'timeoff' && it.status === 'denied', 'Denied time off (kept as a record)'),
         show('special', 'Store hours', (it) => it.kind === 'special', 'Special store hours: holidays and other days'),
-        show('event', 'Events', (it) => it.kind === 'event', 'Events and notes for a day')),
+        show('event', 'Events', (it) => it.kind === 'event', 'Events and notes for a day'),
+        h('label', { class: 'check small', title: 'Holidays: a bar along the bottom of the day' }, h('input', { type: 'checkbox', checked: cal.show.holiday !== false, onchange: (e) => { cal.show.holiday = e.target.checked; calSave(); render(); } }), h('span', { class: 'cal-key holiday' }), ' Holidays')),
       h('div', { class: 'inline no-print', style: { marginTop: '10px' } },
         h('button', { class: 'btn sm primary', onclick: () => eventDialog(null, { from: isList ? today : ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst }) }, '+ Event'),
         h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special store hours'),
@@ -302,17 +313,30 @@
     const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
       const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to).sort(calOrder), sp = specialOn(d), st = storeHoursOn(d);
       const n = planDays().includes(d) ? shiftsOn(d).length : 0;
-      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget) dayDialog(d); } },
+      // holidays: special hours or events that are one, then the list's own (unless an entry that day has its name)
+      const isHol = (it) => (it.kind === 'special' ? holSpecial(it.x) : it.kind === 'event' ? holEvent(it.x) : false);
+      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = new Set([...eventsOn(d).map((x) => holKey(x.title)), ...(sp ? [holKey(sp.name)] : [])]);
+      const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? `${it.x.name || 'Holiday'} · ${it.x.closed ? 'Closed' : specialShort(it.x)}` : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, closed: it.kind === 'special' && it.x.closed })),
+        ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.has(holKey(b.name))).map((b) => ({ label: b.name })))];
+      const rest = its.filter((it) => !holIts.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
+      const topAll = [...rest.filter((it) => it.kind !== 'event'), ...evs.slice(3)], room = Math.max(1, MAX - evShow.length - bars.length), topShow = topAll.length > room ? topAll.slice(0, room - 1) : topAll, more = topAll.slice(topShow.length);
+      const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
+        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol' + (b.closed ? ' closed' : ''), title: b.it ? calTip(b.it) : `${b.label} (holiday). Click to see the day`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else dayDialog(d); } }, b.label);
+          if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
+        // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
+        h('div', { class: 'cal-in', style: { paddingBottom: (evShow.length * 20 + bars.length * 19 + 5) + 'px' } },
         h('div', { class: 'cal-head' },
           h('button', { type: 'button', class: 'cal-num', title: `${longDate(d)}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
           n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
         st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : `${clockShort(st.open)}–${clockShort(st.close)}`) : null,
-        its.slice(0, its.length > MAX ? MAX - 1 : MAX).map(chipN),
-        its.length > MAX ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${its.length - MAX + 1} more`) : null,
+        topShow.map(chipN),
+        more.length ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${more.length} more`) : null,
         // printed: the ones that don't fit as numbers only
-        its.length > MAX && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, its.slice(MAX - 1).map((it) => supNum(numOf(it))).join(',')) : null);
+        more.length && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, more.map((it) => supNum(numOf(it))).join(',')) : null,
+        bottom));
     })));
     main.append(h('div', { class: 'card' }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
