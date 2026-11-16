@@ -495,6 +495,9 @@ table.cal td.cal-day { padding: 0; }
 .cal-wksign .cal-mark-ic svg { width: 14px; height: 14px; vertical-align: -3px; }
 .cal-wksign.urgent .cal-mark-ic { background: #fff; border-radius: 50%; padding: 1px; }
 .cal-eop-key.small { font-size: 9px; padding: 0 2px; outline-width: 1.5px; }
+/* a Some days line's switch: + add / = only / − not, one tight row */
+.seg.line-mode { display: inline-flex; flex-wrap: nowrap; flex: none; }
+.seg.line-mode .btn { min-width: 26px; padding: 0 6px; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -1044,19 +1047,31 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // Weekdays or Weekend tab. On a day that has lines, they are the hours the person can work (each line one stretch, so
   // 7am–11am and 4pm–9pm is a split day) in place of the tab's usual available hours; the day-by-day list still wins.
   const linesOn = (p, i) => (Array.isArray(p.lines) ? p.lines.filter((l) => Array.isArray(l.days) && l.days.includes(i) && l.to > l.from) : []).sort((a, b) => a.from - b.from);
-  // The hours someone can work on a day with Some days lines: the lines and the hours on their tab (the row under
-  // the usual shift), joined. The usual shift itself only presets the fill. With Any time still ticked (older plans;
-  // adding a line now unticks it) nothing limits them: null.
-  const linesWins = (p, i) => {
+  // A day with Some days lines, as a day-by-day entry. Each line has a switch (l.mode): + adds its hours to the hours
+  // row under the usual shift (or to Any time), = makes its hours the only ones that day (with any other + lines),
+  // - takes its hours out (can't work then; it always wins). The usual shift itself only presets the fill.
+  const lineMode = (l) => (l.mode === '=' || l.mode === '-' ? l.mode : '+');
+  const joinRanges = (w) => w.sort((x, y) => x[0] - y[0]).reduce((out, x) => { const last = out[out.length - 1]; if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]); else out.push([...x]); return out; }, []);
+  function linesEntry(p, i) {
     const L = linesOn(p, i); if (!L.length) return null;
-    const st = setOf(p, i >= 5 ? 'we' : 'wk'); if (st.from == null || st.to == null) return null;
-    return [...L.map((l) => [l.from, l.to]), [st.from, st.to]].sort((x, y) => x[0] - y[0]).reduce((out, x) => { const last = out[out.length - 1]; if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]); else out.push([...x]); return out; }, []);
+    const st = setOf(p, i >= 5 ? 'we' : 'wk'), anyBase = st.from == null || st.to == null;
+    const of = (m) => L.filter((l) => lineMode(l) === m).map((l) => [l.from, l.to]);
+    const eq = of('='), add = of('+'), not = of('-');
+    const plus = eq.length ? [...eq, ...add] : anyBase ? null : [[st.from, st.to], ...add]; // null: any time
+    const r = [...(plus ? joinRanges(plus).map(([f, t]) => [f, t, '+']) : []), ...joinRanges(not).map(([f, t]) => [f, t, '-'])];
+    return r.length ? { k: 'times', r } : { k: 'any' };
+  }
+  // can they work shift s with a day-by-day entry of hours? ('' when they can)
+  const timesIssue = (first, d, a, s) => {
+    const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
+    const inPlus = !plus.length || plus.some((x) => s.start >= realMin(x[0]) && s.end <= realMin(x[1]));
+    const hitMinus = minus.some((x) => s.start < realMin(x[1]) && s.end > realMin(x[0]));
+    return inPlus && !hitMinus ? '' : `${first} is available ${avText(a)} on ${dayName(d)}s`;
   };
   // the usual weekday / weekend settings, as a day-by-day entry (to start the list from)
   function avFromSets(p, i) {
     if (p.off && p.off[i]) return { k: 'off' };
-    if (linesOn(p, i).length && setOf(p, i >= 5 ? 'we' : 'wk').from == null) return { k: 'any' };
-    const L = linesWins(p, i); if (L) return { k: 'times', r: L.map(([f, t]) => [f, t, '+']) };
+    const e = linesEntry(p, i); if (e) return e;
     const st = setOf(p, i >= 5 ? 'we' : 'wk');
     if (st.from != null && st.to != null) return { k: 'times', r: [[st.from, st.to, '+']] };
     if (st.parts.length === 3) return { k: 'any' };
@@ -1084,7 +1099,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const away = timeOffIssue(p, d, s); if (away) return away;
     if (offOn(p, d)) return `${first} is not available on ${dayName(d)}s`;
     if (!s) return '';
-    // school is a note about the person (In school), not hours they can't work: it never limits a shift
+    // school: a note about the person, unless its Count tick is on (then class times are hours they can't work)
+    if (p.school && p.school.count) { const sch = schoolIssue(p, d, s); if (sch) return sch; }
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
@@ -1094,14 +1110,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         const win = { Mornings: [DAY_START, plan.midStart], Afternoons: [plan.midStart, plan.pmStart], Evenings: [plan.pmStart, DAY_END] }[a.note];
         return win && (s.start < win[0] - 60 || s.end > win[1] + 60) ? `${first} prefers ${a.note.toLowerCase()} on ${dayName(d)}s` : '';
       }
-      const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
-      const inPlus = !plus.length || plus.some((x) => s.start >= realMin(x[0]) && s.end <= realMin(x[1]));
-      const hitMinus = minus.some((x) => s.start < realMin(x[1]) && s.end > realMin(x[0]));
-      return inPlus && !hitMinus ? '' : `${first} is available ${avText(a)} on ${dayName(d)}s`;
+      return timesIssue(first, d, a, s);
     }
-    if (linesOn(p, avDay(d)).length && setFor(p, d).from == null) return ''; // Any time: open
-    const L = linesWins(p, avDay(d));
-    if (L) return L.some(([f, t]) => s.start >= f && s.end <= t) ? '' : `${first} is available ${L.map(([f, t]) => `${clock(f)} – ${clock(t)}`).join(' and ')} on ${dayName(d)}s`;
+    const e = linesEntry(p, avDay(d));
+    if (e) return e.k === 'any' ? '' : timesIssue(first, d, e, s);
     const st = setFor(p, d), parts = st.parts;
     if (st.from != null && st.to != null && (s.start < st.from || s.end > st.to)) return `${first} is only available ${clock(st.from)} – ${clock(st.to)} on ${partWord(isWkend(d) ? 'we' : 'wk')}`;
     if (parts.length === 3) return '';
@@ -1708,7 +1720,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
       minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
     } else out.push(avText(a));
-    // (school is a note about the person only: its class times are not shown here and limit nothing)
+    // school class times, only when the person's School Count tick is on (then they are hours they can't work)
+    const sc = p.school, today = iso(new Date());
+    if (!noSchool && !(a && a.k === 'off') && sc && sc.on !== false && sc.count && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+      sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
     return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
   };
   function staffView(main) {
@@ -1770,13 +1785,17 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
       const mine = (p.lines || []).filter((l) => (l.tab || (l.days.some((x) => x >= 5) ? 'we' : 'wk')) === k);
       return mine.map((l, j) => {
+        const l2 = l;
         const fa = timePicker(l.from, 'From'), fb = timePicker(l.to, 'Until');
         const save = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => { l.from = f; l.to = t; }); };
         fa.addEventListener('change', () => save('from')); fb.addEventListener('change', () => save('to'));
         const days = l.days.filter((i) => dayIdx.includes(i)).map((i) => WEEKDAYS[i].slice(0, 3));
-        return h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 }, title: `${p.name}: on the days picked, they can work these hours (add another line for a split day)` },
+        return h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 }, title: `${p.name}: on the days picked, ${lineMode(l) === '=' ? 'only these hours' : lineMode(l) === '-' ? 'not these hours' : 'these hours as well as the hours above'} (+ adds, = only, − not)` },
           h('td', { colspan: 2, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), `Some days ${mine.length > 1 ? j + 1 : ''}`, h('span', { class: 'muted' }, days.length ? ` · ${days.join(', ')}` : ' · pick the days →')),
-          h('td', null, h('div', { class: 'hgrid' }, h('span', { class: 'small hlabel' }, days.length ? days.join(', ') : 'Some days'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb),
+          h('td', null, h('div', { class: 'hgrid' }, h('span', { class: 'small hlabel' }, days.length ? days.join(', ') : 'Some days'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } },
+            // + add / = only / - not: how this line works with the hours above
+            h('div', { class: 'seg line-mode', role: 'group', 'aria-label': 'How these hours count' }, [['+', '+', 'Add: these hours as well as the hours above'], ['=', '=', 'Only: on these days just these hours (and any other + lines), not the hours above'], ['-', '−', 'Not: they can’t work these hours on these days']].map(([m, l, t]) =>
+              h('button', { type: 'button', class: 'btn sm', title: t, 'aria-pressed': String(lineMode(l2) === m), onclick: () => change(() => { if (m === '+') delete l2.mode; else l2.mode = m; }) }, l))), fa, '–', fb),
             ib('trash', 'Remove this line (take these hours away)', () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }), { cls: 'danger' }))),
           h('td'),
           h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
@@ -1845,7 +1864,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
-    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for more hours on the days you pick (adding one unticks Any time): on those days they can work the line’s hours and the hours above (11am–12pm on Tue and Thu as well as 1:30pm–9pm). Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
+    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for the days you pick, with a switch: + adds its hours to the hours above (7am–11:30am on Tue and Thu as well as 1:30pm–9pm), = makes them the only hours those days, − takes them out (can’t work then). Adding one unticks Any time. Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
       school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. It is a note about the person (In school, and when): it does not limit when they can work and gives no warnings; their hours are set on the Weekdays, Weekend and Day by day tabs. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
@@ -2544,7 +2563,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('tr', { class: more.length ? 'has-sub' : '', style: { opacity: p.active ? 1 : 0.55 } }, ...main,
           h('td', null, txt('name', 'e.g. Central High · grade 11', 'School', '150px')),
           h('td', { class: 'nowrap' }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, date('from', 'First day of the term'), '–', date('to', 'Last day of the term')),
-            h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet')),
+            h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet'),
+            // include or leave out: a note only, or class times are hours they can't work
+            h('label', { class: 'check small', title: 'Ticked: class times are hours they can’t work (shown in their availability, and a shift over them gets the ! mark). Unticked: school is just a note.' },
+              h('input', { type: 'checkbox', checked: !!sc.count, onchange: (e) => change(() => { if (e.target.checked) sc.count = true; else delete sc.count; }) }), ' Count class times')),
           h('td', null, c0 ? classLine(p, c0, true) : null),
           h('td', null, txt('note', 'e.g. exams in June · summer: any time', 'Note', '140px'))),
         ...more.map((c) => h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 } }, h('td', { colspan: 5, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), 'Other class times'), h('td', null, classLine(p, c, false)), h('td')))];
@@ -4087,7 +4109,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (q.school !== undefined) {
         const sc = q.school, okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
         if (!sc || typeof sc !== 'object') delete q.school;
-        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300),
+        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300), ...(sc.count ? { count: true } : {}),
           classes: Array.isArray(sc.classes) ? sc.classes.filter((c) => c && Array.isArray(c.days) && Number.isFinite(c.from) && Number.isFinite(c.to)).map((c) => ({ days: c.days.filter((x) => Number.isInteger(x) && x >= 0 && x < 7), from: c.from, to: c.to })) : [] };
       }
       if (q.timeOff !== undefined) {

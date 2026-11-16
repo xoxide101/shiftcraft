@@ -27,7 +27,7 @@
       if (q.school !== undefined) {
         const sc = q.school, okd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
         if (!sc || typeof sc !== 'object') delete q.school;
-        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300),
+        else q.school = { on: sc.on !== false, name: String(sc.name || '').slice(0, 80), from: okd(sc.from) ? sc.from : '', to: okd(sc.to) ? sc.to : '', note: String(sc.note || '').slice(0, 300), ...(sc.count ? { count: true } : {}),
           classes: Array.isArray(sc.classes) ? sc.classes.filter((c) => c && Array.isArray(c.days) && Number.isFinite(c.from) && Number.isFinite(c.to)).map((c) => ({ days: c.days.filter((x) => Number.isInteger(x) && x >= 0 && x < 7), from: c.from, to: c.to })) : [] };
       }
       if (q.timeOff !== undefined) {

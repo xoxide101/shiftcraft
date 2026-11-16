@@ -42,7 +42,10 @@
         h('tr', { class: more.length ? 'has-sub' : '', style: { opacity: p.active ? 1 : 0.55 } }, ...main,
           h('td', null, txt('name', 'e.g. Central High · grade 11', 'School', '150px')),
           h('td', { class: 'nowrap' }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, date('from', 'First day of the term'), '–', date('to', 'Last day of the term')),
-            h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet')),
+            h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet'),
+            // include or leave out: a note only, or class times are hours they can't work
+            h('label', { class: 'check small', title: 'Ticked: class times are hours they can’t work (shown in their availability, and a shift over them gets the ! mark). Unticked: school is just a note.' },
+              h('input', { type: 'checkbox', checked: !!sc.count, onchange: (e) => change(() => { if (e.target.checked) sc.count = true; else delete sc.count; }) }), ' Count class times')),
           h('td', null, c0 ? classLine(p, c0, true) : null),
           h('td', null, txt('note', 'e.g. exams in June · summer: any time', 'Note', '140px'))),
         ...more.map((c) => h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 } }, h('td', { colspan: 5, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), 'Other class times'), h('td', null, classLine(p, c, false)), h('td')))];

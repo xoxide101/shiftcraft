@@ -488,3 +488,6 @@ table.cal td.cal-day { padding: 0; }
 .cal-wksign .cal-mark-ic svg { width: 14px; height: 14px; vertical-align: -3px; }
 .cal-wksign.urgent .cal-mark-ic { background: #fff; border-radius: 50%; padding: 1px; }
 .cal-eop-key.small { font-size: 9px; padding: 0 2px; outline-width: 1.5px; }
+/* a Some days line's switch: + add / = only / − not, one tight row */
+.seg.line-mode { display: inline-flex; flex-wrap: nowrap; flex: none; }
+.seg.line-mode .btn { min-width: 26px; padding: 0 6px; font-weight: 800; }

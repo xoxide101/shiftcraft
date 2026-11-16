@@ -10,7 +10,10 @@
       plus.forEach((x) => out.push(`${endWord(x[0])}–${endWord(x[1])}`));
       minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
     } else out.push(avText(a));
-    // (school is a note about the person only: its class times are not shown here and limit nothing)
+    // school class times, only when the person's School Count tick is on (then they are hours they can't work)
+    const sc = p.school, today = iso(new Date());
+    if (!noSchool && !(a && a.k === 'off') && sc && sc.on !== false && sc.count && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+      sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
     return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
   };
   function staffView(main) {
@@ -72,13 +75,17 @@
       const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
       const mine = (p.lines || []).filter((l) => (l.tab || (l.days.some((x) => x >= 5) ? 'we' : 'wk')) === k);
       return mine.map((l, j) => {
+        const l2 = l;
         const fa = timePicker(l.from, 'From'), fb = timePicker(l.to, 'Until');
         const save = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => { l.from = f; l.to = t; }); };
         fa.addEventListener('change', () => save('from')); fb.addEventListener('change', () => save('to'));
         const days = l.days.filter((i) => dayIdx.includes(i)).map((i) => WEEKDAYS[i].slice(0, 3));
-        return h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 }, title: `${p.name}: on the days picked, they can work these hours (add another line for a split day)` },
+        return h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 }, title: `${p.name}: on the days picked, ${lineMode(l) === '=' ? 'only these hours' : lineMode(l) === '-' ? 'not these hours' : 'these hours as well as the hours above'} (+ adds, = only, − not)` },
           h('td', { colspan: 2, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), `Some days ${mine.length > 1 ? j + 1 : ''}`, h('span', { class: 'muted' }, days.length ? ` · ${days.join(', ')}` : ' · pick the days →')),
-          h('td', null, h('div', { class: 'hgrid' }, h('span', { class: 'small hlabel' }, days.length ? days.join(', ') : 'Some days'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, fa, '–', fb),
+          h('td', null, h('div', { class: 'hgrid' }, h('span', { class: 'small hlabel' }, days.length ? days.join(', ') : 'Some days'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } },
+            // + add / = only / - not: how this line works with the hours above
+            h('div', { class: 'seg line-mode', role: 'group', 'aria-label': 'How these hours count' }, [['+', '+', 'Add: these hours as well as the hours above'], ['=', '=', 'Only: on these days just these hours (and any other + lines), not the hours above'], ['-', '−', 'Not: they can’t work these hours on these days']].map(([m, l, t]) =>
+              h('button', { type: 'button', class: 'btn sm', title: t, 'aria-pressed': String(lineMode(l2) === m), onclick: () => change(() => { if (m === '+') delete l2.mode; else l2.mode = m; }) }, l))), fa, '–', fb),
             ib('trash', 'Remove this line (take these hours away)', () => change(() => { p.lines = p.lines.filter((x) => x !== l); if (!p.lines.length) delete p.lines; }), { cls: 'danger' }))),
           h('td'),
           h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Days for these hours' }, dayIdx.map((i) => { const on = l.days.includes(i), wd = WEEKDAYS[i];
@@ -147,7 +154,7 @@
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
-    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for more hours on the days you pick (adding one unticks Any time): on those days they can work the line’s hours and the hours above (11am–12pm on Tue and Thu as well as 1:30pm–9pm). Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
+    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for the days you pick, with a switch: + adds its hours to the hours above (7am–11:30am on Tue and Thu as well as 1:30pm–9pm), = makes them the only hours those days, − takes them out (can’t work then). Adding one unticks Any time. Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
       we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
       avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
       school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. It is a note about the person (In school, and when): it does not limit when they can work and gives no warnings; their hours are set on the Weekdays, Weekend and Day by day tabs. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',

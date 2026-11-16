@@ -351,3 +351,7 @@ Seasonal outline pictures laid over printed pages (an overlay: the page never mo
 Signs on the schedule screens: the Schedule shows the day's signs on a line under the date in words (Produce, Truck delivery 6am, Payday…), and little pictures by each day's name in the week buttons; the Week tab's headings show them too (`cal-wkmark`, renamed from cal-mark). Clicking a day back to green (or picking Available) when it is just Any, or what the settings give anyway, clears the day's own entry so it follows the weekday / weekend settings again (hours row and Some days lines show); a day with hours of its own keeps them.
 
 School is a note about the person (Staff › School: In school, school, term, class times): it no longer limits when they can work, gives no warnings on shifts and is not shown in the availability cells (`schoolIssue` is kept but unused).
+
+### Some days lines: + / = / −
+
+Each Some days line has a switch (`line.mode`, missing = +): + adds its hours to the hours row (or to Any time), = makes its hours the only ones those days (with any other + lines), − takes its hours out (can't work; always wins). `linesEntry(p, i)` turns a day's lines into a day-by-day entry ({ k: 'times', r: [[from, to, '+'|'-']] } or { k: 'any' }); `timesIssue` checks a shift against it. School: a note, unless the person's **Count class times** tick is on (`school.count`): then class times are hours they can't work, shown in the availability cells and checked on shifts.
