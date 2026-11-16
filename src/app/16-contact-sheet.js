@@ -188,7 +188,7 @@
         .al-day { border: 1px solid #000; text-align: center; background: #c6e0b4; font-size: 10pt; height: 18px; }
         .al-day.off { background: #ff7c7c !important; color: #000 !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffff00; }
-        .al-day.none { background: #000 !important; color: #fff !important; }
+        .al-day.none { background: #fff !important; }
         .al-key { display: flex; justify-content: flex-end; gap: 14px; margin-top: 4px; font-size: 8.5pt; }
         .al-key span { display: inline-block; width: 22px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 4px; }
         .al-day div { line-height: 1.15; }
@@ -218,7 +218,7 @@
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
         // the hours themselves, one stretch a line (split days stacked), and school class times
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, (a && a.k === 'unk' ? [] : avCellLines(p, i, a)).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, AL_CSS),
@@ -233,7 +233,7 @@
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
-      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first'], ['#000', 'Not given']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
+      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;

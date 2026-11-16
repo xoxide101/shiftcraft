@@ -937,7 +937,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const PARTS = [['am', 'AM'], ['mid', 'MID'], ['pm', 'PM']];
   const partsOf = (p) => (Array.isArray(p.parts) && p.parts.length ? p.parts : ['am', 'mid', 'pm']);
   // Day-by-day availability (the availability and contact list): p.avail[0–6] (Monday first) is null (not given: the
-  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note' | 'unk' (not given: black on the list), note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
+  // weekday / weekend settings apply) or { k: 'any' | 'off' | 'times' | 'note' | 'unk' (not given: black on the Staff screens only, blank when printed), note, hl (highlight), r: [[from, to, '+' | '-'], …] }.
   // In 'times', '+' ranges are when they can work and '-' ranges when they can't; where they overlap, can't wins.
   // With no '+' range, they can work any time apart from the '-' ranges. OPEN and CLOSE stand for the opening and closing time.
   const OPEN = -1, CLOSE = 9999;
@@ -995,7 +995,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const a = avOf(p, avDay(d));
     if (a) {
       if (a.k === 'any') return '';
-      if (a.k === 'unk') return `${first} has not given availability for ${dayName(d)}s`;
+      if (a.k === 'unk') return ''; // not given: only shown on the Staff screens
       if (a.k === 'note') {
         if (/emergenc/i.test(a.note || '')) return `${first} is only available for emergencies on ${dayName(d)}s`;
         const win = { Mornings: [DAY_START, plan.midStart], Afternoons: [plan.midStart, plan.pmStart], Evenings: [plan.pmStart, DAY_END] }[a.note];
@@ -2111,7 +2111,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-day { border: 1px solid #000; text-align: center; background: #c6e0b4; font-size: 10pt; height: 18px; }
         .al-day.off { background: #ff7c7c !important; color: #000 !important; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
         .al-day.hl { background: #ffff00; }
-        .al-day.none { background: #000 !important; color: #fff !important; }
+        .al-day.none { background: #fff !important; }
         .al-key { display: flex; justify-content: flex-end; gap: 14px; margin-top: 4px; font-size: 8.5pt; }
         .al-key span { display: inline-block; width: 22px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 4px; }
         .al-day div { line-height: 1.15; }
@@ -2141,7 +2141,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
         // the hours themselves, one stretch a line (split days stacked), and school class times
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, avCellLines(p, i, a).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, (a && a.k === 'unk' ? [] : avCellLines(p, i, a)).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
     };
     const sheet = h('div', { class: 'person-sheet al-sheet' },
       h('style', null, AL_CSS),
@@ -2156,7 +2156,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
-      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first'], ['#000', 'Not given']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
+      h('div', { class: 'al-key' }, [['#c6e0b4', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;
