@@ -2,7 +2,8 @@
   let staffTab = 'wk';
   try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
   // a day-by-day cell as lines: the hours (each stretch its own line), what they can’t do, and school class times
-  const avCellLines = (p, i, a) => {
+  // noSchool: leave out the class times (the printed list: the school tab has them)
+  const avCellLines = (p, i, a, noSchool) => {
     const out = [];
     if (a && a.k === 'times') {
       const r = a.r || [], plus = r.filter((x) => x[2] !== '-'), minus = r.filter((x) => x[2] === '-');
@@ -11,7 +12,7 @@
       minus.forEach((x) => out.push(`not ${endWord(x[0])}–${endWord(x[1])}`));
     } else out.push(avText(a));
     const sc = p.school, today = iso(new Date());
-    if (!(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
+    if (!noSchool && !(a && a.k === 'off') && sc && sc.on !== false && Array.isArray(sc.classes) && (!sc.from || sc.from <= today) && (!sc.to || today <= sc.to))
       sc.classes.filter((c) => Array.isArray(c.days) && c.days.includes(i) && c.to > c.from).forEach((c) => out.push(`school ${clockShort(c.from)}–${clockShort(c.to)}`));
     return [...new Set(out)].map((t) => h('span', { class: 'avline' }, t));
   };

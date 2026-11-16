@@ -132,8 +132,8 @@
   // tables side by side. where: under the list ('page'), on a page of their own ('separate'), or left out ('off').
   const AVD_KEY = KEY + '-avail-details';
   const AVAIL_RANGES = [['this', 'This week'], ['next1', 'Next week'], ['this2', 'This week and next'], ['next2', 'The next 2 weeks'], ['next4', 'The next 4 weeks'], ['next8', 'The next 8 weeks']];
-  const availDet = { where: 'page', range: 'next1' };
-  try { const c = JSON.parse(localStorage.getItem(AVD_KEY) || '{}'); if (['page', 'separate', 'off'].includes(c.where)) availDet.where = c.where; if (AVAIL_RANGES.some(([k]) => k === c.range)) availDet.range = c.range; } catch (e) { /* blocked */ }
+  const availDet = { where: 'page', range: 'next1', mode: 'bw' }; // mode: 'bw' (black and white, the first time) or 'color'; the last one used is kept
+  try { const c = JSON.parse(localStorage.getItem(AVD_KEY) || '{}'); if (['page', 'separate', 'off'].includes(c.where)) availDet.where = c.where; if (AVAIL_RANGES.some(([k]) => k === c.range)) availDet.range = c.range; if (['bw', 'color'].includes(c.mode)) availDet.mode = c.mode; } catch (e) { /* blocked */ }
   const saveAvailDet = () => { try { localStorage.setItem(AVD_KEY, JSON.stringify(availDet)); } catch (e) { /* blocked */ } };
   const availRange = () => { const mon = mondayOf(iso(new Date())), r = availDet.range, start = r.startsWith('this') ? mon : addDays(mon, 7), n = { this: 1, next1: 1, this2: 2, next2: 2, next4: 4, next8: 8 }[r] || 1; return [start, addDays(start, n * 7 - 1)]; };
   // also the Calendar's printout: range = its weeks, o.num = the note numbers its entries carry (a # column), o.show =
@@ -166,7 +166,7 @@
       hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
   }
-  const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' }, h('style', null, AL_CSS),
+  const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' + (availDet.mode === 'bw' ? ' al-bw' : '') }, h('style', null, AL_CSS),
     h('div', { style: { fontSize: '14pt', fontWeight: 700, marginBottom: '10px' } }, `${[plan.company, plan.location].filter(Boolean).join(' · ') || 'Schedule'} · Schedule Availability and Contact Information: details`), availDetails());
   const AL_CSS = `
         .al-sheet { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; }
@@ -207,6 +207,13 @@
         .al-dclosed td { background: #f4cccc; }
         .al-dasked td { font-style: italic; }
         .al-ddenied td { color: #777; text-decoration: line-through; }
+        /* black and white: available white, OFF black with white letters, call or arrange first grey */
+        .al-bw .al-day { background: #fff; }
+        .al-bw .al-day.off { background: #000 !important; color: #fff !important; }
+        .al-bw .al-day.hl { background: #d9d9d9; font-style: italic; }
+        .al-bw .al-name.pend { background: #d9d9d9; }
+        .al-bw .al-dspecial td { background: #eee; }
+        .al-bw .al-dclosed td { background: #d9d9d9; }
       `;
   function availabilitySheet(where = availDet.where) {
     const now = new Date(), pad = (n) => String(n).padStart(2, '0');
@@ -222,9 +229,10 @@
         h('td', { class: 'al-phone' }, p.phone || h('span', { class: 'al-blank' }, '')),
         positions.map((pos) => h('td', { class: 'al-tick' }, tick(Array.isArray(p.trained) && p.trained.includes(pos.id)))), h('td'),
         // the hours themselves, one stretch a line (split days stacked), and school class times
-        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, (a && a.k === 'unk' ? [] : avCellLines(p, i, a)).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
+        WEEKDAYS.map((_, i) => { const a = avOf(p, i) || avFromSets(p, i); return h('td', { class: 'al-day ' + avClass(a) }, (a && a.k === 'unk' ? [] : avCellLines(p, i, a, true)).map((x) => h('div', null, x.textContent.replace(/–/g, '⁠–⁠')))); }));
     };
-    const sheet = h('div', { class: 'person-sheet al-sheet' },
+    const bw = availDet.mode === 'bw';
+    const sheet = h('div', { class: 'person-sheet al-sheet' + (bw ? ' al-bw' : '') },
       h('style', null, AL_CSS),
       h('table', null,
         h('colgroup', null, h('col', { style: { width: '170px' } }), h('col', { style: { width: '88px' } }), positions.map(() => h('col', { style: { width: '17px' } })), h('col', { style: { width: '8px' } }), WEEKDAYS.map(() => h('col', null))),
@@ -237,7 +245,7 @@
           const list = people.filter((p) => groupOf(p) === g).sort((a, b) => (a.pending || ROLES[a.role].group === 'trn') - (b.pending || ROLES[b.role].group === 'trn'));
           return list.length ? [h('tr', { class: 'al-section' }, h('td', null, title), h('td', { colspan: positions.length + 9 })), ...list.map(row)] : [];
         }))),
-      h('div', { class: 'al-key' }, [['#5cc98b', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']].map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
+      h('div', { class: 'al-key' }, (bw ? [['#fff', 'Available'], ['#000', 'Unavailable (OFF)'], ['#d9d9d9', 'Call or arrange first']] : [['#5cc98b', 'Available'], ['#ff7c7c', 'Unavailable'], ['#ffff00', 'Call or arrange first']]).map(([c, l]) => h('div', null, h('span', { style: { background: c } }), l))),
       where === 'page' ? availDetails() : null);
     if (where === 'separate') sheet.notesPage = availDetailsPage();
     return sheet;
