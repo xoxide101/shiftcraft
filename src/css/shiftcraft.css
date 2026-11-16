@@ -127,7 +127,9 @@ table.t td .check.small { font-size: 12px; }
 .daytoggles button.dt.av-none { background: #000; border-color: #666; color: #fff; }
 .daytoggles button.pt.on { background: var(--good); border-color: var(--good); color: #fff; }
 .chip.na { opacity: .6; border-style: dashed; }
-.chip.na small::after { content: " · not available"; color: var(--bad); font-weight: 600; }
+/* why they are not available, in words (Vacation, OFF day), or their usual shift is out of their range */
+.chip .na-why { color: var(--bad); font-weight: 600; }
+.chip .na-range { color: var(--warn); font-weight: 600; }
 .shift .w.na { background: #ffb3a8; color: #4a0d06; }
 .crash { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: #fde2e0; color: #4a0d06; padding: 12px 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font: 14px system-ui, sans-serif; }
 .crash button { padding: 6px 12px; border: 1px solid #b3261e; background: #fff; border-radius: 6px; cursor: pointer; }

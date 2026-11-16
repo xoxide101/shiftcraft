@@ -339,3 +339,5 @@ Closed holidays: a one-day repeating event (produce, truck, payday…) that fall
 The Calendar's print button opens a window (`calPrintDialog`, kept in this browser as `shiftcraft-cal-print`): on the month, tick store hours by the date, time off bars, events, signs, holidays, legend (unticked ones are hidden only on paper, `.cp-no-*`); details under the month / on a page of their own / none; which tables (store hours, time off, events, holidays); and repeating events on one line each ("Every other week on Thu", "Every week on Mon–Sat", "Every month on the 30th", with the times moved before a closed holiday). Detail tables never split across pages. The on-screen help line is not printed.
 
 Detail tables read what it is, then when, then the details: Events = Event (its sign and name) · When · Details (moved before a closed holiday, the note); Holidays = Holiday · Date · Store.
+
+Schedule › Unscheduled: instead of "not available", each name says why in red: the all-day time off's reason (Vacation, Personal (asked)…) or OFF day (their availability); a free person whose usual shift is outside the hours they gave says "out of range" in orange.
