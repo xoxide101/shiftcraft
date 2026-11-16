@@ -418,10 +418,13 @@ table.cal td.cal-day { padding: 0; }
 .cal-bottom { position: absolute; left: 0; right: 0; bottom: 0; }
 .cal-bottom .cal-chip { width: calc(100% - 8px); margin: 2px 4px 2px; }
 .cal-hol { display: block; width: 100%; border: 0; border-radius: 0; margin: 0; padding: 0 5px; font: inherit; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; background: var(--accent); color: var(--accent-ink, #fff); }
-.cal-hol.closed { background: var(--bad); color: #fff; }
+/* business or local days (Black Friday, fireworks): their own colour; printed, white with a black frame */
+.cal-hol.local { background: #8a5cd6; color: #fff; }
 .cal-hol:hover { filter: brightness(1.1); }
 .cal-key.holiday { background: var(--accent); border-color: var(--accent); border-radius: 0; }
-@media print { .cal-hol, .cal-hol.closed { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+@media print { .cal-hol { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .cal-hol.local { background: #fff !important; color: #000 !important; box-shadow: inset 0 0 0 1.5px #000; } }
+/* changed hours: the usual ones struck through */
+.cal-was { font-weight: 400; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -2097,10 +2100,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them
     // the list's holidays, and events that are holidays (ticked, or named like one); one row a day and name
-    const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x })), ...holidaysFrom(a, 60).filter((x) => x.date <= b)]
-      .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holKey(y.name) === holKey(x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
+    const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x, type: holEventType(x) })), ...holidaysFrom(a, 60).filter((x) => x.date <= b).map((x) => ({ ...x, type: NATIONAL.has(x.name) ? 'national' : 'local' }))]
+      .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holLike(y.name, x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
     const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
-      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name + (x.type === 'local' ? ' (local)' : ''), s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
   }
   const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' + (availDet.mode === 'bw' ? ' al-bw' : '') }, h('style', null, AL_CSS),
@@ -2706,9 +2709,23 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // A holiday is one from the list above, an event or special hours named like one on that day, or an event ticked as a
   // holiday (x.holiday; unticked = false keeps a holiday-named event an ordinary event).
   const holKey = (s) => String(s || '').toLowerCase().replace(/[’']s?\b/g, '').replace(/\bday\b/g, '').replace(/[^a-z]/g, '');
-  const builtinOn = (d) => HOLIDAYS.map(([name, fn, closed]) => ({ name, date: fn(+d.slice(0, 4)), closed: !!closed })).filter((x) => x.date === d);
-  const holEvent = (x) => (x.holiday != null ? !!x.holiday : builtinOn(x.from).some((b) => holKey(b.name) === holKey(x.title)));
-  const holSpecial = (x) => (x.holiday != null ? !!x.holiday : daysFrom(x.from, dayDiff(x.from, x.to) + 1).some((d) => builtinOn(d).some((b) => holKey(b.name) === holKey(x.name))));
+  // two kinds: 'national' (national or state holidays) and 'local' (business, local or seasonal days: Black Friday,
+  // fireworks, Halloween…), each its own colour. x.holiday on an event: 'national' | 'local' | false (not one, even if
+  // named like one) | missing (from its name); true (older plans) = national.
+  // the list's own days are national, apart from Black Friday (an event named like one of them can say otherwise)
+  const LOCAL_BUILTIN = new Set(['Black Friday']);
+  const NATIONAL = { has: (name) => !LOCAL_BUILTIN.has(name) };
+  const HOL_KINDS = [['', 'Not a holiday'], ['national', 'National or state holiday'], ['local', 'Business or local day (Black Friday, fireworks…)']];
+  const builtinOn = (d) => HOLIDAYS.map(([name, fn, closed]) => ({ name, date: fn(+d.slice(0, 4)), closed: !!closed, type: NATIONAL.has(name) ? 'national' : 'local' })).filter((x) => x.date === d);
+  // names alike: the same; loose (special hours) also one inside the other (Thanksgiving Day (closed) is Thanksgiving),
+  // but an event needs the name itself (Veterans Day Fireworks is an event, unless you say it is a holiday)
+  const holLike = (a, b, loose) => { a = holKey(a); b = holKey(b); return !!a && !!b && (a === b || (!!loose && a.length >= 5 && b.length >= 5 && (a.includes(b) || b.includes(a)))); };
+  const holAuto = (name, days, loose) => { for (const d of days) { const b = builtinOn(d).find((x) => holLike(x.name, name, loose)); if (b) return b.type; } return ''; };
+  const holSet = (v) => (v === true ? 'national' : v === 'national' || v === 'local' ? v : '');
+  const holEventType = (x) => (x.holiday != null ? holSet(x.holiday) : holAuto(x.title, [x.from]));
+  const holSpecialType = (x) => (x.holiday != null ? holSet(x.holiday) : holAuto(x.name, daysFrom(x.from, dayDiff(x.from, x.to) + 1), true));
+  const holEvent = (x) => !!holEventType(x);
+  const holSpecial = (x) => !!holSpecialType(x);
 
   // a row of buttons where one is pressed (like the Status buttons on Time off)
   function calSeg(label, options, value, pick) {
@@ -2784,7 +2801,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const untilRow = fieldOf('Until (leave empty for no end)', until);
     const nextInfo = h('p', { class: 'hint', style: { margin: 0 } });
     const ruleOf = () => (rep === 'none' ? null : { every: rep === 'w2' ? 2 : rep === 'other' ? Math.max(1, Math.min(99, Math.round(+every.value) || 1)) : 1, unit: rep === 'm1' ? 'month' : rep === 'other' ? unit.value : 'week', until: until.value || '' });
-    const holTick = h('input', { type: 'checkbox', checked: holEvent({ ...cur, from: cur.from || at, title: cur.title || '' }) });
+    const holNow = holEventType({ ...cur, from: cur.from || at, title: cur.title || '' });
+    const holSel = h('select', { class: 'input', style: { width: 'auto' }, 'aria-label': 'Holiday' }, HOL_KINDS.map(([k, l]) => h('option', { value: k, selected: holNow === k }, l)));
     let allDay = !cur.hours;
     const seg = calSeg('When in the day', [[true, 'All day'], [false, 'At a time']], allDay, (v) => { allDay = v; sync(); });
     const a = timePicker(cur.hours ? cur.hours[0] : 540, 'Starts'), b = timePicker(cur.hours ? cur.hours[1] : 600, 'Ends');
@@ -2808,7 +2826,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (!allDay && b.value <= a.value) { toast('The event must end after it starts.'); return false; }
       const r = ruleOf(); if (r && r.until && r.until < from.value) { toast('Until must be on or after the first day.'); return false; }
       const e = { id: x ? x.id : uid(), from: from.value, to: to.value < from.value ? from.value : to.value, title: t, hours: allDay ? null : [a.value, b.value], note: note.value.trim(), ...(x && x.ics ? { ics: x.ics } : {}),
-        ...(holTick.checked !== builtinOn(from.value).some((bb) => holKey(bb.name) === holKey(t)) ? { holiday: holTick.checked } : {}),
+        ...(holSel.value !== holAuto(t, [from.value]) ? { holiday: holSel.value || false } : {}),
         ...(r ? { repeat: r } : {}), ...(r && x && x.skip && x.skip.some((d) => d >= from.value) ? { skip: x.skip.filter((d) => d >= from.value) } : {}) };
       change(() => { plan.events = (plan.events || []).filter((y) => y.id !== e.id).concat(e).sort((p, q) => p.from.localeCompare(q.from)); });
       toast(`${e.title}: ${timeOffWhen(e)}${r ? ', ' + repeatText(r) : ''}.`);
@@ -2816,7 +2834,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     sync();
     modal({ title: x ? `Store event · ${x.title}` : 'Store event or note for a day', body: [
       h('p', { class: 'hint', style: { marginTop: 0 } }, x && x.repeat && occ ? `This repeats (${repeatText(x.repeat)}): what you change here changes every time. Skip leaves out ${longDate(occ)} only.` : 'Something for the store, not for a person: end of period, payday, a delivery, a meeting. It shows on the Calendar, the Schedule and the Week, and changes nothing else.'),
-      fieldOf('What', title), picks, h('label', { class: 'check' }, holTick, ' A holiday (a solid bar along the bottom of the day on the Calendar)'), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      fieldOf('What', title), picks, fieldOf('Holiday (a solid bar along the bottom of the day on the Calendar)', holSel), pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
       h('div', { class: 'field' }, h('span', null, 'When'), seg), hoursRow,
       h('div', { class: 'field' }, h('span', null, 'Repeats'), repSeg), otherRow, untilRow, nextInfo, fieldOf('Notes', note)], actions });
   }
@@ -2836,7 +2854,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const calWhat = (it) => (it.kind === 'timeoff' ? `${it.who} · ${it.title}` : it.title);
   const calText = (it) => [CAL_KIND[it.kind], it.who, it.title, it.note, calHours(it), calStatus(it), datesOnly(it), it.from, it.to, it.kind === 'timeoff' && it.status === 'requested' ? 'request' : ''].join(' ').toLowerCase();
   const calTip = (it) => [`${CAL_KIND[it.kind]}: ${calWhat(it)}`, `${datesOnly(it)} · ${calHours(it)}`, it.kind === 'event' && it.x.repeat ? 'Repeats ' + repeatText(it.x.repeat) : '', calStatus(it), it.note ? 'Note: ' + it.note : '', 'Click to see or change it'].filter(Boolean).join('\n');
-  const calChipText = (it) => (it.kind === 'special' ? `${specialShort(it.x)} · ${it.title}` : it.kind === 'event' ? `${it.x.repeat ? '↻ ' : ''}${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
+  const calChipText = (it) => (it.kind === 'special' ? it.title // the hours (or Closed) are by the date : it.kind === 'event' ? `${it.x.repeat ? '↻ ' : ''}${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`
     : `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.title}${it.hours ? ` ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
   const calChip = (it) => h('button', { type: 'button', class: `cal-chip ${it.kind} ${it.status}`, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } }, calChipText(it));
   const calOrder = (a, b) => ['special', 'event', 'timeoff'].indexOf(a.kind) - ['special', 'event', 'timeoff'].indexOf(b.kind) || (a.hours ? a.hours[0] : -1) - (b.hours ? b.hours[0] : -1) || calWhat(a).localeCompare(calWhat(b));
@@ -2924,13 +2942,14 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const n = planDays().includes(d) ? shiftsOn(d).length : 0;
       // holidays: special hours or events that are one, then the list's own (unless an entry that day has its name)
       const isHol = (it) => (it.kind === 'special' ? holSpecial(it.x) : it.kind === 'event' ? holEvent(it.x) : false);
-      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = new Set([...eventsOn(d).map((x) => holKey(x.title)), ...(sp ? [holKey(sp.name)] : [])]);
-      const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? `${it.x.name || 'Holiday'} · ${it.x.closed ? 'Closed' : specialShort(it.x)}` : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, closed: it.kind === 'special' && it.x.closed })),
-        ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.has(holKey(b.name))).map((b) => ({ label: b.name })))];
+      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = [...eventsOn(d).map((x) => [x.title]), ...(sp ? [[sp.name, true]] : [])];
+      const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? it.x.name || 'Holiday' : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, type: it.kind === 'special' ? holSpecialType(it.x) : holEventType(it.x) })),
+        ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.some(([n, loose]) => holLike(n, b.name, loose))).map((b) => ({ label: b.name, type: b.type })))]
+        .sort((x, y) => (x.type === 'national') - (y.type === 'national'));
       const rest = its.filter((it) => !holIts.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
       const topAll = [...rest.filter((it) => it.kind !== 'event'), ...evs.slice(3)], room = Math.max(1, MAX - evShow.length - bars.length), topShow = topAll.length > room ? topAll.slice(0, room - 1) : topAll, more = topAll.slice(topShow.length);
       const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
-        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol' + (b.closed ? ' closed' : ''), title: b.it ? calTip(b.it) : `${b.label} (holiday). Click to see the day`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else dayDialog(d); } }, b.label);
+        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to see the day`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else dayDialog(d); } }, b.label);
           if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
       return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
         // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
@@ -2940,7 +2959,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
-        st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : `${clockShort(st.open)}–${clockShort(st.close)}`) : null,
+        st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
+          // changed hours (still open): the usual hours struck through, the day's own next to them
+          return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null,
         topShow.map(chipN),
         more.length ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${more.length} more`) : null,
         // printed: the ones that don't fit as numbers only

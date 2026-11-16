@@ -162,10 +162,10 @@
       ev.map((x) => tr('', N.ev(x), datesOnly(x) + (x.hours ? `, ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''), x.title, x.note || '')), 'No events.');
     // 4 · holidays, with the store's hours on them
     // the list's holidays, and events that are holidays (ticked, or named like one); one row a day and name
-    const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x })), ...holidaysFrom(a, 60).filter((x) => x.date <= b)]
-      .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holKey(y.name) === holKey(x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
+    const hol = [...eventsIn(a, b).filter(holEvent).map((x) => ({ name: x.title, date: x.from < a ? a : x.from, ev: x, type: holEventType(x) })), ...holidaysFrom(a, 60).filter((x) => x.date <= b).map((x) => ({ ...x, type: NATIONAL.has(x.name) ? 'national' : 'local' }))]
+      .filter((x, i, all) => all.findIndex((y) => y.date === x.date && holLike(y.name, x.name)) === i).sort((x, y) => x.date.localeCompare(y.date));
     const holidays = box(`Holidays · ${span}`, ['34%', '33%', ''], ['Date', 'Holiday', 'Store'],
-      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name, s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
+      hol.map((x) => { const s = specialOn(x.date), u = usualOn(x.date); return tr(s && s.closed ? 'al-dclosed' : '', s ? N.sp(s) : x.ev ? N.ev(x.ev) : '', `${dayName(x.date, 'short')} ${shortDate(x.date)}`, x.name + (x.type === 'local' ? ' (local)' : ''), s ? hrsOf(s) + (s.name && s.name !== x.name ? ` (${s.name})` : '') : `usual ${usualText(u)}${x.closed ? ' · often closed' : ''}`); }), 'No holidays in these weeks.');
     return h('div', { class: 'al-details' }, hours, timeOff, events, holidays);
   }
   const availDetailsPage = () => h('div', { class: 'person-sheet al-sheet' + (availDet.mode === 'bw' ? ' al-bw' : '') }, h('style', null, AL_CSS),

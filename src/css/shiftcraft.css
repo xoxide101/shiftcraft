@@ -411,7 +411,10 @@ table.cal td.cal-day { padding: 0; }
 .cal-bottom { position: absolute; left: 0; right: 0; bottom: 0; }
 .cal-bottom .cal-chip { width: calc(100% - 8px); margin: 2px 4px 2px; }
 .cal-hol { display: block; width: 100%; border: 0; border-radius: 0; margin: 0; padding: 0 5px; font: inherit; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; background: var(--accent); color: var(--accent-ink, #fff); }
-.cal-hol.closed { background: var(--bad); color: #fff; }
+/* business or local days (Black Friday, fireworks): their own colour; printed, white with a black frame */
+.cal-hol.local { background: #8a5cd6; color: #fff; }
 .cal-hol:hover { filter: brightness(1.1); }
 .cal-key.holiday { background: var(--accent); border-color: var(--accent); border-radius: 0; }
-@media print { .cal-hol, .cal-hol.closed { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+@media print { .cal-hol { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .cal-hol.local { background: #fff !important; color: #000 !important; box-shadow: inset 0 0 0 1.5px #000; } }
+/* changed hours: the usual ones struck through */
+.cal-was { font-weight: 400; color: var(--muted); }
