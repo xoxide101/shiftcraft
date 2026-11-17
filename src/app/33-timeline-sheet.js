@@ -8,9 +8,9 @@
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, { ...o, vector: false }), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    const M = 0.3 * dpi, GAP = 0.12 * dpi, TOP = 0.42 * dpi, days = weekDays(weekOf(start));
-    g.fillStyle = '#000'; g.font = `700 ${(14 / 72) * dpi}px Arial, Helvetica, sans-serif`; g.textBaseline = 'alphabetic';
-    g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule'} · week of ${longDate(days[0])}`, M, M + (12 / 72) * dpi);
+    const M = decoMargin(0.3) * dpi, GAP = 0.12 * dpi, TOP = 0.42 * dpi, days = weekDays(weekOf(start));
+    g.fillStyle = '#000'; g.textBaseline = 'alphabetic';
+    headLine(g, M, W - M, M + (12 / 72) * dpi, { s: `${sheetName()} · week of ${longDate(days[0])}`, px: (14 / 72) * dpi, weight: '700' });
     const cols = 3, rows = 3, tw = (W - 2 * M - (cols - 1) * GAP) / cols, th = (H - M - TOP - M - (rows - 1) * GAP) / rows;
     // everyone working this week gets a number (in the app's groups, then by name); the tiles show the numbers and the
     // legend in the spare space says who is who, so the tiles stay uncluttered
@@ -67,11 +67,9 @@
     const nb = notesFor([d], o), noteList = nb.list;
     if (o.numbers) { y -= pt(4); text(longDate(d) + nb.day(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
     else {
-      text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 18, '700');
-      text(totals, W - M, y, 'right', 10, '400', '#333');
+      headLine(g, M, W - M, y, { s: sheetName(), px: pt(18), weight: '700' }, { s: totals, px: pt(10), col: '#333' });
       y += pt(20);
-      text(longDate(d) + nb.day(d), M, y, 'left', 14, '700');
-      if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
+      headLine(g, M, W - M, y, { s: longDate(d) + nb.day(d), px: pt(14), weight: '700' }, { s: placeLine(), px: pt(9) });
     }
     y += pt(12);
 
@@ -97,7 +95,9 @@
     // Hour labels
     g.fillStyle = '#222'; g.fillRect(M, y, CW, headH);
     text('Name', M + pt(5), y + headH * 0.7, 'left', 8.5, '700', '#fff');
-    for (let m = DAY_START; m < DAY_END; m += 60) text(hourLabel(m), xAt(m) + pt(3), y + headH * 0.7, 'left', 8, '700', '#fff');
+    // every hour, or every other one when they would run into each other (a small tile)
+    { g.font = font(8, '700'); const need = g.measureText('12pm').width + pt(5), every = xAt(DAY_START + 60) - xAt(DAY_START) >= need ? 60 : 120;
+      for (let m = DAY_START; m < DAY_END; m += every) if (xAt(m) + pt(3) + g.measureText(hourLabel(m)).width <= x1) text(hourLabel(m), xAt(m) + pt(3), y + headH * 0.7, 'left', 8, '700', '#fff'); }
     y += headH;
     const gridTop = y;
     rows.forEach((r) => {
@@ -112,8 +112,9 @@
           g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
           g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
           const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${nb.on ? nb.shift(sh) : sh.note ? '   Note: ' + sh.note : ''}`;
-          text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
-          if (availIssue(r.p, d, sh)) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
+          const iss = availIssue(r.p, d, sh); // the ! at the bar's end: the time is cut short to leave it room
+          text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(iss ? 6 + barPt * 0.6 : 6));
+          if (iss) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
         });
       }
       y += rowH;
@@ -145,7 +146,9 @@
       }
       text(`max ${max}`, x0 - pt(4), cy + pt(8), 'right', 8, '400', '#555');
       text('0', x0 - pt(4), cy + ch, 'right', 8, '400', '#555');
-      text('count at each hour', M, cy + ch + pt(10), 'left', 7.5, '400', '#555');
+      // the label under the axis, only as far as the first hour's count (smaller, or left out, on a small tile)
+      { const room = xAt(DAY_START + 30) - pt(6) - M; let fsz = 7.5; g.font = font(fsz); const w = g.measureText('count at each hour').width; if (w > room) fsz *= room / w;
+        if (fsz >= 5) text('count at each hour', M, cy + ch + pt(10), 'left', fsz, '400', '#555'); }
       y = cy + ch + pt(14);
     }
     if (notesH) {

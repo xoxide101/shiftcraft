@@ -40,6 +40,27 @@
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     return c;
   }
+  // A heading line on a printed page: text on the left and (smaller) text on the right, never over each other or off
+  // the page, however long the store's name is or however narrow the paper. The right side gets … first (it keeps at
+  // least 35% of the line), then the left side shrinks (down to 70% of its size) and gets … if it still doesn't fit.
+  // L / R: { s, px (font size in pixels), weight, col }. Returns the left side's font size in pixels.
+  function headLine(g, x0, x1, y, L, R) {
+    const f = (t, px) => `${t.weight || '400'} ${px}px Arial, Helvetica, sans-serif`;
+    const wOf = (t, px, str) => { g.font = f(t, px); return g.measureText(str).width; };
+    const cut = (t, px, str, max) => { g.font = f(t, px); while (str.length > 1 && g.measureText(str).width > max) str = str.slice(0, -2) + '…'; return str; };
+    const span = x1 - x0, gap = L.px * 0.9;
+    let ls = String(L.s || ''), rs = R && R.s ? String(R.s) : '', px = L.px;
+    if (rs) rs = cut(R, R.px, rs, Math.max(span * 0.35, span - wOf(L, px, ls) - gap));
+    const room = span - (rs ? wOf(R, R.px, rs) + gap : 0);
+    while (px > L.px * 0.7 && wOf(L, px, ls) > room) px -= L.px * 0.03;
+    ls = cut(L, px, ls, room);
+    const al = g.textAlign, fs = g.fillStyle;
+    g.textAlign = 'left'; g.font = f(L, px); g.fillStyle = L.col || '#000'; g.fillText(ls, x0, y);
+    if (rs) { g.textAlign = 'right'; g.font = f(R, R.px); g.fillStyle = R.col || '#444'; g.fillText(rs, x1, y); }
+    g.textAlign = al; g.fillStyle = fs;
+    return px;
+  }
+  const sheetName = () => [plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule';
   const hourLabel = (m) => { const h24 = Math.floor(m / 60) % 24; return `${h24 % 12 || 12}${h24 < 12 ? 'am' : 'pm'}`; };
   // Browsers can't hold pictures much over ~250 million pixels; bigger pages are saved as vectors.
   const tooBig = (W, H) => W > 32000 || H > 32000 || W * H > 200e6;

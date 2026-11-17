@@ -224,6 +224,9 @@ table.t tr.off td { color: var(--muted); }
 .task-add { display: grid; grid-template-columns: 1fr 200px auto; gap: 8px; }
 #print-area { display: none; }
 .person-sheet { background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
+/* a sheet over more than one page: the total only once, at the end (not at the foot of every page); rows never split */
+.person-sheet tfoot { display: table-row-group; }
+.person-sheet tr { break-inside: avoid; page-break-inside: avoid; }
 .person-sheet .ps-head { display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
 .person-sheet h1 { font-size: 26px; margin: 2px 0; }
 .person-sheet .ps-place { font-weight: 700; color: #444; }
@@ -348,8 +351,9 @@ table.cal td.cal-day { vertical-align: top; height: 104px; border: 1px solid var
 table.cal td.cal-out { background: var(--bg); }
 table.cal td.cal-out .cal-num { opacity: .5; }
 table.cal td.cal-closed { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
-.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-.cal-head .small { margin-left: auto; font-size: 10px; }
+.cal-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin-bottom: 2px; }
+/* the count never breaks in two; with many signs it moves to a line of its own (right) instead of running into the next day */
+.cal-head .small { margin-left: auto; font-size: 10px; white-space: nowrap; }
 .cal-num { border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; padding: 0 6px; border-radius: 10px; cursor: pointer; min-width: 24px; }
 .cal-num:hover { background: var(--accent-soft); }
 .cal-today .cal-num { background: var(--accent); color: var(--accent-ink); }
@@ -2116,7 +2120,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // Everyone on 1 page: the grid that gives the biggest cards for n people. k: the card's size against standard.
   const CARD_W = 2.5, CARD_H = 3.2;
   function cardGrid(pw, ph, n = 1) {
-    const aw = pw - 0.6, ah = ph - 1.1;
+    const m = decoMargin(0.3), aw = pw - 2 * m, ah = ph - 0.8 - m;
     if (cardPrefs.fit !== 'one') { const cols = Math.max(1, Math.floor(aw / CARD_W)), rows = Math.max(1, Math.floor(ah / CARD_H)); return [cols, rows, 1]; }
     let best = [1, n, 0];
     for (let cols = 1; cols <= Math.max(1, n); cols++) { const rows = Math.ceil(Math.max(1, n) / cols), k = Math.min(aw / cols / CARD_W, ah / rows / CARD_H); if (k > best[2]) best = [cols, rows, k]; }
@@ -2127,14 +2131,14 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, o), g = c.getContext('2d');
     const [cols, rows, k0] = cardGrid(pw, ph, item.total || item.people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
-    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi;
+    const pt = (n) => (n / 72) * dpi, M = decoMargin(0.3) * dpi, TOP = M + 0.45 * dpi;
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
     const font = (w, size) => { g.font = `${w} ${pt(size)}px Arial, Helvetica, sans-serif`; };
     const fit = (str, maxW) => { while (str.length > 1 && g.measureText(str).width > maxW) str = str.slice(0, -2) + '…'; return str; };
     // words on up to two lines
     const wrap2 = (str, maxW) => { if (g.measureText(str).width <= maxW) return [str]; const w = str.split(' '); let a = ''; while (w.length && g.measureText((a ? a + ' ' : '') + w[0]).width <= maxW) a += (a ? ' ' : '') + w.shift(); return a ? [a, fit(w.join(' '), maxW)] : [fit(str, maxW)]; };
     const on = (f) => cardOn('show', f);
-    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, M, M + pt(12));
+    headLine(g, M, W - M, M + pt(12), { s: `${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, px: pt(14), weight: '700' }); g.fillStyle = '#000';
     font('400', 9); g.fillStyle = '#444'; g.fillText(`Scan a code with a phone camera to add that person to its contacts.${item.pages > 1 ? `   Page ${item.page} of ${item.pages}` : ''}`, M, M + pt(26));
     const cw = (W - 2 * M) / cols, chh = (H - M - TOP) / rows;
     item.people.forEach((p, i) => {
@@ -2267,7 +2271,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         .al-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; align-items: start; }
         .al-dbox { break-inside: avoid; page-break-inside: avoid; }
         .al-dbox table { table-layout: fixed; }
-        .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; }
+        .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; overflow-wrap: anywhere; }
         .al-dbox thead th { background: #d9d9d9; font-weight: 700; }
         .al-dbox th.al-dtitle { background: #000; color: #fff; font-size: 9pt; text-align: center; }
         .al-dnone { color: #555; font-style: italic; }
@@ -2321,13 +2325,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
   // to fill it (by whichever of width or height runs out first, so it stays one page)
-  const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b); return { key: k, W, H, zoom: Math.min((W - 0.8) / 10.2, (H - 0.8) / 7.7) }; };
+  const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b), m = decoMargin(0.4); return { key: k, W, H, m, zoom: Math.min((W - 2 * m) / 10.2, (H - 2 * m) / 7.7) }; }; // m: the margin (wider with the decorations on)
   let availPaperPref = 'letter'; try { availPaperPref = localStorage.getItem(KEY + '-avail-paper') || 'letter'; } catch (e) { /* ignore */ }
   // Fitting the sheet to its page: it is measured off screen and enlarged until it fills the page's height (the width
   // always fits: the table spreads across it), at most half as big again; then, if the page is still taller, the rows
   // are stretched to use the rest, so the sheet fills the paper top to bottom. Returns the zoom (set on the sheet).
   function fitAvailability(sh, pg) {
-    const innerW = (pg.W - 0.8) * 96, innerH = (pg.H - 0.8) * 96 - 2;
+    const innerW = (pg.W - 2 * pg.m) * 96, innerH = (pg.H - 2 * pg.m) * 96 - 2;
     const holder = h('div', { style: { position: 'fixed', left: '-100000px', top: '0', width: innerW + 'px', visibility: 'hidden', background: '#fff' } }, sh);
     document.body.append(holder);
     const heightAt = (z) => { sh.style.zoom = z; sh.style.width = innerW / z + 'px'; return sh.getBoundingClientRect().height; };
@@ -2351,7 +2355,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // el: another page to draw instead (the notes page)
   async function availabilityCanvas(paper, dpi, el) {
     const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = el || availabilitySheet(); if (!el) fitAvailability(sh, pg);
-    const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
+    const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: pg.m + 'in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
     const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
     const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
@@ -2417,9 +2421,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
     // the sheet has its title and version already; the space round it is put back inside the page
     const pg = availPaper(availPaperPref);
-    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: 0.4in; box-sizing: border-box; }`), sheet);
+    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: ${pg.m}in; box-sizing: border-box; }`), sheet);
     fitAvailability(sheet, pg); $('#print-area').append(sheet);
-    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: '0.4in' } }, sheet.notesPage));
+    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: pg.m + 'in' } }, sheet.notesPage));
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
@@ -4324,6 +4328,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     return { col, art: turn(art) };
   }
   // laid over a drawn page (a canvas, or a vector page): corners and the border, sized from the page's dots per inch
+  // a page's margin (inches) with the decorations on: wide enough that the frame and the corner pictures (out to
+  // 0.43 in) never sit on what is printed. Pages with narrow margins (the week in tiles, contact cards) use it.
+  const decoMargin = (m) => (deco.on && (deco.corners || deco.border) ? Math.max(m, 0.45) : m);
   function decorateSurface(c, a, b, dpi) {
     if (!deco.on || (!deco.corners && !deco.border) || !c) return c;
     const g = c.getContext('2d'); if (!g) return c;
@@ -4461,8 +4468,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const line = (x1, y1, x2, y2, wpt, col) => { g.strokeStyle = col; g.lineWidth = pt(wpt); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
       g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
       const n = Math.ceil(book.list.length / per);
-      text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, M + pt(18), 'left', 18, '700');
-      text(`Notes for the pages before${n > 1 ? ` · ${k + 1} of ${n}` : ''}`, W - M, M + pt(18), 'right', 10, '400', '#444');
+      headLine(g, M, W - M, M + pt(18), { s: sheetName(), px: pt(18), weight: '700' }, { s: `Notes for the pages before${n > 1 ? ` · ${k + 1} of ${n}` : ''}`, px: pt(10) });
       drawNotes(text, line, book.list.slice(k * per, (k + 1) * per), M, W - 2 * M, M + pt(34), H - M, inch, pt, gap);
       pages.push(c);
     }
@@ -4589,13 +4595,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const M = inch(0.45), CW = W - 2 * M;
     const days = weekDays(w);
     let y = M + pt(18);
-    g.font = font(20, '700'); g.fillText([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y);
-    g.font = font(10); g.textAlign = 'right'; g.fillStyle = '#444';
-    g.fillText(`Printed ${new Date().toLocaleDateString()}`, W - M, y);
-    if (placeLine()) g.fillText(placeLine(), W - M, y + pt(16));
-    g.textAlign = 'left'; g.fillStyle = '#000';
+    headLine(g, M, W - M, y, { s: sheetName(), px: pt(20), weight: '700' }, { s: `Printed ${new Date().toLocaleDateString()}`, px: pt(10) });
     y += pt(20);
-    g.font = font(13, '700'); g.fillText(`Week of ${longDate(days[0])} – ${longDate(days[6])}`, M, y);
+    headLine(g, M, W - M, y, { s: `Week of ${longDate(days[0])} – ${longDate(days[6])}`, px: pt(13), weight: '700' }, { s: placeLine(), px: pt(10) });
+    g.textAlign = 'left'; g.fillStyle = '#000';
     y += pt(14);
 
     const staff = sortStaff(plan.staff.filter((p) => p.active || days.some((d) => shiftsOn(d).some((s) => s.staffId === p.id))));
@@ -4726,9 +4729,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, { ...o, vector: false }), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    const M = 0.3 * dpi, GAP = 0.12 * dpi, TOP = 0.42 * dpi, days = weekDays(weekOf(start));
-    g.fillStyle = '#000'; g.font = `700 ${(14 / 72) * dpi}px Arial, Helvetica, sans-serif`; g.textBaseline = 'alphabetic';
-    g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule'} · week of ${longDate(days[0])}`, M, M + (12 / 72) * dpi);
+    const M = decoMargin(0.3) * dpi, GAP = 0.12 * dpi, TOP = 0.42 * dpi, days = weekDays(weekOf(start));
+    g.fillStyle = '#000'; g.textBaseline = 'alphabetic';
+    headLine(g, M, W - M, M + (12 / 72) * dpi, { s: `${sheetName()} · week of ${longDate(days[0])}`, px: (14 / 72) * dpi, weight: '700' });
     const cols = 3, rows = 3, tw = (W - 2 * M - (cols - 1) * GAP) / cols, th = (H - M - TOP - M - (rows - 1) * GAP) / rows;
     // everyone working this week gets a number (in the app's groups, then by name); the tiles show the numbers and the
     // legend in the spare space says who is who, so the tiles stay uncluttered
@@ -4785,11 +4788,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const nb = notesFor([d], o), noteList = nb.list;
     if (o.numbers) { y -= pt(4); text(longDate(d) + nb.day(d), M, y, 'left', 16, '700'); y += pt(13); text(totals, M, y, 'left', 9.5, '400', '#333'); } // a tile: the page has the company's name
     else {
-      text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 18, '700');
-      text(totals, W - M, y, 'right', 10, '400', '#333');
+      headLine(g, M, W - M, y, { s: sheetName(), px: pt(18), weight: '700' }, { s: totals, px: pt(10), col: '#333' });
       y += pt(20);
-      text(longDate(d) + nb.day(d), M, y, 'left', 14, '700');
-      if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
+      headLine(g, M, W - M, y, { s: longDate(d) + nb.day(d), px: pt(14), weight: '700' }, { s: placeLine(), px: pt(9) });
     }
     y += pt(12);
 
@@ -4815,7 +4816,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     // Hour labels
     g.fillStyle = '#222'; g.fillRect(M, y, CW, headH);
     text('Name', M + pt(5), y + headH * 0.7, 'left', 8.5, '700', '#fff');
-    for (let m = DAY_START; m < DAY_END; m += 60) text(hourLabel(m), xAt(m) + pt(3), y + headH * 0.7, 'left', 8, '700', '#fff');
+    // every hour, or every other one when they would run into each other (a small tile)
+    { g.font = font(8, '700'); const need = g.measureText('12pm').width + pt(5), every = xAt(DAY_START + 60) - xAt(DAY_START) >= need ? 60 : 120;
+      for (let m = DAY_START; m < DAY_END; m += every) if (xAt(m) + pt(3) + g.measureText(hourLabel(m)).width <= x1) text(hourLabel(m), xAt(m) + pt(3), y + headH * 0.7, 'left', 8, '700', '#fff'); }
     y += headH;
     const gridTop = y;
     rows.forEach((r) => {
@@ -4830,8 +4833,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           g.fillStyle = PRINT_COLORS[r.gk] || '#2a7fd4';
           g.beginPath(); (g.roundRect ? g.roundRect(bx, by, bw, bh, pt(2)) : g.rect(bx, by, bw, bh)); g.fill();
           const label = `${clock(sh.start, true)}–${clock(sh.end, true)}  ${hrs(len(sh))} h${nb.on ? nb.shift(sh) : sh.note ? '   Note: ' + sh.note : ''}`;
-          text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(6));
-          if (availIssue(r.p, d, sh)) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
+          const iss = availIssue(r.p, d, sh); // the ! at the bar's end: the time is cut short to leave it room
+          text(label, bx + pt(4), by + bh * 0.68, 'left', barPt, '700', '#fff', bw - pt(iss ? 6 + barPt * 0.6 : 6));
+          if (iss) text('!', bx + bw - pt(4), by + bh * 0.7, 'right', barPt, '700', '#ffd34d');
         });
       }
       y += rowH;
@@ -4863,7 +4867,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       }
       text(`max ${max}`, x0 - pt(4), cy + pt(8), 'right', 8, '400', '#555');
       text('0', x0 - pt(4), cy + ch, 'right', 8, '400', '#555');
-      text('count at each hour', M, cy + ch + pt(10), 'left', 7.5, '400', '#555');
+      // the label under the axis, only as far as the first hour's count (smaller, or left out, on a small tile)
+      { const room = xAt(DAY_START + 30) - pt(6) - M; let fsz = 7.5; g.font = font(fsz); const w = g.measureText('count at each hour').width; if (w > room) fsz *= room / w;
+        if (fsz >= 5) text('count at each hour', M, cy + ch + pt(10), 'left', fsz, '400', '#555'); }
       y = cy + ch + pt(14);
     }
     if (notesH) {
@@ -4914,6 +4920,27 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     return c;
   }
+  // A heading line on a printed page: text on the left and (smaller) text on the right, never over each other or off
+  // the page, however long the store's name is or however narrow the paper. The right side gets … first (it keeps at
+  // least 35% of the line), then the left side shrinks (down to 70% of its size) and gets … if it still doesn't fit.
+  // L / R: { s, px (font size in pixels), weight, col }. Returns the left side's font size in pixels.
+  function headLine(g, x0, x1, y, L, R) {
+    const f = (t, px) => `${t.weight || '400'} ${px}px Arial, Helvetica, sans-serif`;
+    const wOf = (t, px, str) => { g.font = f(t, px); return g.measureText(str).width; };
+    const cut = (t, px, str, max) => { g.font = f(t, px); while (str.length > 1 && g.measureText(str).width > max) str = str.slice(0, -2) + '…'; return str; };
+    const span = x1 - x0, gap = L.px * 0.9;
+    let ls = String(L.s || ''), rs = R && R.s ? String(R.s) : '', px = L.px;
+    if (rs) rs = cut(R, R.px, rs, Math.max(span * 0.35, span - wOf(L, px, ls) - gap));
+    const room = span - (rs ? wOf(R, R.px, rs) + gap : 0);
+    while (px > L.px * 0.7 && wOf(L, px, ls) > room) px -= L.px * 0.03;
+    ls = cut(L, px, ls, room);
+    const al = g.textAlign, fs = g.fillStyle;
+    g.textAlign = 'left'; g.font = f(L, px); g.fillStyle = L.col || '#000'; g.fillText(ls, x0, y);
+    if (rs) { g.textAlign = 'right'; g.font = f(R, R.px); g.fillStyle = R.col || '#444'; g.fillText(rs, x1, y); }
+    g.textAlign = al; g.fillStyle = fs;
+    return px;
+  }
+  const sheetName = () => [plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule';
   const hourLabel = (m) => { const h24 = Math.floor(m / 60) % 24; return `${h24 % 12 || 12}${h24 < 12 ? 'am' : 'pm'}`; };
   // Browsers can't hold pictures much over ~250 million pixels; bigger pages are saved as vectors.
   const tooBig = (W, H) => W > 32000 || H > 32000 || W * H > 200e6;
@@ -4962,11 +4989,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     const end = addDays(start, weeks * 7 - 1);
     let y = M + pt(20);
-    text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 20, '700');
-    text(`Printed ${new Date().toLocaleDateString()}`, W - M, y, 'right', 9, '400', '#444');
+    headLine(g, M, W - M, y, { s: sheetName(), px: pt(20), weight: '700' }, { s: `Printed ${new Date().toLocaleDateString()}`, px: pt(9) });
     y += pt(20);
-    text(`${longDate(start)} – ${longDate(end)}`, M, y, 'left', 12, '700');
-    if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
+    headLine(g, M, W - M, y, { s: `${longDate(start)} – ${longDate(end)}`, px: pt(12), weight: '700' }, { s: placeLine(), px: pt(9) });
     y = M + titleH;
     // Heading row
     const top = y;
@@ -5101,7 +5126,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
       const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
-      const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: '38px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
+      const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: pg.m * 96 + 'px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
@@ -5285,6 +5310,26 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     g.drawImage(img, 0, 0, c.width, c.height);
     return c;
   }
+  // A tall screen on paper: cut into page-high pieces, each cut moved up to a gap between lines (a pixel row the same
+  // as the one above it: only background and up-and-down lines pass through), so no line of text is cut in two
+  function screenPages(c, max) {
+    if (c.height <= max) return [c];
+    const g = c.getContext('2d'), W = c.width, out = [];
+    for (let y0 = 0; y0 < c.height;) {
+      let y1 = Math.min(c.height, y0 + max);
+      if (y1 < c.height) {
+        const look = Math.floor(max * 0.3), top = y1 - look, d = g.getImageData(0, top, W, look).data, row = W * 4;
+        for (let r = look - 1; r > 0; r--) {
+          let same = true;
+          for (let i = r * row, j = (r - 1) * row, e = i + row; i < e; i += 4, j += 4) if (Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]) > 18) { same = false; break; }
+          if (same) { y1 = top + r; break; }
+        }
+      }
+      const p = document.createElement('canvas'); p.width = W; p.height = y1 - y0;
+      p.getContext('2d').drawImage(c, 0, y0, W, y1 - y0, 0, 0, W, y1 - y0); out.push(p); y0 = y1;
+    }
+    return out;
+  }
   function printScreenDialog() {
     const o = { format: 'png', dpi: 300, light: true, paper: 'letter', orient: 'landscape', ...(() => { try { return JSON.parse(localStorage.getItem(KEY + '-screen')) || {}; } catch (e) { return {}; } })() };
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
@@ -5319,7 +5364,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         const c = await screenCanvas(snapshotScreen(true), 2);
         let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
         const area = $('#print-area');
-        area.replaceChildren(h('style', null, `@page { size: ${pw}in ${ph}in; margin: 0.3in; } #print-area img.page { display: block; width: 100%; height: auto; }`), h('img', { class: 'page', alt: '', src: c.toDataURL('image/png') }));
+        // a page each piece (the page's height at the width the picture prints)
+        const pages = screenPages(c, Math.floor((ph - 0.6) / (pw - 0.6) * c.width) - 2);
+        area.replaceChildren(h('style', null, `@page { size: ${pw}in ${ph}in; margin: 0.3in; } #print-area img.page { display: block; width: 100%; height: auto; break-after: page; page-break-after: always; } #print-area img.page:last-of-type { break-after: auto; page-break-after: auto; }`),
+          ...pages.map((pc) => h('img', { class: 'page', alt: '', src: pc.toDataURL('image/png') })));
         document.body.classList.add('print-people');
         const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
         window.addEventListener('afterprint', done);

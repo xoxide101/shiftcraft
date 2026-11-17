@@ -80,8 +80,7 @@
       const line = (x1, y1, x2, y2, wpt, col) => { g.strokeStyle = col; g.lineWidth = pt(wpt); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
       g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
       const n = Math.ceil(book.list.length / per);
-      text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, M + pt(18), 'left', 18, '700');
-      text(`Notes for the pages before${n > 1 ? ` · ${k + 1} of ${n}` : ''}`, W - M, M + pt(18), 'right', 10, '400', '#444');
+      headLine(g, M, W - M, M + pt(18), { s: sheetName(), px: pt(18), weight: '700' }, { s: `Notes for the pages before${n > 1 ? ` · ${k + 1} of ${n}` : ''}`, px: pt(10) });
       drawNotes(text, line, book.list.slice(k * per, (k + 1) * per), M, W - 2 * M, M + pt(34), H - M, inch, pt, gap);
       pages.push(c);
     }

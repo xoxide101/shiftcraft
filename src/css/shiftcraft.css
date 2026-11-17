@@ -217,6 +217,9 @@ table.t tr.off td { color: var(--muted); }
 .task-add { display: grid; grid-template-columns: 1fr 200px auto; gap: 8px; }
 #print-area { display: none; }
 .person-sheet { background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
+/* a sheet over more than one page: the total only once, at the end (not at the foot of every page); rows never split */
+.person-sheet tfoot { display: table-row-group; }
+.person-sheet tr { break-inside: avoid; page-break-inside: avoid; }
 .person-sheet .ps-head { display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
 .person-sheet h1 { font-size: 26px; margin: 2px 0; }
 .person-sheet .ps-place { font-weight: 700; color: #444; }
@@ -341,8 +344,9 @@ table.cal td.cal-day { vertical-align: top; height: 104px; border: 1px solid var
 table.cal td.cal-out { background: var(--bg); }
 table.cal td.cal-out .cal-num { opacity: .5; }
 table.cal td.cal-closed { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
-.cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
-.cal-head .small { margin-left: auto; font-size: 10px; }
+.cal-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin-bottom: 2px; }
+/* the count never breaks in two; with many signs it moves to a line of its own (right) instead of running into the next day */
+.cal-head .small { margin-left: auto; font-size: 10px; white-space: nowrap; }
 .cal-num { border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; padding: 0 6px; border-radius: 10px; cursor: pointer; min-width: 24px; }
 .cal-num:hover { background: var(--accent-soft); }
 .cal-today .cal-num { background: var(--accent); color: var(--accent-ink); }

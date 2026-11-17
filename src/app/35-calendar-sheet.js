@@ -42,11 +42,9 @@
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     const end = addDays(start, weeks * 7 - 1);
     let y = M + pt(20);
-    text([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y, 'left', 20, '700');
-    text(`Printed ${new Date().toLocaleDateString()}`, W - M, y, 'right', 9, '400', '#444');
+    headLine(g, M, W - M, y, { s: sheetName(), px: pt(20), weight: '700' }, { s: `Printed ${new Date().toLocaleDateString()}`, px: pt(9) });
     y += pt(20);
-    text(`${longDate(start)} – ${longDate(end)}`, M, y, 'left', 12, '700');
-    if (placeLine()) text(placeLine(), W - M, y, 'right', 9, '400', '#444');
+    headLine(g, M, W - M, y, { s: `${longDate(start)} – ${longDate(end)}`, px: pt(12), weight: '700' }, { s: placeLine(), px: pt(9) });
     y = M + titleH;
     // Heading row
     const top = y;

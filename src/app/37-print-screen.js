@@ -54,6 +54,26 @@
     g.drawImage(img, 0, 0, c.width, c.height);
     return c;
   }
+  // A tall screen on paper: cut into page-high pieces, each cut moved up to a gap between lines (a pixel row the same
+  // as the one above it: only background and up-and-down lines pass through), so no line of text is cut in two
+  function screenPages(c, max) {
+    if (c.height <= max) return [c];
+    const g = c.getContext('2d'), W = c.width, out = [];
+    for (let y0 = 0; y0 < c.height;) {
+      let y1 = Math.min(c.height, y0 + max);
+      if (y1 < c.height) {
+        const look = Math.floor(max * 0.3), top = y1 - look, d = g.getImageData(0, top, W, look).data, row = W * 4;
+        for (let r = look - 1; r > 0; r--) {
+          let same = true;
+          for (let i = r * row, j = (r - 1) * row, e = i + row; i < e; i += 4, j += 4) if (Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]) > 18) { same = false; break; }
+          if (same) { y1 = top + r; break; }
+        }
+      }
+      const p = document.createElement('canvas'); p.width = W; p.height = y1 - y0;
+      p.getContext('2d').drawImage(c, 0, y0, W, y1 - y0, 0, 0, W, y1 - y0); out.push(p); y0 = y1;
+    }
+    return out;
+  }
   function printScreenDialog() {
     const o = { format: 'png', dpi: 300, light: true, paper: 'letter', orient: 'landscape', ...(() => { try { return JSON.parse(localStorage.getItem(KEY + '-screen')) || {}; } catch (e) { return {}; } })() };
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
@@ -88,7 +108,10 @@
         const c = await screenCanvas(snapshotScreen(true), 2);
         let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
         const area = $('#print-area');
-        area.replaceChildren(h('style', null, `@page { size: ${pw}in ${ph}in; margin: 0.3in; } #print-area img.page { display: block; width: 100%; height: auto; }`), h('img', { class: 'page', alt: '', src: c.toDataURL('image/png') }));
+        // a page each piece (the page's height at the width the picture prints)
+        const pages = screenPages(c, Math.floor((ph - 0.6) / (pw - 0.6) * c.width) - 2);
+        area.replaceChildren(h('style', null, `@page { size: ${pw}in ${ph}in; margin: 0.3in; } #print-area img.page { display: block; width: 100%; height: auto; break-after: page; page-break-after: always; } #print-area img.page:last-of-type { break-after: auto; page-break-after: auto; }`),
+          ...pages.map((pc) => h('img', { class: 'page', alt: '', src: pc.toDataURL('image/png') })));
         document.body.classList.add('print-people');
         const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
         window.addEventListener('afterprint', done);

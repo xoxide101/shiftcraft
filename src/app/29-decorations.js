@@ -113,6 +113,9 @@
     return { col, art: turn(art) };
   }
   // laid over a drawn page (a canvas, or a vector page): corners and the border, sized from the page's dots per inch
+  // a page's margin (inches) with the decorations on: wide enough that the frame and the corner pictures (out to
+  // 0.43 in) never sit on what is printed. Pages with narrow margins (the week in tiles, contact cards) use it.
+  const decoMargin = (m) => (deco.on && (deco.corners || deco.border) ? Math.max(m, 0.45) : m);
   function decorateSurface(c, a, b, dpi) {
     if (!deco.on || (!deco.corners && !deco.border) || !c) return c;
     const g = c.getContext('2d'); if (!g) return c;

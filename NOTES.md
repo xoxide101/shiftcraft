@@ -355,3 +355,15 @@ School is a note about the person (Staff › School: In school, school, term, cl
 ### Some days lines: + / = / −
 
 Each Some days line has a switch (`line.mode`, missing = +): + adds its hours to the hours row (or to Any time), = makes its hours the only ones those days (with any other + lines), − takes its hours out (can't work; always wins). `linesEntry(p, i)` turns a day's lines into a day-by-day entry ({ k: 'times', r: [[from, to, '+'|'-']] } or { k: 'any' }); `timesIssue` checks a shift against it. School: a note, unless the person's **Count class times** tick is on (`school.count`): then class times are hours they can't work, shown in the availability cells and checked on shifts. A day's plain Any (green, no highlight) gives way when the person has an hours row or Some days lines on the Weekdays / Weekend tab (`avOf`), so those show; older green clicks had saved Any and hidden them.
+
+### Printouts checked for overlaps
+
+Every printout was checked at every paper size and orientation, at 150 / 300 / 600 / 1200 DPI and as SVG at 2400 / 4800, with decorations on and off, colour and black and white. On canvas pages every piece of text was recorded and checked against the others, the page edge and the decorations. Web-page printouts were laid out at the paper's width and checked element by element. Fixes:
+
+- **Headings**: `headLine()` (34-surfaces.js) draws a heading's left and right text without them running into each other or off the page. The right text gets … first; the left text shrinks to 70%, then gets ….
+- **Narrow margins with decorations**: `decoMargin()` keeps the week tiles, contact cards and availability sheet clear of the frame and corner pictures.
+- **Timeline**: hour labels thin to every other hour when they would run together. The ! on a shift bar has its own room. The label under the floor chart is dropped when there is no room.
+- **Calendar 2**: the day's "7 sched." no longer breaks in two and runs into the next day; with many signs it moves to its own line. Long words and links in the details tables wrap.
+- **Print screen**: a tall screen is cut into pages in a gap between lines (`screenPages`), never through text.
+- **Person sheets**: the total prints once at the end, not at the foot of every page, and rows don't split.
+

@@ -15,13 +15,10 @@
     const M = inch(0.45), CW = W - 2 * M;
     const days = weekDays(w);
     let y = M + pt(18);
-    g.font = font(20, '700'); g.fillText([plan.company, plan.location].filter(Boolean).join(' – ') || 'Schedule', M, y);
-    g.font = font(10); g.textAlign = 'right'; g.fillStyle = '#444';
-    g.fillText(`Printed ${new Date().toLocaleDateString()}`, W - M, y);
-    if (placeLine()) g.fillText(placeLine(), W - M, y + pt(16));
-    g.textAlign = 'left'; g.fillStyle = '#000';
+    headLine(g, M, W - M, y, { s: sheetName(), px: pt(20), weight: '700' }, { s: `Printed ${new Date().toLocaleDateString()}`, px: pt(10) });
     y += pt(20);
-    g.font = font(13, '700'); g.fillText(`Week of ${longDate(days[0])} – ${longDate(days[6])}`, M, y);
+    headLine(g, M, W - M, y, { s: `Week of ${longDate(days[0])} – ${longDate(days[6])}`, px: pt(13), weight: '700' }, { s: placeLine(), px: pt(10) });
+    g.textAlign = 'left'; g.fillStyle = '#000';
     y += pt(14);
 
     const staff = sortStaff(plan.staff.filter((p) => p.active || days.some((d) => shiftsOn(d).some((s) => s.staffId === p.id))));

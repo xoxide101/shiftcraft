@@ -64,7 +64,7 @@
   // Everyone on 1 page: the grid that gives the biggest cards for n people. k: the card's size against standard.
   const CARD_W = 2.5, CARD_H = 3.2;
   function cardGrid(pw, ph, n = 1) {
-    const aw = pw - 0.6, ah = ph - 1.1;
+    const m = decoMargin(0.3), aw = pw - 2 * m, ah = ph - 0.8 - m;
     if (cardPrefs.fit !== 'one') { const cols = Math.max(1, Math.floor(aw / CARD_W)), rows = Math.max(1, Math.floor(ah / CARD_H)); return [cols, rows, 1]; }
     let best = [1, n, 0];
     for (let cols = 1; cols <= Math.max(1, n); cols++) { const rows = Math.ceil(Math.max(1, n) / cols), k = Math.min(aw / cols / CARD_W, ah / rows / CARD_H); if (k > best[2]) best = [cols, rows, k]; }
@@ -75,14 +75,14 @@
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, o), g = c.getContext('2d');
     const [cols, rows, k0] = cardGrid(pw, ph, item.total || item.people.length), k = Math.max(0.55, Math.min(1.3, k0 || 1));
-    const pt = (n) => (n / 72) * dpi, M = 0.3 * dpi, TOP = 0.75 * dpi;
+    const pt = (n) => (n / 72) * dpi, M = decoMargin(0.3) * dpi, TOP = M + 0.45 * dpi;
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
     const font = (w, size) => { g.font = `${w} ${pt(size)}px Arial, Helvetica, sans-serif`; };
     const fit = (str, maxW) => { while (str.length > 1 && g.measureText(str).width > maxW) str = str.slice(0, -2) + '…'; return str; };
     // words on up to two lines
     const wrap2 = (str, maxW) => { if (g.measureText(str).width <= maxW) return [str]; const w = str.split(' '); let a = ''; while (w.length && g.measureText((a ? a + ' ' : '') + w[0]).width <= maxW) a += (a ? ' ' : '') + w.shift(); return a ? [a, fit(w.join(' '), maxW)] : [fit(str, maxW)]; };
     const on = (f) => cardOn('show', f);
-    g.fillStyle = '#000'; font('700', 14); g.fillText(`${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, M, M + pt(12));
+    headLine(g, M, W - M, M + pt(12), { s: `${[plan.company, plan.location].filter(Boolean).join(' – ') || 'Team'} · Contact Cards`, px: pt(14), weight: '700' }); g.fillStyle = '#000';
     font('400', 9); g.fillStyle = '#444'; g.fillText(`Scan a code with a phone camera to add that person to its contacts.${item.pages > 1 ? `   Page ${item.page} of ${item.pages}` : ''}`, M, M + pt(26));
     const cw = (W - 2 * M) / cols, chh = (H - M - TOP) / rows;
     item.people.forEach((p, i) => {
@@ -215,7 +215,7 @@
         .al-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 12px; align-items: start; }
         .al-dbox { break-inside: avoid; page-break-inside: avoid; }
         .al-dbox table { table-layout: fixed; }
-        .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; }
+        .al-dbox th, .al-dbox td { border: 1px solid #000; font-size: 8pt; padding: 1px 4px; text-align: left; vertical-align: top; overflow: hidden; overflow-wrap: anywhere; }
         .al-dbox thead th { background: #d9d9d9; font-weight: 700; }
         .al-dbox th.al-dtitle { background: #000; color: #fff; font-size: 9pt; text-align: center; }
         .al-dnone { color: #555; font-style: italic; }
@@ -269,13 +269,13 @@
   }
   // the availability sheet on Letter, Legal or Tabloid (landscape): how big the page is and how much the sheet is enlarged
   // to fill it (by whichever of width or height runs out first, so it stays one page)
-  const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b); return { key: k, W, H, zoom: Math.min((W - 0.8) / 10.2, (H - 0.8) / 7.7) }; };
+  const availPaper = (paper) => { const k = PAPERS[paper] ? paper : 'letter', [a, b] = PAPERS[k], W = Math.max(a, b), H = Math.min(a, b), m = decoMargin(0.4); return { key: k, W, H, m, zoom: Math.min((W - 2 * m) / 10.2, (H - 2 * m) / 7.7) }; }; // m: the margin (wider with the decorations on)
   let availPaperPref = 'letter'; try { availPaperPref = localStorage.getItem(KEY + '-avail-paper') || 'letter'; } catch (e) { /* ignore */ }
   // Fitting the sheet to its page: it is measured off screen and enlarged until it fills the page's height (the width
   // always fits: the table spreads across it), at most half as big again; then, if the page is still taller, the rows
   // are stretched to use the rest, so the sheet fills the paper top to bottom. Returns the zoom (set on the sheet).
   function fitAvailability(sh, pg) {
-    const innerW = (pg.W - 0.8) * 96, innerH = (pg.H - 0.8) * 96 - 2;
+    const innerW = (pg.W - 2 * pg.m) * 96, innerH = (pg.H - 2 * pg.m) * 96 - 2;
     const holder = h('div', { style: { position: 'fixed', left: '-100000px', top: '0', width: innerW + 'px', visibility: 'hidden', background: '#fff' } }, sh);
     document.body.append(holder);
     const heightAt = (z) => { sh.style.zoom = z; sh.style.width = innerW / z + 'px'; return sh.getBoundingClientRect().height; };
@@ -299,7 +299,7 @@
   // el: another page to draw instead (the notes page)
   async function availabilityCanvas(paper, dpi, el) {
     const pg = availPaper(paper), W = Math.round(pg.W * 96), H = Math.round(pg.H * 96), sh = el || availabilitySheet(); if (!el) fitAvailability(sh, pg);
-    const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: '0.4in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
+    const page = h('div', { xmlns: 'http://www.w3.org/1999/xhtml', style: { width: W + 'px', height: H + 'px', padding: pg.m + 'in', boxSizing: 'border-box', background: '#ffffff', color: '#000000', overflow: 'hidden' } }, sh);
     const xhtml = new XMLSerializer().serializeToString(page), k = dpi / 96;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(W * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${W} ${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xhtml}</foreignObject></svg>`;
     const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
@@ -365,9 +365,9 @@
     // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
     // the sheet has its title and version already; the space round it is put back inside the page
     const pg = availPaper(availPaperPref);
-    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: 0.4in; box-sizing: border-box; }`), sheet);
+    area.replaceChildren(h('style', null, `@page { size: ${pg.W}in ${pg.H}in; margin: 0; } #print-area { padding: ${pg.m}in; box-sizing: border-box; }`), sheet);
     fitAvailability(sheet, pg); $('#print-area').append(sheet);
-    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: '0.4in' } }, sheet.notesPage));
+    if (sheet.notesPage) $('#print-area').append(h('div', { style: { breakBefore: 'page', pageBreakBefore: 'always', paddingTop: pg.m + 'in' } }, sheet.notesPage));
     document.body.classList.add('print-people');
     const done = () => { document.body.classList.remove('print-people'); area.replaceChildren(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
