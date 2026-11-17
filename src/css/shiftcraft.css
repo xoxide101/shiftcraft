@@ -392,10 +392,15 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cp-closed td.cal-closed .cal-num { position: relative; }
 .cp-closed td.cal-closed .cal-num::after { content: ''; position: absolute; left: 50%; top: 50%; width: 21px; height: 21px; margin: -12.5px 0 0 -12.5px; border: 2px solid #c62828; border-radius: 50%; pointer-events: none;
   background: linear-gradient(45deg, transparent calc(50% - 1px), #c62828 calc(50% - 1px), #c62828 calc(50% + 1px), transparent calc(50% + 1px)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-/* the days gone by crossed off: an X from corner to corner */
-.cp-past td.cal-past .cal-in::after { content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
-  background: linear-gradient(to top right, transparent calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% + 1.6px), transparent calc(50% + 1.6px)), linear-gradient(to top left, transparent calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% + 1.6px), transparent calc(50% + 1.6px)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-@media screen { .cp-past td.cal-past .cal-in::after { background: linear-gradient(to top right, transparent calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% + 1.6px), transparent calc(50% + 1.6px)), linear-gradient(to top left, transparent calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% + 1.6px), transparent calc(50% + 1.6px)); } }
+/* the days gone by crossed off: an X as drawn by hand, square (45°) in the middle of the day, not stretched to the
+   corners; grey, so it reads on paper and on the dark screen alike */
+.cp-past td.cal-past .cal-in::after { content: ''; position: absolute; inset: 4px; z-index: 4; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 12 88 88M88 12 12 88' stroke='%23777' stroke-width='3.2' stroke-linecap='round' vector-effect='non-scaling-stroke' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* or just over the date */
+.cp-pastdate td.cal-past .cal-in::after { display: none; }
+.cp-past.cp-pastdate td.cal-past .cal-num { position: relative; }
+.cp-past.cp-pastdate td.cal-past .cal-num::before { content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 12 88 88M88 12 12 88' stroke='%23777' stroke-width='2' stroke-opacity='.75' stroke-linecap='round' vector-effect='non-scaling-stroke' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media print { .cp-out-blank td.cal-out .cal-num::before { display: none; } }
 .cal-hrs.special { color: var(--fg); font-weight: 700; }
 .cal-hrs.closed { color: var(--bad); font-weight: 700; }
 /* numbered notes when the Calendar is printed (29-page-notes.js): the numbers and the list show only on paper */

@@ -370,6 +370,6 @@ Every printout was checked at every paper size and orientation, at 150 / 300 / 6
 ### Calendar print options and one-day repeats
 
 - **Closed days** (on by default): a no sign, a red circle with a line through it, over the date.
-- **Cross off the days gone by** (off by default): an X from corner to corner over each past day.
+- **Cross off the days gone by**: Off (the default), X over the day, or X over the date. The X is square and in the middle of the day, like one drawn by hand, not stretched to the corners (an SVG that fits the day).
 - **Days outside the month**: Show, Dim or Leave blank. Blank days lose their contents and lines, except a time off bar running through them. When there are 3 or more blank days after the month (or before it), and no bar runs into them, the legend goes there.
 - **Repeating store events are one day each time**: a range that repeats makes far too many days. Last day is hidden while an event repeats. Older ranged repeats are read as one day each time, and iCal in and out do the same. Moving First day moves Last day with it, so a one-day event stays one day (store events and special hours).
