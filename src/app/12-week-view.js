@@ -19,7 +19,7 @@
       h('div', { class: 'daynav' }, h('h1', { style: { textAlign: 'left', minWidth: 0 } }, `${placeName()} · Week ${w + 1}: ${shortDate(days[0])} – ${shortDate(days[6])}`), h('span', { class: 'spacer' }), weeks,
         h('button', { class: 'btn sm no-print', onclick: () => copyWeekDialog(w) }, 'Copy week to…'),
         h('button', { class: 'btn sm no-print', onclick: checkDialog }, 'Check schedule…'),
-        h('button', { class: 'btn sm no-print', onclick: () => window.print() }, 'Print')),
+        h('button', { class: 'btn sm no-print', onclick: () => printPageDialog() }, 'Print…')),
       h('div', { class: 'table-wrap', style: { marginTop: '12px' } }, h('table', { class: 't' },
         h('thead', null, h('tr', null, h('th', null, 'Name'), days.map((d) => h('th', { class: 'c' }, `${dayName(d, 'short')} ${parseIso(d).getDate()}`, calMark(d))), h('th', { class: 'num' }, 'Hours'))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 9, class: 'muted' }, 'No staff yet.'))),

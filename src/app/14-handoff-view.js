@@ -15,7 +15,7 @@
           h('button', { class: 'btn icon', 'aria-label': 'Next day', disabled: i >= days.length - 1, onclick: () => { ui.day = days[i + 1]; persist(); render(); } }, '›')),
         h('h1', null, longDate(d)), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm no-print', onclick: () => navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => toast('Copy was blocked. Select the text below instead.')) }, 'Copy as text'),
-        h('button', { class: 'btn sm no-print', onclick: () => window.print() }, 'Print')),
+        h('button', { class: 'btn sm no-print', onclick: () => printPageDialog() }, 'Print…')),
       h('p', { class: 'hint no-print', style: { margin: '6px 0 12px' } }, 'Keep this next to the real scheduler and enter each shift in order. Tick them off as you go.'),
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, h('th', { class: 'no-print' }, '✓'), h('th', null, 'Job group'), h('th', null, 'Name'), h('th', null, 'Role'), h('th', null, 'Start'), h('th', null, 'Finish'), h('th', { class: 'num' }, 'Hours'))),

@@ -482,32 +482,41 @@
   // month, on a page of their own, or none; which tables; repeating events on one line each. Kept in this browser.
   const CALP_KEY = 'shiftcraft-cal-print';
   // closed: a no sign over the date on a closed day; past: the days gone by crossed off with an X
-  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
-  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date', 'dim'].includes(c.pastAt)) calp.pastAt = c.pastAt; } catch (e) { /* blocked */ }
+  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', paper: 'letter', orient: 'landscape', format: 'pdf', dpi: 300, tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
+  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date', 'dim'].includes(c.pastAt)) calp.pastAt = c.pastAt; ['paper', 'orient', 'format'].forEach((k) => { if (typeof c[k] === 'string') calp[k] = c[k]; }); if (+c.dpi) calp.dpi = +c.dpi; } catch (e) { /* blocked */ }
   const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
   const CALP_ON = ['closed', 'past']; // shown when ticked (the others: left off when not)
   const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out + (calp.pastAt === 'date' ? ' cp-pastdate' : calp.pastAt === 'dim' ? ' cp-pastdim' : '');
+  // The choices show at once in the preview (and on the Calendar behind it); Cancel puts back what was there before.
   function calPrintDialog() {
-    const grid = JSON.parse(JSON.stringify(calp.grid)), tables = { ...calp.tables };
-    let where = notesWhere, condense = calp.condense, out = calp.out, past = grid.past ? calp.pastAt : 'off';
-    // the days before the first and after the last of the month: as usual, dimmed, or left blank (room for the legend)
-    const outSeg = calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], out, (v) => { out = v; });
-    const tick = (obj, k, label) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!obj[k], onchange: (e) => { obj[k] = e.target.checked; } }), ' ' + label);
-    const cols = (...kids) => h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 18px' } }, kids);
-    const cond = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: condense, onchange: (e) => { condense = e.target.checked; } }), ' Repeating events on one line each (Produce · every week on Mon–Sat)');
-    const tablesBox = h('div', { class: 'grid', style: { gap: '6px', display: where === 'off' ? 'none' : '' } },
-      cols(tick(tables, 'hours', 'Store hours'), tick(tables, 'timeoff', 'Time off'), tick(tables, 'events', 'Events'), tick(tables, 'holidays', 'Holidays')), cond);
-    const whereSeg = calSeg('Details', [['page', 'Under the month'], ['separate', 'On a page of their own'], ['off', 'None']], where, (v) => { where = v; tablesBox.style.display = v === 'off' ? 'none' : ''; });
-    modal({ title: `Print the calendar · ${monthLabel(cal.ym)}`, body: [
-      h('div', { class: 'field' }, h('span', null, 'On the month'),
-        cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'), tick(grid, 'closed', 'Closed days: a no sign over the date')),
-        h('div', { class: 'field', style: { marginTop: '6px' } }, h('span', null, 'Cross off the days gone by'), calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim them'], ['day', 'X in the middle'], ['date', 'X over the date']], past, (v) => { past = v; }))),
-      h('div', { class: 'field' }, h('span', null, 'Days before the 1st and after the last day (blank: the legend can go there)'), outSeg),
-      h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
-      tablesBox,
-      h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => render())),
-      h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks: requests, approved, store hours, events, holidays). The schedule calendar (who works each day) is in Print & share › Calendar.')],
-    actions: [{ label: 'Cancel' }, { label: 'Print…', primary: true, onClick: () => { Object.assign(calp.grid, grid); Object.assign(calp.tables, tables); calp.condense = condense; calp.out = out; grid.past = past !== 'off'; if (past !== 'off') calp.pastAt = past; Object.assign(calp.grid, grid); calpSave(); setNotesWhere(where); render(); setTimeout(() => window.print(), 80); } }] });
+    const before = JSON.parse(JSON.stringify(calp)), whereBefore = notesWhere;
+    if (!calp.paper) Object.assign(calp, { paper: 'letter', orient: 'landscape', format: 'pdf', dpi: 300 });
+    let kept = false, pw = null;
+    const changed = () => { calpSave(); render(); pw && pw.refresh(); };
+    const tick = (obj, k, label) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!obj[k], onchange: (e) => { obj[k] = e.target.checked; changed(); } }), ' ' + label);
+    const past0 = calp.grid.past ? calp.pastAt : 'off';
+    const tablesBox = h('div', { class: 'grid', style: { gap: '4px', display: notesWhere === 'off' ? 'none' : '' } },
+      tick(calp.tables, 'hours', 'Store hours'), tick(calp.tables, 'timeoff', 'Time off'), tick(calp.tables, 'events', 'Events'), tick(calp.tables, 'holidays', 'Holidays'), tick(calp, 'condense', 'Repeating events on one line each (Produce · every week on Mon–Sat)'));
+    const field = (label, ...kids) => h('div', { class: 'field' }, h('span', null, label), ...kids);
+    // the month and the details: the details on a page of their own start a new page
+    const sections = () => { const main = $('#main'), kids = [...main.children], sep = notesWhere === 'separate' ? kids.find((k) => k.classList.contains('cal-pnotes')) : null;
+      return [h('div', { class: 'main' }, kids.filter((k) => k !== sep).map((k) => k.cloneNode(true))), sep ? h('div', { class: 'main' }, sep.cloneNode(true)) : null].filter(Boolean); };
+    const MARGIN = 10 / 25.4;
+    pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`,
+      opts: [...paperChoices(calp, changed),
+        field('On the month', tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
+        field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),
+        field('Days before the 1st and after the last day (blank: the legend can go there)', calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], calp.out, (v) => { calp.out = v; changed(); })),
+        field('Details: store hours, time off, events and holidays, with the numbers from the month', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })),
+        tablesBox,
+        field('Decorations', decoControls(() => { render(); pw && pw.refresh(); })),
+        ...saveChoices(calp, changed),
+        h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks up top: requests, approved, store hours, events, holidays).')],
+      draw: (pv) => { const [w, hgt] = paperOf(calp), n = pvDom(pv, sections(), { pw: w, ph: hgt, m: MARGIN }); return `${monthLabel(cal.ym)} · ${PAPERS[calp.paper][2]} ${calp.orient} · ${n} page${n > 1 ? 's' : ''}${notesWhere === 'separate' ? ' · details on a page of their own' : ''}`; },
+      onClose: () => { if (kept) return; Object.keys(calp).forEach((k) => delete calp[k]); Object.assign(calp, before); calpSave(); setNotesWhere(whereBefore); render(); },
+      actions: [{ label: 'Cancel' },
+        { label: 'Print…', onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp); setPrintPage(w, hgt, MARGIN); setTimeout(() => window.print(), 80); } },
+        { label: 'Save', primary: true, onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp), sec = sections(); savePrintout({ name: fileStem('calendar', monthLabel(cal.ym)), pw: w, ph: hgt, o: calp, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt, m: MARGIN }, k) }); } }] });
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {

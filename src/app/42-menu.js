@@ -27,7 +27,7 @@
       { label: 'Print schedule for a person or group…', run: () => printPeopleDialog() },
       { label: 'Print availability and contact list', run: () => printAvailability() },
       { label: 'Print screen (what you see)…', key: 'Ctrl+Shift+P', run: printScreenDialog },
-      { label: 'Print…', key: 'Ctrl+P', run: () => { if (inFrame) blockedHere(); else window.print(); } },
+      { label: 'Print…', key: 'Ctrl+P', run: () => { if (inFrame) blockedHere(); else if (ui.tab === 'calendar') calPrintDialog(); else printPageDialog(); } },
       '-',
       { label: 'Company & location…', run: () => { ui.tab = 'company'; persist(); render(); } },
       { label: 'Settings…', run: settingsDialog },

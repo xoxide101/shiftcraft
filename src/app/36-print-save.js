@@ -65,8 +65,6 @@
     o.range = preset.range || ONE[o.layout] || 'week';
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
     const box = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } });
-    const size = h('p', { class: 'hint' });
-    const preview = h('img', { alt: 'Preview', style: { width: '100%', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff' } });
     // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
@@ -116,7 +114,7 @@
         h('div', { class: 'inline' }, h('b', { class: 'small', style: { minWidth: '190px' } }, 'Cards per page:'), fitSel), addrInUse() ? null : h('span', { class: 'hint small' }, 'Address is set to not in use (Company & Location › Contact details we keep).'));
     };
     const sel = (key, options, label) => {
-      const s = h('select', { class: 'input', onchange: () => { if (key === 'layout' && s.value === 'pretty') { md.close(); ui.tab = 'calendar'; persist(); render(); setTimeout(() => calPrintDialog(), 60); return; } // Calendar 2: the Calendar tab's own print window
+      const s = h('select', { class: 'input', onchange: () => { if (key === 'layout' && s.value === 'pretty') { pw.close(); ui.tab = 'calendar'; persist(); render(); setTimeout(() => calPrintDialog(), 60); return; } // Calendar 2: the Calendar tab's own print window
         o[key] = key === 'dpi' ? +s.value : s.value; if (key === 'layout') { o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); } else if (key === 'range') build(); update(); } },
         options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l)));
       return h('label', { class: 'field' }, h('span', null, label), s);
@@ -138,7 +136,7 @@
         o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
         sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
         sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
-        sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
+        sel('format', [['pdf', 'PDF – all pages in one file'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
         sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')].filter(Boolean));
       checks.replaceChildren(...[
         notesWhereSel(),
@@ -148,30 +146,36 @@
         o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
-    const update = () => {
-      preview.style.display = o.layout === 'avail' ? 'none' : ''; pagePrev.style.display = o.layout === 'avail' ? '' : 'none';
-      if (o.layout === 'avail') { showPage(); size.className = 'hint'; size.textContent = `Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in and Monday to Sunday, on one ${PAPERS[o.availPaper || 'letter'][2].replace(/ in$/, ' in')} landscape page (bigger paper, bigger print). Print sends it straight to the printer (choose the same paper there); Save makes a ${(o.availFormat || 'pdf').toUpperCase()} at ${o.dpi} DPI.`; return; }
-      const [pw, ph] = pageSize();
-      const n = items().length, W = Math.round(pw * o.dpi), H = Math.round(ph * o.dpi);
-      const big = o.format !== 'svg' && tooBig(W, H);
+    let pw = null;
+    const update = () => { pw && pw.refresh(); };
+    // the preview: the pages as they will print (the first few), and what saving makes
+    const drawPv = (pv) => {
+      if (o.layout === 'avail') { pv.replaceChildren(pagePrev); pagePrev.style.display = ''; pagePrev.style.width = pvWidth(pv) + 'px'; pagePrev.style.flex = 'none'; showPage(); return `Schedule Availability and Contact Information: everyone with phone numbers, the positions they are trained in and Monday to Sunday, on one ${PAPERS[o.availPaper || 'letter'][2].replace(/ in$/, ' in')} landscape page (bigger paper, bigger print). Save makes a ${(o.availFormat || 'pdf').toUpperCase()} at ${o.dpi} DPI.`; }
+      const [pw2, ph] = pageSize();
+      const n = items().length, W = Math.round(pw2 * o.dpi), H = Math.round(ph * o.dpi);
+      const big = o.format !== 'svg' && o.format !== 'pdf' && tooBig(W, H);
       const mb = (W * H * (o.format === 'bmp' ? 3 : o.format === 'png' ? 0.12 : 0.15)) / 1e6;
-      size.textContent = o.format === 'svg'
-        ? `${n} page${n > 1 ? 's' : ''} · SVG vector · prints sharp at any size and DPI${o.layout === 'calendar' ? ' · page grows to fit' : ` · ${pw} × ${ph} in`}`
-        : big
-          ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels (${(W * H / 1e9).toFixed(1)} billion), more than a browser can make into a ${o.format.toUpperCase()}. It will be saved as SVG instead: a vector file that prints sharp at ${o.dpi} DPI or any other.`
-          : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels${o.layout === 'calendar' ? ' (taller when there are many weeks)' : ' each'} · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
-      size.className = big ? 'hint warn' : 'hint';
-      if (o.layout === 'cards') { const info = cardQrInfo(pw, ph, cardPeople(o.range)); if (info) { size.textContent += ' · ' + info; if (/small:/.test(info)) size.className = 'hint warn'; } }
-      if (whereFor() === 'separate') size.textContent += ' · then the numbered notes on a page of their own';
-      preview.src = draw(items()[0], { ...o, dpi: 60, vector: false, numbered: whereFor() }).toDataURL();
+      let text = o.format === 'svg'
+        ? `${n} page${n > 1 ? 's' : ''} · SVG vector · prints sharp at any size and DPI · ${pw2} × ${ph} in`
+        : o.format === 'pdf' ? `${n} page${n > 1 ? 's' : ''} · one PDF, ${pw2} × ${ph} in pages, pictures at ${Math.min(o.dpi, 600)} DPI`
+        : big ? `At ${o.dpi} DPI a page would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, more than a browser can make into a ${o.format.toUpperCase()}: it will be saved as SVG instead (sharp at ${o.dpi} DPI or any other).`
+          : `${n} page${n > 1 ? 's' : ''} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels each · about ${mb < 1 ? '<1' : Math.round(mb)} MB each${o.dpi >= 1200 ? ' · this can take a while' : ''}`;
+      if (o.layout === 'cards') { const info = cardQrInfo(pw2, ph, cardPeople(o.range)); if (info) text += ' · ' + info; }
+      if (whereFor() === 'separate') text += ' · then the numbered notes on a page of their own';
+      // the first few pages (and the notes page), drawn small
+      const book = noteBook(), w = whereFor(), list = items(), show = list.slice(0, 4).map((it) => draw(it, { ...o, dpi: 90, vector: false, numbered: w, book }));
+      if (w === 'separate' && book.list.length && list.length <= 4) show.push(...drawNotesPages(book, { ...o, dpi: 90, vector: false }));
+      pvPictures(pv, show, list.length + (w === 'separate' && book.list.length ? drawNotesPages(book, { ...o, dpi: 20, vector: false }).length : 0));
+      return text;
     };
     build();
-    const md = modal({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save as image', wide: true, body: [box, checks, decoControls(() => update()), size, preview, pagePrev],
+    pw = printWindow({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save', opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
       actions: [{ label: 'Cancel' },
-        { label: 'Print', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
+        { label: 'Print…', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {
           remember();
           if (o.layout === 'avail') { saveAvailability(o); return; }
+          if (o.format === 'pdf') { const [pw2, ph] = pageSize(), list = items(); savePrintout({ name: list.length === 1 ? nameOf(list[0]) : `${nameOf(list[0])} and on`, pw: pw2, ph, o, canvases: async (d, vector) => allPages({ ...o, dpi: d, vector: !!vector }) }); return; }
           (async () => {
             const list = items(), book = noteBook(), w = whereFor();
             toast(`Making ${list.length} file${list.length > 1 ? 's' : ''}…`);
@@ -198,6 +202,5 @@
           })();
         } }] });
     function remember() { try { localStorage.setItem(KEY + '-img', JSON.stringify(o)); } catch (e) { /* ignore */ } }
-    update();
   }
 

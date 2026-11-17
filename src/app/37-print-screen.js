@@ -79,28 +79,26 @@
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
     const tabName = (TABS.find(([k]) => k === ui.tab) || [0, 'Screen'])[1];
     const sel = (key, options, label) => { const el = h('select', { class: 'input', onchange: () => { o[key] = key === 'dpi' ? +el.value : el.value; update(); } }, options.map(([v, l]) => h('option', { value: v, selected: String(o[key]) === String(v) }, l))); return h('label', { class: 'field' }, h('span', null, label), el); };
-    const size = h('p', { class: 'hint' });
-    const preview = h('img', { alt: 'Preview of the screen picture', style: { width: '100%', maxHeight: '42vh', objectFit: 'contain', objectPosition: 'top', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff' } });
-    let snap = null;
-    const update = async () => {
-      snap = snapshotScreen(true);
-      const scale = o.dpi / 96, W = Math.round(snap.W * scale), H = Math.round(snap.H * scale);
-      const big = o.format !== 'svg' && tooBig(W, H);
-      size.textContent = big
-        ? `At ${o.dpi} DPI this screen would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, too big for a picture file, so it will be saved as SVG (sharp at any size).`
-        : `${tabName} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels · ${o.dpi} DPI (the screen is drawn ${scale.toFixed(1)}× sharper than it looks)`;
-      size.className = big ? 'hint warn' : 'hint';
-      try { preview.src = (await screenCanvas(snap, 0.5)).toDataURL(); } catch (e) { preview.removeAttribute('src'); }
+    // the screen cut into pages as it prints (a page each piece, cut in a gap between lines)
+    const pagesOf = async (k) => { const c = await screenCanvas(snapshotScreen(true), k); const [pw2, ph] = paperOf(o); return screenPages(c, Math.floor((ph - 0.6) / (pw2 - 0.6) * c.width) - 2); };
+    let pw = null; const update = () => pw && pw.refresh();
+    const drawPv = async (pv) => {
+      const snap = snapshotScreen(true), scale = o.dpi / 96, W = Math.round(snap.W * scale), H = Math.round(snap.H * scale), big = o.format !== 'svg' && o.format !== 'pdf' && tooBig(W, H);
+      // each piece on a sheet of the paper picked (white round it: the 0.3 in margin)
+      const [pw2, ph] = paperOf(o), pieces = await pagesOf(1), sheets = pieces.map((pc) => { const S = 96, c = document.createElement('canvas'); c.width = Math.round(pw2 * S); c.height = Math.round(ph * S); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); const k = (c.width - 0.6 * S) / pc.width; g.drawImage(pc, 0.3 * S, 0.3 * S, pc.width * k, pc.height * k); return c; });
+      pvPictures(pv, sheets.slice(0, 8), sheets.length);
+      return o.format === 'pdf' ? `${tabName} · ${sheets.length} page${sheets.length > 1 ? 's' : ''} · one PDF, ${PAPERS[o.paper][2]} ${o.orient}`
+        : big ? `At ${o.dpi} DPI this screen would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, too big for a picture file, so it will be saved as SVG (sharp at any size).`
+          : `${tabName} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels · ${o.dpi} DPI (the screen is drawn ${scale.toFixed(1)}× sharper than it looks) · prints on ${sheets.length} page${sheets.length > 1 ? 's' : ''}`;
     };
-    modal({ title: `Print screen · ${tabName}`, wide: true, body: [
-      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } },
-        sel('format', [['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type'),
+    pw = printWindow({ title: `Print screen · ${tabName}`, opts: [
+        sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type'),
         sel('dpi', DPI_OPTIONS, 'Resolution'),
-        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper (for printing)'),
-        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation (for printing)')),
+        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper (for printing and PDF)'),
+        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation (for printing and PDF)'),
       h('p', { class: 'hint' }, 'Pictures and printouts always use light colors, even when you edit in dark mode.'),
-      size, preview,
       h('p', { class: 'hint' }, 'Takes the whole page of the tab you are on, including parts you would have to scroll to. Change tabs or days first to capture something else.')],
+    draw: drawPv,
     actions: [{ label: 'Cancel' },
       { label: 'Print', onClick: async () => {
         remember();
@@ -119,6 +117,11 @@
       } },
       { label: 'Save', primary: true, onClick: async () => {
         remember();
+        if (o.format === 'pdf') { // the pages as printed, each piece on a sheet with the margin round it
+          const [pw2, ph] = paperOf(o), d = Math.min(o.dpi, 300); toast('Making the PDF…');
+          const sheets = (await pagesOf(d / 96 * 1)).map((pc) => { const c = document.createElement('canvas'); c.width = Math.round(pw2 * d); c.height = Math.round(ph * d); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); const k = (c.width - 0.6 * d) / pc.width; g.drawImage(pc, 0.3 * d, 0.3 * d, pc.width * k, pc.height * k); return c; });
+          const n = await saveBlob(`${fileStem(tabName.toLowerCase(), 'screen', `${dayName(ui.day, 'short')} ${fileDate(ui.day)}`)}.pdf`, await pdfFromCanvas(sheets, pw2, ph), fileType('pdf'));
+          if (n) toast(`Saved ${n}`); return; }
         const s2 = snapshotScreen(true), scale = o.dpi / 96;
         const stamp = `${dayName(ui.day, 'short')} ${fileDate(ui.day)}`;
         const base = `${fileStem(tabName.toLowerCase(), 'screen', stamp)}`;
@@ -133,6 +136,5 @@
         if (n) toast(`Saved ${n}${ext !== o.format ? ' (as SVG, because that DPI is too big for a picture file)' : ''}`);
       } }] });
     function remember() { try { localStorage.setItem(KEY + '-screen', JSON.stringify(o)); } catch (e) { /* ignore */ } }
-    update();
   }
 

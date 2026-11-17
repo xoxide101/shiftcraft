@@ -8,7 +8,7 @@
     if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveFile('location'); return; }
     if (mod && k === 'o') { e.preventDefault(); openFile(); return; }
     if (mod && k === 'p' && e.shiftKey) { e.preventDefault(); printScreenDialog(); return; }
-    if (mod && k === 'p') { e.preventDefault(); if (inFrame) blockedHere(); else window.print(); return; }
+    if (mod && k === 'p') { e.preventDefault(); if (inFrame) blockedHere(); else if (ui.tab === 'calendar') calPrintDialog(); else printPageDialog(); return; }
     if (mod && k === 'z' && !typing) { e.preventDefault(); undo(); return; }
     if (!typing && ui.tab === 'schedule' && !mod && !e.target.classList.contains('shift')) {
       const days = planDays(), i = days.indexOf(ui.day);

@@ -385,3 +385,12 @@ A one-day sign (payday, produce, truck…) that falls on a day the store is clos
 ### Calendar 1 turned off
 
 The old picture calendar (weeks as rows, `drawCalendarSheet` in 35-calendar-sheet.js) is no longer offered in Print or save. A saved choice of it falls back to the week table. The Calendar button in the ribbon and the menu opens Calendar 2's print window, the Calendar tab's own. The code stays, to bring it back or remove it later.
+
+### Print windows: choices on the left, the pages on the right
+
+Every printout opens the same kind of window (05b-print-window.js, `printWindow`): the choices on the left, the pages as they will print on the right (all of them, up to 12), and Cancel / Print… / Save at the bottom. That covers Print or save (week table, timeline, availability list, contact cards), the Calendar, person schedules, Print screen, and Print this page (the Week and Hand-off buttons, Ctrl+P, File › Print…).
+
+- **Every printout can be saved** as PDF (all pages in one file), PNG, JPG, BMP or SVG, at any DPI on the list. PDF pages are pictures at up to 600 DPI (300 for Print screen). At a DPI too big for a picture, pictures are saved as SVG.
+- **Web-page printouts** (the Calendar, person sheets, a tab) are previewed with the page's own print styles, copied once under `.pd-print`, laid out at the paper's printable width. `pageCuts()` ends each page at a clean place: before a row, a box or a heading, and a heading stays with what follows it. A table wider than the paper is shrunk to fit, as the browser does when printing. Saved, each page is an SVG picture carrying the page's whole stylesheet, so it lays out exactly as the preview, drawn marks included.
+- **Paper size and orientation** are now picked for the Calendar, person sheets and Print this page too (`setPrintPage` sets the paper just before printing).
+- **The Calendar's choices** show at once in the preview and on the Calendar behind it. Cancel puts back what was there before.

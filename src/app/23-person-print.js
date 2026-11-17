@@ -2,25 +2,32 @@
   // Printed schedule for one person or a group
   // ===================================================================
   function printPeopleDialog(presetId) {
-    const who = h('select', { class: 'input' },
+    const o = { paper: 'letter', orient: 'landscape', format: 'pdf', dpi: 300, ...(() => { try { return JSON.parse(localStorage.getItem(KEY + '-people-pr')) || {}; } catch (e) { return {}; } })() };
+    let pw = null; const changed = () => pw && pw.refresh();
+    const who = h('select', { class: 'input', onchange: changed },
       h('optgroup', { label: 'Groups' }, h('option', { value: 'all' }, 'Everyone (one page each)'), GROUPS.map(([g]) => h('option', { value: 'g:' + g }, `All ${PLURAL[g]}`))),
       h('optgroup', { label: 'One person' }, sortStaff(plan.staff.filter((p) => !p.left)).map((p) => h('option', { value: 'p:' + p.id, selected: p.id === presetId }, `${p.name} (${ROLES[p.role].short})`))));
-    const range = h('select', { class: 'input' }, h('option', { value: 'week' }, `This week (week ${weekOf(ui.day) + 1})`), h('option', { value: 'all' }, `All ${plan.weeks} weeks`));
-    const tasks = h('input', { type: 'checkbox', checked: true });
-    const onlyScheduled = h('input', { type: 'checkbox', checked: true });
-    modal({ title: 'Print a schedule for a person or group', body: [
+    const range = h('select', { class: 'input', onchange: changed }, h('option', { value: 'week' }, `This week (week ${weekOf(ui.day) + 1})`), h('option', { value: 'all' }, `All ${plan.weeks} weeks`));
+    const tasks = h('input', { type: 'checkbox', checked: true, onchange: changed });
+    const onlyScheduled = h('input', { type: 'checkbox', checked: true, onchange: changed });
+    const weeksOf = () => (range.value === 'week' ? [weekOf(ui.day)] : Array.from({ length: plan.weeks }, (_, k) => k));
+    const peopleOf = () => { const weeks = weeksOf(); let people = who.value === 'all' ? plan.staff : who.value.startsWith('g:') ? plan.staff.filter((p) => ROLES[p.role].group === who.value.slice(2)) : plan.staff.filter((p) => 'p:' + p.id === who.value);
+      if (!who.value.startsWith('p:') && onlyScheduled.checked) people = people.filter((p) => weeks.some((w) => onPaper(() => personWeekHours(p.id, w))()));
+      return sortStaff(people); };
+    const sheets = () => peopleOf().map((p) => personSheet(p, weeksOf(), tasks.checked));
+    const keep = () => { try { localStorage.setItem(KEY + '-people-pr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
+    pw = printWindow({ title: 'Print or save a schedule for a person or group', opts: [
       h('label', { class: 'field' }, h('span', null, 'Who'), who),
       h('label', { class: 'field' }, h('span', null, 'Weeks'), range),
       h('label', { class: 'check' }, tasks, ' Include tasks and training'),
       h('label', { class: 'check' }, onlyScheduled, ' Skip people with no shifts in these weeks (groups only)'),
-      h('p', { class: 'hint' }, 'Each person gets their own page. In the print window you can also choose “Save as PDF”.')],
-    actions: [{ label: 'Cancel' }, { label: 'Print', primary: true, onClick: () => {
-      const weeks = range.value === 'week' ? [weekOf(ui.day)] : Array.from({ length: plan.weeks }, (_, k) => k);
-      let people = who.value === 'all' ? plan.staff : who.value.startsWith('g:') ? plan.staff.filter((p) => ROLES[p.role].group === who.value.slice(2)) : plan.staff.filter((p) => 'p:' + p.id === who.value);
-      if (!who.value.startsWith('p:') && onlyScheduled.checked) people = people.filter((p) => weeks.some((w) => personWeekHours(p.id, w)));
-      if (!people.length) { toast('Nobody to print for those weeks.'); return false; }
-      printPeople(sortStaff(people), weeks, tasks.checked);
-    } }] });
+      ...paperChoices(o, changed), ...saveChoices(o, changed),
+      h('p', { class: 'hint' }, 'Each person gets their own page.')],
+    draw: (pv) => { const list = sheets(); if (!list.length) { pv.replaceChildren(h('p', { class: 'hint' }, 'Nobody to print for those weeks.')); return 'Nobody'; } const [w, hgt] = paperOf(o), n = pvDom(pv, list, { pw: w, ph: hgt }); return `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
+    actions: [{ label: 'Cancel' },
+      { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
+      { label: 'Save', primary: true, onClick: () => { const list = sheets(); if (!list.length) { toast('Nobody to save for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o), one = who.value.startsWith('p:') ? staffById(who.value.slice(2)) : null;
+        savePrintout({ name: fileStem(one ? one.name : 'schedules', ...weeksOf().length === 1 ? [fileDate(weekDays(weeksOf()[0])[0])] : []), pw: w, ph: hgt, o, svgs: (k) => domPageSvgs(list, { pw: w, ph: hgt }, k) }); } }] });
   }
   // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
   const printPeople = onPaper(printPeopleBody);
