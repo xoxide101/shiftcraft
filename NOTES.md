@@ -377,3 +377,7 @@ Every printout was checked at every paper size and orientation, at 150 / 300 / 6
 ### A closed day has nobody on it, on paper
 
 Every printout, and the text and spreadsheet copies, is built inside `onPaper()` (04-calculations.js). While it runs, `shiftsOn(d)` gives nobody on a day the store is closed: special hours closed (a holiday), or closed as usual that weekday. Shifts, hours, totals and names all leave those days out. On screen the shifts still show, so Check schedule points them out and they can be taken off. Calendar 2 shows the day's count in red on screen only.
+
+### A sign moved off a closed day: circled
+
+A one-day sign (payday, produce, truck…) that falls on a day the store is closed moves to the open day before. It shows as the usual picture with a plain circle drawn round it, not filled, on screen and on paper, in colour or black and white. That covers the Calendar, the Schedule's sign line and the Week's heading. The legend says "Circled: moved to the day before (the store is closed that day)".

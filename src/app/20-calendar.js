@@ -47,7 +47,7 @@
   const dayRuns = (days) => { const d = [...new Set(days)].sort(), out = []; for (let i = 0; i < d.length;) { let j = i; while (j + 1 < d.length && d[j + 1] === d[j] + 1) j++; const A = WEEKDAYS[d[i]].slice(0, 3), B = WEEKDAYS[d[j]].slice(0, 3); out.push(j - i >= 2 ? `${A}–${B}` : j > i ? `${A}, ${B}` : A); i = j + 1; } return out.join(', '); };
   const repeatText = (r) => { const u = REPEAT_UNITS.find(([k]) => k === r.unit) || REPEAT_UNITS[1], n = Math.max(1, r.every | 0); return `every ${n === 1 ? u[1] : n === 2 && r.unit === 'week' ? 'other week' : n + ' ' + u[2]}${r.unit === 'week' && Array.isArray(r.days) && r.days.length ? ' on ' + dayRuns(r.days) : ''}${r.until ? ' until ' + shortDate(r.until) : ''}`; };
   // A one-day repeating event (produce, the truck, payday…) that falls on a day the store is closed for special hours
-  // (a holiday: Thanksgiving) moves to the open day before it, marked movedFrom (shown inverted: urgent). If that day
+  // (a holiday: Thanksgiving) moves to the open day before it, marked movedFrom (shown with a circle round it). If that day
   // already has it, that one is marked instead (a double order). End of period stays on its date.
   const shutForHoliday = (d) => { const sp = specialOn(d); return !!(sp && sp.closed); };
   const openOn = (d) => { const st = storeHoursOn(d); return !st || !st.closed; };
@@ -450,10 +450,10 @@
     }));
     // the legend (what the signs mean)
     const legendEl = () => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
-        // and the heads up: something moved to the day before a closed holiday (a white circle)
+        // and the heads up: something moved to the day before a closed holiday (circled)
         const moved = shown.some((it) => it.kind === 'event' && it.x.movedFrom && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start);
         return used.size || moved ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l)),
-          moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Heads up: moved to the day before a closed holiday') : null) : null; };
+          moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Circled: moved to the day before (the store is closed that day)') : null) : null; };
     // printed with the days outside the month left blank: the legend goes in the empty days after the month (or before
     // it) when there are 3 or more and no time off bar runs into them; on screen those days show as usual
     let legIn = false;
