@@ -1,7 +1,9 @@
   // ===================================================================
   // Text and CSV export
   // ===================================================================
-  function weekText(w) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const weekText = onPaper(weekTextBody);
+  function weekTextBody(w) {
     const days = weekDays(w);
     const out = [`${[plan.company, plan.location].filter(Boolean).join(' - ')}`, `Week of ${longDate(days[0])} - ${longDate(days[6])}`, ''];
     days.forEach((d) => {
@@ -16,7 +18,9 @@
     sortStaff(plan.staff).forEach((p) => { const t = personWeekHours(p.id, w); if (t) out.push(`  ${p.name.padEnd(24)} ${hrs(t).padStart(5)} h${p.maxHours && t > p.maxHours ? `  OVER MAX (${p.maxHours})` : ''}`); });
     return out.join('\r\n');
   }
-  function csvRows(weeks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const csvRows = onPaper(csvRowsBody);
+  function csvRowsBody(weeks) {
     const cell = (v) => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const rows = [['Date', 'Day', 'Job group', 'Name', 'Role', 'Start', 'Finish', 'Hours', 'Note']];
     weeks.forEach((w) => weekDays(w).forEach((d) => shiftsOn(d).map((s) => ({ s, p: staffById(s.staffId) }))

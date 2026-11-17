@@ -27,7 +27,9 @@
   const noteKey = { sp: (x) => 'sp' + x.id, ev: (x) => 'ev' + x.id, to: (p, t) => 'to' + (t.id || p.id + t.from) };
   // numbers for some days: special store hours and events (on the day), time off (on the person and day), notes on shifts
   // o.book: share the numbers across pages; o.numbered: where the list goes (notesWhere when not given)
-  function notesFor(days, o = {}) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const notesFor = onPaper(notesForBody);
+  function notesForBody(days, o = {}) {
     const where = o.numbered || notesWhere, book = o.book || noteBook(), on = where !== 'off';
     const dayN = new Map(), personN = new Map(), shiftN = new Map(), mine = new Set();
     const take = (key, text) => { const n = book.add(key, text); mine.add(n); return n; };
@@ -64,7 +66,9 @@
     for (; ly < bottom; ly += inch(gap)) line(M, ly, M + CW, ly, 0.5, '#bbb');
   }
   // the separate notes page(s) after the sheets: the whole printout's list, as many pages as it takes
-  function drawNotesPages(book, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawNotesPages = onPaper(drawNotesPagesBody);
+  function drawNotesPagesBody(book, o) {
     let [pw, ph] = PAPERS[o.paper] || PAPERS.letter;
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), gap = 0.3, M = 0.45 * dpi;

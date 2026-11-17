@@ -387,6 +387,9 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cal-hrs-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* how many are on the schedule that day: at the right of the hours, never broken in two */
 .cal-cnt { flex: none; margin-left: auto; color: var(--muted); font-weight: 400; }
+/* shifts left on a closed day: shown on screen as a reminder, never printed */
+.cal-cnt.shut { color: var(--bad); font-weight: 700; }
+@media print { .cal-cnt.shut { display: none; } }
 @media print { .cp-no-hours .cal-hrs .cal-cnt { visibility: visible; } }
 /* a closed day: a no sign (a circle with a line through it) over the date */
 .cp-closed td.cal-closed .cal-num { position: relative; }

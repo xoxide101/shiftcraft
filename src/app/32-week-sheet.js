@@ -2,7 +2,9 @@
   // Week sheet image (for printing and marking up)
   // ===================================================================
   const PAPERS = { letter: [8.5, 11, 'Letter 8.5 × 11 in'], legal: [8.5, 14, 'Legal 8.5 × 14 in'], tabloid: [11, 17, 'Tabloid 11 × 17 in'] };
-  function drawWeekSheet(w, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawWeekSheet = onPaper(drawWeekSheetBody);
+  function drawWeekSheetBody(w, o) {
     let [pw, ph] = PAPERS[o.paper];
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi);

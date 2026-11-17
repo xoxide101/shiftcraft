@@ -1,7 +1,9 @@
   // ===================================================================
   // Calendar sheet: weeks as rows, Monday–Sunday as columns
   // ===================================================================
-  function drawCalendarSheet(item, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawCalendarSheet = onPaper(drawCalendarSheetBody);
+  function drawCalendarSheetBody(item, o) {
     const { start, weeks } = item;
     let [pw, ph] = PAPERS[o.paper];
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];

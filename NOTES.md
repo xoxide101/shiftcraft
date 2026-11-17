@@ -373,3 +373,7 @@ Every printout was checked at every paper size and orientation, at 150 / 300 / 6
 - **Cross off the days gone by**: Off (the default), Dim them (the quietest), X in the middle, or X over the date. The X is small and square, in the middle of the day like one drawn by hand, not stretched to the corners.
 - **Days outside the month**: Show, Dim or Leave blank. Blank days lose their contents and lines, except a time off bar running through them. When there are 3 or more blank days after the month (or before it), and no bar runs into them, the legend goes there.
 - **Repeating store events are one day each time**: a range that repeats makes far too many days. Last day is hidden while an event repeats. Older ranged repeats are read as one day each time, and iCal in and out do the same. Moving First day moves Last day with it, so a one-day event stays one day (store events and special hours).
+
+### A closed day has nobody on it, on paper
+
+Every printout, and the text and spreadsheet copies, is built inside `onPaper()` (04-calculations.js). While it runs, `shiftsOn(d)` gives nobody on a day the store is closed: special hours closed (a holiday), or closed as usual that weekday. Shifts, hours, totals and names all leave those days out. On screen the shifts still show, so Check schedule points them out and they can be taken off. Calendar 2 shows the day's count in red on screen only.

@@ -4,7 +4,9 @@
   const PRINT_COLORS = { mgr: '#5b6675', sup: '#1d3f78', tm: '#2a7fd4', trn: '#1f8a5c' };
   // A week of timelines on one page: each day's timeline page drawn small (from a 7 × 5 in layout, so its text stays as
   // big as it can) in a 3 × 3 grid, the week's dates as the title; for reviewing the week at a glance
-  function drawWeekTiles(start, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawWeekTiles = onPaper(drawWeekTilesBody);
+  function drawWeekTilesBody(start, o) {
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, { ...o, vector: false }), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
@@ -43,7 +45,9 @@
     if (!people.length) { g.font = `400 ${fs}px Arial, Helvetica, sans-serif`; g.fillText('No one is scheduled this week.', lx + fs * 0.8, ly + fs * 2.9); }
     return c;
   }
-  function drawDaySheet(d, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawDaySheet = onPaper(drawDaySheetBody);
+  function drawDaySheetBody(d, o) {
     let [pw, ph] = o.pageIn || PAPERS[o.paper];
     if (!o.pageIn && o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi);

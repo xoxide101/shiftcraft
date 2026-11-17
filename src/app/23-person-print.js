@@ -22,7 +22,9 @@
       printPeople(sortStaff(people), weeks, tasks.checked);
     } }] });
   }
-  function printPeople(people, weeks, withTasks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const printPeople = onPaper(printPeopleBody);
+  function printPeopleBody(people, weeks, withTasks) {
     if (blockedHere()) return;
     const area = $('#print-area');
     area.replaceChildren(...people.map((p) => personSheet(p, weeks, withTasks)));
@@ -31,7 +33,9 @@
     window.addEventListener('afterprint', done);
     setTimeout(() => window.print(), 60);
   }
-  function personSheet(p, weeks, withTasks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const personSheet = onPaper(personSheetBody);
+  function personSheetBody(p, weeks, withTasks) {
     const days = weeks.flatMap((w) => weekDays(w));
     const total = weeks.reduce((t, w) => t + personWeekHours(p.id, w), 0);
     const rows = [];

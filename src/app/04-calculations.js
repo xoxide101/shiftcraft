@@ -5,7 +5,13 @@
   const weekOf = (d) => Math.floor((parseIso(d) - parseIso(plan.startDate)) / 864e5 / 7);
   const weekDays = (w) => Array.from({ length: 7 }, (_, i) => addDays(plan.startDate, w * 7 + i));
   const staffById = (id) => plan.staff.find((s) => s.id === id);
-  const shiftsOn = (d) => (plan.shifts[d] || []).filter((s) => staffById(s.staffId));
+  // On paper, a day the store is closed (special hours: a holiday; or closed as usual that weekday) has nobody on it,
+  // whatever is left on the schedule: every printout (and the text and spreadsheet copies) is built inside onPaper(),
+  // so its shifts, hours, totals and names all leave those days out. On screen they still show, so Check schedule
+  // points them out and they can be taken off.
+  let onPaperN = 0;
+  const onPaper = (fn) => function (...a) { onPaperN++; try { return fn.apply(this, a); } finally { onPaperN--; } };
+  const shiftsOn = (d) => (onPaperN && storeShut(d) ? [] : (plan.shifts[d] || []).filter((s) => staffById(s.staffId)));
   const dayHours = (d) => shiftsOn(d).reduce((t, s) => t + len(s), 0);
   function trend(d) {
     const vals = [7, 14, 21, 28].map((k) => plan.history[addDays(d, -k)]).filter((v) => v != null && v !== '' && !isNaN(v));

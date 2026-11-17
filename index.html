@@ -394,6 +394,9 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cal-hrs-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* how many are on the schedule that day: at the right of the hours, never broken in two */
 .cal-cnt { flex: none; margin-left: auto; color: var(--muted); font-weight: 400; }
+/* shifts left on a closed day: shown on screen as a reminder, never printed */
+.cal-cnt.shut { color: var(--bad); font-weight: 700; }
+@media print { .cal-cnt.shut { display: none; } }
 @media print { .cp-no-hours .cal-hrs .cal-cnt { visibility: visible; } }
 /* a closed day: a no sign (a circle with a line through it) over the date */
 .cp-closed td.cal-closed .cal-num { position: relative; }
@@ -1045,7 +1048,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const weekOf = (d) => Math.floor((parseIso(d) - parseIso(plan.startDate)) / 864e5 / 7);
   const weekDays = (w) => Array.from({ length: 7 }, (_, i) => addDays(plan.startDate, w * 7 + i));
   const staffById = (id) => plan.staff.find((s) => s.id === id);
-  const shiftsOn = (d) => (plan.shifts[d] || []).filter((s) => staffById(s.staffId));
+  // On paper, a day the store is closed (special hours: a holiday; or closed as usual that weekday) has nobody on it,
+  // whatever is left on the schedule: every printout (and the text and spreadsheet copies) is built inside onPaper(),
+  // so its shifts, hours, totals and names all leave those days out. On screen they still show, so Check schedule
+  // points them out and they can be taken off.
+  let onPaperN = 0;
+  const onPaper = (fn) => function (...a) { onPaperN++; try { return fn.apply(this, a); } finally { onPaperN--; } };
+  const shiftsOn = (d) => (onPaperN && storeShut(d) ? [] : (plan.shifts[d] || []).filter((s) => staffById(s.staffId)));
   const dayHours = (d) => shiftsOn(d).reduce((t, s) => t + len(s), 0);
   function trend(d) {
     const vals = [7, 14, 21, 28].map((k) => plan.history[addDays(d, -k)]).filter((v) => v != null && v !== '' && !isNaN(v));
@@ -2856,6 +2865,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const usualOn = (d) => usualWeek()[dayIdx(d)];
   const regularHours = (d) => { const u = usualOn(d); return u && !u.closed ? u : null; };
   // the store's hours on a day: special hours win, otherwise the usual hours for that weekday (null: not set)
+  const storeShut = (d) => { const st = storeHoursOn(d); return !!(st && st.closed); };
   const storeHoursOn = (d) => { const sp = specialOn(d); if (sp) return { closed: !!sp.closed, open: sp.open, close: sp.close, special: sp }; const u = usualOn(d); return u ? { closed: !!u.closed, open: u.open, close: u.close, special: null } : null; };
   const setUsual = (fn) => change(() => { const w = usualWeek(); fn(w); plan.hours = { days: w }; });
   const usualText = (u) => (!u ? 'not set' : u.closed ? 'closed' : `${clockShort(u.open)}–${clockShort(u.close)}`);
@@ -3220,7 +3230,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('div', { class: 'cal-hrs' + (st && sp ? ' special' : '') + (st && st.closed ? ' closed' : '') }, st ? h('span', { class: 'cal-hrs-t', title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
           // changed hours (still open): the usual hours struck through, the day's own next to them
           return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null,
-          n ? h('span', { class: 'cal-cnt', title: `${n} on the schedule` }, `${n} sched.`) : null),
+          n ? h('span', { class: 'cal-cnt' + (st && st.closed ? ' shut' : ''), title: st && st.closed ? `${n} on the schedule, but the store is closed: Check schedule points them out (not printed)` : `${n} on the schedule` }, `${n} sched.`) : null),
         // the week's time off bars: this day's own starts here; a lane another day's bar runs through is kept empty
         spans[w].length ? h('div', { class: 'cal-lanes' }, spans[w].map((l) => { const seg = l.find((x) => x.s <= d && d <= x.e); return seg && seg.s === d ? spanBar(seg) : h('div', { class: 'cal-lane' }); })) : null,
         topShow.map(chipN),
@@ -3774,7 +3784,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       printPeople(sortStaff(people), weeks, tasks.checked);
     } }] });
   }
-  function printPeople(people, weeks, withTasks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const printPeople = onPaper(printPeopleBody);
+  function printPeopleBody(people, weeks, withTasks) {
     if (blockedHere()) return;
     const area = $('#print-area');
     area.replaceChildren(...people.map((p) => personSheet(p, weeks, withTasks)));
@@ -3783,7 +3795,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     window.addEventListener('afterprint', done);
     setTimeout(() => window.print(), 60);
   }
-  function personSheet(p, weeks, withTasks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const personSheet = onPaper(personSheetBody);
+  function personSheetBody(p, weeks, withTasks) {
     const days = weeks.flatMap((w) => weekDays(w));
     const total = weeks.reduce((t, w) => t + personWeekHours(p.id, w), 0);
     const rows = [];
@@ -4475,7 +4489,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const noteKey = { sp: (x) => 'sp' + x.id, ev: (x) => 'ev' + x.id, to: (p, t) => 'to' + (t.id || p.id + t.from) };
   // numbers for some days: special store hours and events (on the day), time off (on the person and day), notes on shifts
   // o.book: share the numbers across pages; o.numbered: where the list goes (notesWhere when not given)
-  function notesFor(days, o = {}) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const notesFor = onPaper(notesForBody);
+  function notesForBody(days, o = {}) {
     const where = o.numbered || notesWhere, book = o.book || noteBook(), on = where !== 'off';
     const dayN = new Map(), personN = new Map(), shiftN = new Map(), mine = new Set();
     const take = (key, text) => { const n = book.add(key, text); mine.add(n); return n; };
@@ -4512,7 +4528,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     for (; ly < bottom; ly += inch(gap)) line(M, ly, M + CW, ly, 0.5, '#bbb');
   }
   // the separate notes page(s) after the sheets: the whole printout's list, as many pages as it takes
-  function drawNotesPages(book, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawNotesPages = onPaper(drawNotesPagesBody);
+  function drawNotesPagesBody(book, o) {
     let [pw, ph] = PAPERS[o.paper] || PAPERS.letter;
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), gap = 0.3, M = 0.45 * dpi;
@@ -4602,7 +4620,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // ===================================================================
   // Text and CSV export
   // ===================================================================
-  function weekText(w) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const weekText = onPaper(weekTextBody);
+  function weekTextBody(w) {
     const days = weekDays(w);
     const out = [`${[plan.company, plan.location].filter(Boolean).join(' - ')}`, `Week of ${longDate(days[0])} - ${longDate(days[6])}`, ''];
     days.forEach((d) => {
@@ -4617,7 +4637,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     sortStaff(plan.staff).forEach((p) => { const t = personWeekHours(p.id, w); if (t) out.push(`  ${p.name.padEnd(24)} ${hrs(t).padStart(5)} h${p.maxHours && t > p.maxHours ? `  OVER MAX (${p.maxHours})` : ''}`); });
     return out.join('\r\n');
   }
-  function csvRows(weeks) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const csvRows = onPaper(csvRowsBody);
+  function csvRowsBody(weeks) {
     const cell = (v) => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const rows = [['Date', 'Day', 'Job group', 'Name', 'Role', 'Start', 'Finish', 'Hours', 'Note']];
     weeks.forEach((w) => weekDays(w).forEach((d) => shiftsOn(d).map((s) => ({ s, p: staffById(s.staffId) }))
@@ -4642,7 +4664,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // Week sheet image (for printing and marking up)
   // ===================================================================
   const PAPERS = { letter: [8.5, 11, 'Letter 8.5 × 11 in'], legal: [8.5, 14, 'Legal 8.5 × 14 in'], tabloid: [11, 17, 'Tabloid 11 × 17 in'] };
-  function drawWeekSheet(w, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawWeekSheet = onPaper(drawWeekSheetBody);
+  function drawWeekSheetBody(w, o) {
     let [pw, ph] = PAPERS[o.paper];
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi);
@@ -4785,7 +4809,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const PRINT_COLORS = { mgr: '#5b6675', sup: '#1d3f78', tm: '#2a7fd4', trn: '#1f8a5c' };
   // A week of timelines on one page: each day's timeline page drawn small (from a 7 × 5 in layout, so its text stays as
   // big as it can) in a 3 × 3 grid, the week's dates as the title; for reviewing the week at a glance
-  function drawWeekTiles(start, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawWeekTiles = onPaper(drawWeekTilesBody);
+  function drawWeekTilesBody(start, o) {
     let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), c = makeSurface(W, H, { ...o, vector: false }), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
@@ -4824,7 +4850,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     if (!people.length) { g.font = `400 ${fs}px Arial, Helvetica, sans-serif`; g.fillText('No one is scheduled this week.', lx + fs * 0.8, ly + fs * 2.9); }
     return c;
   }
-  function drawDaySheet(d, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawDaySheet = onPaper(drawDaySheetBody);
+  function drawDaySheetBody(d, o) {
     let [pw, ph] = o.pageIn || PAPERS[o.paper];
     if (!o.pageIn && o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi);
@@ -5008,7 +5036,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // ===================================================================
   // Calendar sheet: weeks as rows, Monday–Sunday as columns
   // ===================================================================
-  function drawCalendarSheet(item, o) {
+  // on paper: a closed day has nobody on it (onPaper, 04-calculations.js)
+  const drawCalendarSheet = onPaper(drawCalendarSheetBody);
+  function drawCalendarSheetBody(item, o) {
     const { start, weeks } = item;
     let [pw, ph] = PAPERS[o.paper];
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];

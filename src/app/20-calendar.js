@@ -74,6 +74,7 @@
   const usualOn = (d) => usualWeek()[dayIdx(d)];
   const regularHours = (d) => { const u = usualOn(d); return u && !u.closed ? u : null; };
   // the store's hours on a day: special hours win, otherwise the usual hours for that weekday (null: not set)
+  const storeShut = (d) => { const st = storeHoursOn(d); return !!(st && st.closed); };
   const storeHoursOn = (d) => { const sp = specialOn(d); if (sp) return { closed: !!sp.closed, open: sp.open, close: sp.close, special: sp }; const u = usualOn(d); return u ? { closed: !!u.closed, open: u.open, close: u.close, special: null } : null; };
   const setUsual = (fn) => change(() => { const w = usualWeek(); fn(w); plan.hours = { days: w }; });
   const usualText = (u) => (!u ? 'not set' : u.closed ? 'closed' : `${clockShort(u.open)}–${clockShort(u.close)}`);
@@ -438,7 +439,7 @@
         h('div', { class: 'cal-hrs' + (st && sp ? ' special' : '') + (st && st.closed ? ' closed' : '') }, st ? h('span', { class: 'cal-hrs-t', title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
           // changed hours (still open): the usual hours struck through, the day's own next to them
           return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null,
-          n ? h('span', { class: 'cal-cnt', title: `${n} on the schedule` }, `${n} sched.`) : null),
+          n ? h('span', { class: 'cal-cnt' + (st && st.closed ? ' shut' : ''), title: st && st.closed ? `${n} on the schedule, but the store is closed: Check schedule points them out (not printed)` : `${n} on the schedule` }, `${n} sched.`) : null),
         // the week's time off bars: this day's own starts here; a lane another day's bar runs through is kept empty
         spans[w].length ? h('div', { class: 'cal-lanes' }, spans[w].map((l) => { const seg = l.find((x) => x.s <= d && d <= x.e); return seg && seg.s === d ? spanBar(seg) : h('div', { class: 'cal-lane' }); })) : null,
         topShow.map(chipN),
