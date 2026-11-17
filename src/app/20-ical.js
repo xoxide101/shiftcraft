@@ -60,7 +60,7 @@
       if (cS.c.checked) (plan.specialHours || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: null,
         summary: `${x.name || 'Special hours'}: ${x.closed ? 'store closed' : `store open ${clock(x.open)} – ${clock(x.close)}`}`, desc: bare ? '' : x.note, cats: 'Store hours',
         x: { KIND: 'special', ID: x.id, NAME: x.name, CLOSED: x.closed ? '1' : '0', OPEN: x.open, CLOSE: x.close, NOTE: bare ? '' : x.note } })));
-      if (cE.c.checked) (plan.events || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.to, hours: x.hours, summary: x.title, desc: bare ? '' : x.note, cats: 'Event', repeat: x.repeat, skip: x.skip,
+      if (cE.c.checked) (plan.events || []).filter(keep).forEach((x) => out.push(icsEvent({ uidOf: x.ics || `${x.id}@shiftcraft`, from: x.from, to: x.repeat ? x.from : x.to, hours: x.hours, summary: x.title, desc: bare ? '' : x.note, cats: 'Event', repeat: x.repeat, skip: x.skip,
         x: { KIND: 'event', ID: x.id, TITLE: x.title, NOTE: bare ? '' : x.note } })));
       return out;
     };
@@ -132,7 +132,7 @@
           let until = '';
           if (r.UNTIL) { const u = icsWhen(r.UNTIL); if (u) until = u.d; }
           else if (r.COUNT) { const all = repeatStarts({ from, to: from, repeat: { every, unit, until: '', ...(wd && wd.length ? { days: wd } : {}) } }, from, addDays(from, 366 * 40)); until = all[Math.max(1, +r.COUNT) - 1] || ''; }
-          rule = { every, unit, until, ...(wd && wd.length ? { days: [...new Set(wd)].sort() } : {}) };
+          rule = { every, unit, until, ...(wd && wd.length ? { days: [...new Set(wd)].sort() } : {}) }; to = from; // one day each time
           skip = String(e.EXDATE || '').split(',').map((v) => icsWhen(v.trim())).filter(Boolean).map((w) => w.d);
           repeat = repeatText(rule);
         } else repeat = { DAILY: 'every day', WEEKLY: 'every week', MONTHLY: 'every month', YEARLY: 'every year' }[r.FREQ] || 'repeats';
