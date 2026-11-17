@@ -409,7 +409,7 @@
       if (notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' '));
       return el;
     };
-    const rows = Array.from({ length: weeks }, (_, w) => h('tr', null, Array.from({ length: 7 }, (_, i) => {
+    const cells = Array.from({ length: weeks }, (_, w) => Array.from({ length: 7 }, (_, i) => {
       const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to && !multi(it)).sort(calOrder), sp = specialOn(d), st = storeHoursOn(d);
       const n = planDays().includes(d) ? shiftsOn(d).length : 0;
       // holidays: special hours or events that are one, then the list's own (unless an entry that day has its name)
@@ -424,7 +424,7 @@
       const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
         bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else eventDialog(null, { from: d, to: d, title: b.label, holiday: b.type, replaces: b.label }); } }, b.label);
           if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
-      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (d < today ? ' cal-past' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
         // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
         h('div', { class: 'cal-in', style: { paddingBottom: (evShow.length * 20 + bars.length * 19 + 5) + 'px' } },
         h('div', { class: 'cal-head' },
@@ -432,12 +432,13 @@
           eop && notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(eop))) : null,
           // the signs next to the date (payday, truck, inventory, insurance, meeting)
           marked.filter((it) => it !== eop).map((it) => h('button', { type: 'button', class: 'cal-mark' + (it.x.movedFrom ? ' urgent' : ''), title: calTip(it), 'aria-label': it.title, onclick: (e) => { e.stopPropagation(); calOpen(it); } }, markSvg(markOf(it.x)), notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(it))) : null)),
-          n ? h('span', { class: 'small muted', title: `${n} on the schedule` }, `${n} sched.`) : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
-        st ? h('div', { class: 'cal-hrs' + (sp ? ' special' : '') + (st.closed ? ' closed' : ''), title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
+        // and how many are on the schedule, at its right (the date's line stays one line: the time off bars line up)
+        h('div', { class: 'cal-hrs' + (st && sp ? ' special' : '') + (st && st.closed ? ' closed' : '') }, st ? h('span', { class: 'cal-hrs-t', title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
           // changed hours (still open): the usual hours struck through, the day's own next to them
-          return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : h('div', { class: 'cal-hrs' }, ' '),
+          return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null,
+          n ? h('span', { class: 'cal-cnt', title: `${n} on the schedule` }, `${n} sched.`) : null),
         // the week's time off bars: this day's own starts here; a lane another day's bar runs through is kept empty
         spans[w].length ? h('div', { class: 'cal-lanes' }, spans[w].map((l) => { const seg = l.find((x) => x.s <= d && d <= x.e); return seg && seg.s === d ? spanBar(seg) : h('div', { class: 'cal-lane' }); })) : null,
         topShow.map(chipN),
@@ -445,14 +446,25 @@
         // printed: the ones that don't fit as numbers only
         more.length && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, more.map((it) => supNum(numOf(it))).join(',')) : null,
         bottom));
-    })));
-    main.append(h('div', { class: 'card cal-card' + calpClass() }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
-      h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, rows))),
-      (() => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
+    }));
+    // the legend (what the signs mean)
+    const legendEl = () => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
         // and the heads up: something moved to the day before a closed holiday (a white circle)
         const moved = shown.some((it) => it.kind === 'event' && it.x.movedFrom && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start);
         return used.size || moved ? h('div', { class: 'cal-legend' }, CAL_MARKS.filter(([k]) => used.has(k)).map(([k, l]) => h('span', null, k === 'period' ? h('span', { class: 'cal-eop-key' }, '24') : markSvg(k), ' ' + l)),
-          moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Heads up: moved to the day before a closed holiday') : null) : null; })(),
+          moved ? h('span', null, h('span', { class: 'cal-mark urgent cal-heads' }, h('span', { class: 'cal-mark-ic' }, '!')), ' Heads up: moved to the day before a closed holiday') : null) : null; };
+    // printed with the days outside the month left blank: the legend goes in the empty days after the month (or before
+    // it) when there are 3 or more and no time off bar runs into them; on screen those days show as usual
+    let legIn = false;
+    if (calp.out === 'blank') {
+      const lw = weeks - 1, after = dayDiff(mLast, addDays(start, lw * 7 + 6)), before = dayDiff(start, mFirst), clear = (w, ok) => !spans[w].some((l) => l.some(ok));
+      const put = (w, k, atEnd) => { const leg = legendEl(); if (!leg) return; leg.classList.add('in-cell'); const row = cells[w], gone = atEnd ? row.slice(7 - k) : row.slice(0, k);
+        gone.forEach((td) => td.classList.add('cal-gone')); const td = h('td', { class: 'cal-legcell', colSpan: k }, leg); if (atEnd) row.push(td); else row.unshift(td); legIn = true; };
+      if (after >= 3 && clear(lw, (x) => x.e > mLast)) put(lw, after, true); else if (before >= 3 && clear(0, (x) => x.s < mFirst)) put(0, before, false);
+    }
+    main.append(h('div', { class: 'card cal-card' + calpClass() + (legIn ? ' cp-leg-in' : '') }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
+      h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, cells.map((row) => h('tr', null, row))))),
+      legendEl(),
       h('p', { class: 'hint no-print', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
     // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
     // each entry with the number it has on the month; under the month or on a page of their own
@@ -468,13 +480,17 @@
   // On the month: store hours by the date, time off bars, events, signs, holidays, the legend. The details: under the
   // month, on a page of their own, or none; which tables; repeating events on one line each. Kept in this browser.
   const CALP_KEY = 'shiftcraft-cal-print';
-  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true }, tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
-  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; } catch (e) { /* blocked */ }
+  // closed: a no sign over the date on a closed day; past: the days gone by crossed off with an X
+  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
+  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; } catch (e) { /* blocked */ }
   const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
-  const calpClass = () => Object.keys(calp.grid).filter((k) => !calp.grid[k]).map((k) => ' cp-no-' + k).join('');
+  const CALP_ON = ['closed', 'past']; // shown when ticked (the others: left off when not)
+  const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out;
   function calPrintDialog() {
     const grid = JSON.parse(JSON.stringify(calp.grid)), tables = { ...calp.tables };
-    let where = notesWhere, condense = calp.condense;
+    let where = notesWhere, condense = calp.condense, out = calp.out;
+    // the days before the first and after the last of the month: as usual, dimmed, or left blank (room for the legend)
+    const outSeg = calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], out, (v) => { out = v; });
     const tick = (obj, k, label) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!obj[k], onchange: (e) => { obj[k] = e.target.checked; } }), ' ' + label);
     const cols = (...kids) => h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 18px' } }, kids);
     const cond = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: condense, onchange: (e) => { condense = e.target.checked; } }), ' Repeating events on one line each (Produce · every week on Mon–Sat)');
@@ -483,12 +499,13 @@
     const whereSeg = calSeg('Details', [['page', 'Under the month'], ['separate', 'On a page of their own'], ['off', 'None']], where, (v) => { where = v; tablesBox.style.display = v === 'off' ? 'none' : ''; });
     modal({ title: `Print the calendar · ${monthLabel(cal.ym)}`, body: [
       h('div', { class: 'field' }, h('span', null, 'On the month'),
-        cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'))),
+        cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'), tick(grid, 'closed', 'Closed days: a no sign over the date'), tick(grid, 'past', 'Cross off the days gone by (an X)'))),
+      h('div', { class: 'field' }, h('span', null, 'Days before the 1st and after the last day (blank: the legend can go there)'), outSeg),
       h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
       tablesBox,
       h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => render())),
       h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks: requests, approved, store hours, events, holidays). The schedule calendar (who works each day) is in Print & share › Calendar.')],
-    actions: [{ label: 'Cancel' }, { label: 'Print…', primary: true, onClick: () => { Object.assign(calp.grid, grid); Object.assign(calp.tables, tables); calp.condense = condense; calpSave(); setNotesWhere(where); render(); setTimeout(() => window.print(), 80); } }] });
+    actions: [{ label: 'Cancel' }, { label: 'Print…', primary: true, onClick: () => { Object.assign(calp.grid, grid); Object.assign(calp.tables, tables); calp.condense = condense; calp.out = out; calpSave(); setNotesWhere(where); render(); setTimeout(() => window.print(), 80); } }] });
   }
   // the usual hours as a card on the Calendar
   function usualHoursCard() {

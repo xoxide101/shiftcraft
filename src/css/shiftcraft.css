@@ -344,14 +344,15 @@ table.cal td.cal-day { vertical-align: top; height: 104px; border: 1px solid var
 table.cal td.cal-out { background: var(--bg); }
 table.cal td.cal-out .cal-num { opacity: .5; }
 table.cal td.cal-closed { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
-.cal-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin-bottom: 2px; }
-/* the count never breaks in two; with many signs it moves to a line of its own (right) instead of running into the next day */
-.cal-head .small { margin-left: auto; font-size: 10px; white-space: nowrap; }
+/* the date's line is one line, the same height every day, so the time off bars (which run across days) line up and
+   never land on each other; with many signs they close up (overlap a little) instead of wrapping */
+.cal-head { display: flex; flex-wrap: nowrap; align-items: center; gap: 0 4px; height: 20px; margin-bottom: 2px; }
+.cal-head .cal-num { flex: none; }
+.cal-head .cal-mark { flex: 0 1 auto; min-width: 7px; }
 .cal-num { border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; padding: 0 6px; border-radius: 10px; cursor: pointer; min-width: 24px; }
 .cal-num:hover { background: var(--accent-soft); }
 .cal-today .cal-num { background: var(--accent); color: var(--accent-ink); }
 .cal-add { margin-left: auto; border: 1px solid transparent; background: none; color: var(--muted); border-radius: 5px; width: 20px; height: 20px; line-height: 16px; padding: 0; cursor: pointer; font-size: 15px; opacity: 0; }
-.cal-head .small + .cal-add { margin-left: 2px; }
 td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line); }
 .cal-chip { display: block; width: 100%; text-align: left; font: inherit; font-size: 11px; line-height: 16px; padding: 1px 5px; margin-top: 2px; border-radius: 4px; border: 1px solid transparent; color: var(--fg); background: var(--accent-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .cal-chip:hover { border-color: var(--accent); }
@@ -382,7 +383,19 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .qr-big { font-size: 15px; font-weight: 700; margin-top: 6px; }
 /* usual store hours, Monday to Sunday (20-calendar.js) */
 .usual-hours .co-hours { grid-template-columns: 110px auto auto auto; }
-.cal-hrs { font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-hrs { display: flex; gap: 4px; height: 13px; font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.cal-hrs-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* how many are on the schedule that day: at the right of the hours, never broken in two */
+.cal-cnt { flex: none; margin-left: auto; color: var(--muted); font-weight: 400; }
+@media print { .cp-no-hours .cal-hrs .cal-cnt { visibility: visible; } }
+/* a closed day: a no sign (a circle with a line through it) over the date */
+.cp-closed td.cal-closed .cal-num { position: relative; }
+.cp-closed td.cal-closed .cal-num::after { content: ''; position: absolute; left: 50%; top: 50%; width: 21px; height: 21px; margin: -12.5px 0 0 -12.5px; border: 2px solid #c62828; border-radius: 50%; pointer-events: none;
+  background: linear-gradient(45deg, transparent calc(50% - 1px), #c62828 calc(50% - 1px), #c62828 calc(50% + 1px), transparent calc(50% + 1px)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* the days gone by crossed off: an X from corner to corner */
+.cp-past td.cal-past .cal-in::after { content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background: linear-gradient(to top right, transparent calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% + 1.6px), transparent calc(50% + 1.6px)), linear-gradient(to top left, transparent calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% - 1.6px), rgba(0, 0, 0, 0.5) calc(50% + 1.6px), transparent calc(50% + 1.6px)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media screen { .cp-past td.cal-past .cal-in::after { background: linear-gradient(to top right, transparent calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% + 1.6px), transparent calc(50% + 1.6px)), linear-gradient(to top left, transparent calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% - 1.6px), color-mix(in srgb, var(--fg) 50%, transparent) calc(50% + 1.6px), transparent calc(50% + 1.6px)); } }
 .cal-hrs.special { color: var(--fg); font-weight: 700; }
 .cal-hrs.closed { color: var(--bad); font-weight: 700; }
 /* numbered notes when the Calendar is printed (29-page-notes.js): the numbers and the list show only on paper */
@@ -466,6 +479,20 @@ table.cal td.cal-day { padding: 0; }
   .cp-no-signs .cal-mark { display: none; } .cp-no-signs .cal-num.eop { outline: none !important; }
   .cp-no-holidays .cal-hol { display: none; }
   .cp-no-legend .cal-legend { display: none; }
+}
+/* Print the calendar: the days outside the month dimmed, or left blank (a time off bar running through still shows);
+   blank, the legend can sit in the empty days after the month (or before it) */
+.cal-legcell { display: none; }
+@media print {
+  .cp-out-dim td.cal-out .cal-in > :not(.cal-lanes) { opacity: 0.3; }
+  .cp-out-blank table.cal td.cal-out { border-style: none; background: none !important; }
+  .cp-out-blank td.cal-out .cal-in * { visibility: hidden; }
+  .cp-out-blank td.cal-out .cal-in::after, .cp-out-blank td.cal-out .cal-num::after { display: none; }
+  .cp-out-blank td.cal-out .cal-span, .cp-out-blank td.cal-out .cal-span * { visibility: visible; }
+  .cp-out-blank td.cal-gone { display: none; }
+  .cp-out-blank .cal-legcell { display: table-cell; vertical-align: middle; padding: 6px 10px; border: none; }
+  .cp-out-blank .cal-legcell .cal-legend { margin: 0; }
+  .cp-out-blank.cp-leg-in > .cal-legend { display: none; }
 }
 /* Decorations (29-decorations.js): the controls in the print windows, and the overlay on the printed Calendar */
 .deco-ctl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }

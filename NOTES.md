@@ -363,7 +363,13 @@ Every printout was checked at every paper size and orientation, at 150 / 300 / 6
 - **Headings**: `headLine()` (34-surfaces.js) draws a heading's left and right text without them running into each other or off the page. The right text gets … first; the left text shrinks to 70%, then gets ….
 - **Narrow margins with decorations**: `decoMargin()` keeps the week tiles, contact cards and availability sheet clear of the frame and corner pictures.
 - **Timeline**: hour labels thin to every other hour when they would run together. The ! on a shift bar has its own room. The label under the floor chart is dropped when there is no room.
-- **Calendar 2**: the day's "7 sched." no longer breaks in two and runs into the next day; with many signs it moves to its own line. Long words and links in the details tables wrap.
+- **Calendar 2**: the date's line is one line on every day (signs close up instead of wrapping) and the "7 sched." count sits at the right of the hours line, so time off bars, which run across several days, line up and never land on each other. Long words and links in the details tables wrap.
 - **Print screen**: a tall screen is cut into pages in a gap between lines (`screenPages`), never through text.
 - **Person sheets**: the total prints once at the end, not at the foot of every page, and rows don't split.
 
+### Calendar print options and one-day repeats
+
+- **Closed days** (on by default): a no sign, a red circle with a line through it, over the date.
+- **Cross off the days gone by** (off by default): an X from corner to corner over each past day.
+- **Days outside the month**: Show, Dim or Leave blank. Blank days lose their contents and lines, except a time off bar running through them. When there are 3 or more blank days after the month (or before it), and no bar runs into them, the legend goes there.
+- **Repeating store events are one day each time**: a range that repeats makes far too many days. Last day is hidden while an event repeats. Older ranged repeats are read as one day each time, and iCal in and out do the same. Moving First day moves Last day with it, so a one-day event stays one day (store events and special hours).
