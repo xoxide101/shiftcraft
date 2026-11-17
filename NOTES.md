@@ -381,3 +381,7 @@ Every printout, and the text and spreadsheet copies, is built inside `onPaper()`
 ### A sign moved off a closed day: circled
 
 A one-day sign (payday, produce, truck…) that falls on a day the store is closed moves to the open day before. It shows as the usual picture with a plain circle drawn round it, not filled, on screen and on paper, in colour or black and white. That covers the Calendar, the Schedule's sign line and the Week's heading. The legend says "Circled: moved to the day before (the store is closed that day)".
+
+### Calendar 1 turned off
+
+The old picture calendar (weeks as rows, `drawCalendarSheet` in 35-calendar-sheet.js) is no longer offered in Print or save. A saved choice of it falls back to the week table. The Calendar button in the ribbon and the menu opens Calendar 2's print window, the Calendar tab's own. The code stays, to bring it back or remove it later.

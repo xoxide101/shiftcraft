@@ -20,7 +20,7 @@
       '-',
       { label: 'Print or save week table…', run: () => exportImageDialog({ layout: 'table' }) },
       { label: 'Print or save visual timeline…', run: () => exportImageDialog({ layout: 'timeline' }) },
-      { label: 'Print or save calendar…', run: () => exportImageDialog({ layout: 'calendar' }) },
+      { label: 'Print the calendar…', run: () => { ui.tab = 'calendar'; persist(); render(); setTimeout(() => calPrintDialog(), 60); } }, // Calendar 2 (Calendar 1 is turned off)
       { label: 'Save as text or CSV…', run: exportTextDialog },
       { label: 'Import calendar (iCal .ics)…', run: icalImport },
       { label: 'Export calendar (iCal .ics)…', run: () => icalExportDialog() },
