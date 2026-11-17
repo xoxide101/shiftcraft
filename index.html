@@ -399,12 +399,13 @@ td.cal-day:hover .cal-add, .cal-add:focus { opacity: 1; border-color: var(--line
 .cp-closed td.cal-closed .cal-num { position: relative; }
 .cp-closed td.cal-closed .cal-num::after { content: ''; position: absolute; left: 50%; top: 50%; width: 21px; height: 21px; margin: -12.5px 0 0 -12.5px; border: 2px solid #c62828; border-radius: 50%; pointer-events: none;
   background: linear-gradient(45deg, transparent calc(50% - 1px), #c62828 calc(50% - 1px), #c62828 calc(50% + 1px), transparent calc(50% + 1px)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-/* the days gone by crossed off: an X as drawn by hand, square (45°) in the middle of the day, not stretched to the
+/* the days gone by crossed off: a small X as drawn by hand, square (45°) in the middle of the day, not stretched to the
    corners; grey, so it reads on paper and on the dark screen alike */
-.cp-past td.cal-past .cal-in::after { content: ''; position: absolute; inset: 4px; z-index: 4; pointer-events: none;
+.cp-past td.cal-past .cal-in::after { content: ''; position: absolute; left: 50%; top: 50%; width: 46px; max-width: 60%; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 12 88 88M88 12 12 88' stroke='%23777' stroke-width='3.2' stroke-linecap='round' vector-effect='non-scaling-stroke' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-/* or just over the date */
-.cp-pastdate td.cal-past .cal-in::after { display: none; }
+/* or just over the date, or the days dimmed (the quietest) */
+.cp-pastdate td.cal-past .cal-in::after, .cp-pastdim td.cal-past .cal-in::after { display: none; }
+.cp-past.cp-pastdim td.cal-past .cal-in > * { opacity: 0.35; }
 .cp-past.cp-pastdate td.cal-past .cal-num { position: relative; }
 .cp-past.cp-pastdate td.cal-past .cal-num::before { content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M12 12 88 88M88 12 12 88' stroke='%23777' stroke-width='2' stroke-opacity='.75' stroke-linecap='round' vector-effect='non-scaling-stroke' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 @media print { .cp-out-blank td.cal-out .cal-num::before { display: none; } }
@@ -3263,10 +3264,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const CALP_KEY = 'shiftcraft-cal-print';
   // closed: a no sign over the date on a closed day; past: the days gone by crossed off with an X
   const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
-  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date'].includes(c.pastAt)) calp.pastAt = c.pastAt; } catch (e) { /* blocked */ }
+  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date', 'dim'].includes(c.pastAt)) calp.pastAt = c.pastAt; } catch (e) { /* blocked */ }
   const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
   const CALP_ON = ['closed', 'past']; // shown when ticked (the others: left off when not)
-  const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out + (calp.pastAt === 'date' ? ' cp-pastdate' : '');
+  const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out + (calp.pastAt === 'date' ? ' cp-pastdate' : calp.pastAt === 'dim' ? ' cp-pastdim' : '');
   function calPrintDialog() {
     const grid = JSON.parse(JSON.stringify(calp.grid)), tables = { ...calp.tables };
     let where = notesWhere, condense = calp.condense, out = calp.out, past = grid.past ? calp.pastAt : 'off';
@@ -3281,7 +3282,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     modal({ title: `Print the calendar · ${monthLabel(cal.ym)}`, body: [
       h('div', { class: 'field' }, h('span', null, 'On the month'),
         cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'), tick(grid, 'closed', 'Closed days: a no sign over the date')),
-        h('div', { class: 'field', style: { marginTop: '6px' } }, h('span', null, 'Cross off the days gone by'), calSeg('Cross off the days gone by', [['off', 'Off'], ['day', 'X over the day'], ['date', 'X over the date']], past, (v) => { past = v; }))),
+        h('div', { class: 'field', style: { marginTop: '6px' } }, h('span', null, 'Cross off the days gone by'), calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim them'], ['day', 'X in the middle'], ['date', 'X over the date']], past, (v) => { past = v; }))),
       h('div', { class: 'field' }, h('span', null, 'Days before the 1st and after the last day (blank: the legend can go there)'), outSeg),
       h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
       tablesBox,

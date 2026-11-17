@@ -482,10 +482,10 @@
   const CALP_KEY = 'shiftcraft-cal-print';
   // closed: a no sign over the date on a closed day; past: the days gone by crossed off with an X
   const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
-  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date'].includes(c.pastAt)) calp.pastAt = c.pastAt; } catch (e) { /* blocked */ }
+  try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date', 'dim'].includes(c.pastAt)) calp.pastAt = c.pastAt; } catch (e) { /* blocked */ }
   const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
   const CALP_ON = ['closed', 'past']; // shown when ticked (the others: left off when not)
-  const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out + (calp.pastAt === 'date' ? ' cp-pastdate' : '');
+  const calpClass = () => Object.keys(calp.grid).map((k) => (CALP_ON.includes(k) ? (calp.grid[k] ? ' cp-' + k : '') : calp.grid[k] ? '' : ' cp-no-' + k)).join('') + ' cp-out-' + calp.out + (calp.pastAt === 'date' ? ' cp-pastdate' : calp.pastAt === 'dim' ? ' cp-pastdim' : '');
   function calPrintDialog() {
     const grid = JSON.parse(JSON.stringify(calp.grid)), tables = { ...calp.tables };
     let where = notesWhere, condense = calp.condense, out = calp.out, past = grid.past ? calp.pastAt : 'off';
@@ -500,7 +500,7 @@
     modal({ title: `Print the calendar · ${monthLabel(cal.ym)}`, body: [
       h('div', { class: 'field' }, h('span', null, 'On the month'),
         cols(tick(grid, 'hours', 'Store hours by the date'), tick(grid, 'timeoff', 'Time off bars'), tick(grid, 'events', 'Events'), tick(grid, 'signs', 'Signs (payday, produce, truck…)'), tick(grid, 'holidays', 'Holidays'), tick(grid, 'legend', 'Legend (what the signs mean)'), tick(grid, 'closed', 'Closed days: a no sign over the date')),
-        h('div', { class: 'field', style: { marginTop: '6px' } }, h('span', null, 'Cross off the days gone by'), calSeg('Cross off the days gone by', [['off', 'Off'], ['day', 'X over the day'], ['date', 'X over the date']], past, (v) => { past = v; }))),
+        h('div', { class: 'field', style: { marginTop: '6px' } }, h('span', null, 'Cross off the days gone by'), calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim them'], ['day', 'X in the middle'], ['date', 'X over the date']], past, (v) => { past = v; }))),
       h('div', { class: 'field' }, h('span', null, 'Days before the 1st and after the last day (blank: the legend can go there)'), outSeg),
       h('div', { class: 'field' }, h('span', null, 'Details: store hours, time off, events and holidays, with the numbers from the month'), whereSeg),
       tablesBox,
