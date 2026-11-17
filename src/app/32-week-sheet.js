@@ -14,7 +14,7 @@
     const font = (size, weight = '400') => `${weight} ${pt(size)}px Arial, Helvetica, sans-serif`;
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#000'; g.textBaseline = 'alphabetic';
-    const M = inch(0.45), CW = W - 2 * M;
+    const M = inch(decoMargin(0.45)), CW = W - 2 * M;
     const days = weekDays(w);
     let y = M + pt(18);
     headLine(g, M, W - M, y, { s: sheetName(), px: pt(20), weight: '700' }, { s: `Printed ${new Date().toLocaleDateString()}`, px: pt(10) });

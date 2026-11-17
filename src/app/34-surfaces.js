@@ -21,6 +21,7 @@
       stroke() { parts.push(`<path d="${path.join('')}" fill="none" stroke="${this.strokeStyle}" stroke-width="${n(this.lineWidth)}"/>`); },
       save() {}, restore() {},
       // a decoration's outline picture (29-decorations.js): an SVG path, moved and scaled
+      rawSvg(svg) { parts.push(svg); },
       decoPath(d, a, b, s, col, lw) { parts.push(`<path d="${d}" transform="translate(${n(a)} ${n(b)}) scale(${+s.toFixed(4)})" fill="none" stroke="${col}" stroke-width="${+(lw / s).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"/>`); },
       measureText(t) { measure.font = this.font; return measure.measureText(t); },
       fillText(t, a, b) {

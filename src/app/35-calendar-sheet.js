@@ -9,7 +9,7 @@
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
     const dpi = o.dpi, W = Math.round(pw * dpi);
     const pt = (v) => v / 72 * dpi, inch = (v) => v * dpi;
-    const M = inch(0.4), CW = W - 2 * M;
+    const M = inch(decoMargin(0.4)), CW = W - 2 * M;
     const weekW = CW * 0.1, dayW = (CW - weekW) / 7;
     const entryPt = Math.max(6, Math.min(8.5, dayW / dpi * 72 / 15.5));
     const lineH = pt(entryPt * 1.38);

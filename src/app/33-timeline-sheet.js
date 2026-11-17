@@ -64,7 +64,7 @@
     };
     const line = (x1, y1, x2, y2, wpt, col) => { g.strokeStyle = col; g.lineWidth = pt(wpt); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    const M = inch(0.45), CW = W - 2 * M;
+    const M = inch(decoMargin(0.45)), CW = W - 2 * M;
     let y = M + pt(18);
     const f = forecastOf(d), t = targetHours(d), v = varianceHours(d);
     const totals = `Scheduled ${hrs(dayHours(d))} h  ·  Forecast ${money(f)}  ·  Target ${t == null ? '—' : hrs(t)} h  ·  Variance ${v == null ? '—' : signed(v)} h`;

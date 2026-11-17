@@ -16,7 +16,7 @@
       return sortStaff(people); };
     const sheets = () => peopleOf().map((p) => personSheet(p, weeksOf(), tasks.checked));
     const keep = () => { try { localStorage.setItem(KEY + '-people-pr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
-    pw = printWindow({ title: 'Print or save a schedule for a person or group', opts: [
+    pw = printWindow({ title: 'Print or save a schedule for a person or group', use: 'person', reopen: () => printPeopleDialog(presetId), opts: [
       h('label', { class: 'field' }, h('span', null, 'Who'), who),
       h('label', { class: 'field' }, h('span', null, 'Weeks'), range),
       h('label', { class: 'check' }, tasks, ' Include tasks and training'),

@@ -473,7 +473,7 @@
       h('h3', null, `Details · ${monthLabel(cal.ym)}`),
       availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, tables: calp.tables, condense: calp.condense, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
     // printed: the decorations for these weeks, over every page
-    { const ov = decoOverlay(start, addDays(start, weeks * 7 - 1)); if (ov) main.append(ov); }
+    { const ov = decoOverlay(start, addDays(start, weeks * 7 - 1), calp.paper ? [...paperOf(calp), 10 / 25.4] : null); if (ov) main.append(ov); }
     main.append(usualHoursCard());
   }
   // the Calendar's print button: where the numbered notes go, then print
@@ -502,7 +502,7 @@
     const sections = () => { const main = $('#main'), kids = [...main.children], sep = notesWhere === 'separate' ? kids.find((k) => k.classList.contains('cal-pnotes')) : null;
       return [h('div', { class: 'main' }, kids.filter((k) => k !== sep).map((k) => k.cloneNode(true))), sep ? h('div', { class: 'main' }, sep.cloneNode(true)) : null].filter(Boolean); };
     const MARGIN = 10 / 25.4;
-    pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`,
+    pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`, use: 'calendar', reopen: () => calPrintDialog(), keep: () => { kept = true; calpSave(); },
       opts: [...paperChoices(calp, changed),
         field('On the month', tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
         field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),

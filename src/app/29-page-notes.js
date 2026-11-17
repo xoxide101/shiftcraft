@@ -71,7 +71,7 @@
   function drawNotesPagesBody(book, o) {
     let [pw, ph] = PAPERS[o.paper] || PAPERS.letter;
     if (o.orient === 'landscape') [pw, ph] = [ph, pw];
-    const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), gap = 0.3, M = 0.45 * dpi;
+    const dpi = o.dpi, W = Math.round(pw * dpi), H = Math.round(ph * dpi), gap = 0.3, M = decoMargin(0.45) * dpi;
     const per = Math.max(1, Math.floor((H - 2 * M - 0.9 * dpi) / (gap * dpi)) - 1), pages = [];
     for (let k = 0; k * per < book.list.length || k === 0; k++) {
       const c = makeSurface(W, H, o), g = c.getContext('2d');

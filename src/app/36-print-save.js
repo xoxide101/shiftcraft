@@ -169,7 +169,7 @@
       return text;
     };
     build();
-    pw = printWindow({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save', opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
+    pw = printWindow({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save', use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {

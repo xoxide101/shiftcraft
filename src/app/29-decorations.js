@@ -96,8 +96,8 @@
   ];
   // the choices, kept in this browser: on, corners (0–4), border, design ('random' or 1–5), holidays { key: on }
   const DECO_KEY = KEY + '-deco';
-  const deco = { on: true, corners: 2, border: true, pick: 'random', holidays: Object.fromEntries(DECO_HOLIDAYS.map(([k]) => [k, true])) };
-  try { const c = JSON.parse(localStorage.getItem(DECO_KEY) || '{}'); if (typeof c.on === 'boolean') deco.on = c.on; if ([0, 1, 2, 3, 4].includes(c.corners)) deco.corners = c.corners; if (typeof c.border === 'boolean') deco.border = c.border; if (c.pick === 'random' || [1, 2, 3, 4, 5].includes(c.pick)) deco.pick = c.pick; if (c.holidays) Object.keys(deco.holidays).forEach((k) => { if (typeof c.holidays[k] === 'boolean') deco.holidays[k] = c.holidays[k]; }); } catch (e) { /* blocked */ }
+  const deco = { on: true, corners: 2, border: true, style: 'frame', pick: 'random', holidays: Object.fromEntries(DECO_HOLIDAYS.map(([k]) => [k, true])) };
+  try { const c = JSON.parse(localStorage.getItem(DECO_KEY) || '{}'); if (typeof c.on === 'boolean') deco.on = c.on; if ([0, 1, 2, 3, 4].includes(c.corners)) deco.corners = c.corners; if (typeof c.border === 'boolean') deco.border = c.border; if (c.style === 'frame' || c.style === 'design') deco.style = c.style; if (c.on === false && !c.v) deco.border = false; deco.v = 2; if (c.pick === 'random' || [1, 2, 3, 4, 5].includes(c.pick)) deco.pick = c.pick; if (c.holidays) Object.keys(deco.holidays).forEach((k) => { if (typeof c.holidays[k] === 'boolean') deco.holidays[k] = c.holidays[k]; }); } catch (e) { /* blocked */ }
   const decoSave = () => { try { localStorage.setItem(DECO_KEY, JSON.stringify(deco)); } catch (e) { /* blocked */ } };
   // the design for the days a to b: a ticked holiday among them, or the month of a (of b's week when a is a Monday
   // late in the month that mostly falls in the next); the week of the year turns the five pictures around
@@ -114,10 +114,13 @@
   }
   // laid over a drawn page (a canvas, or a vector page): corners and the border, sized from the page's dots per inch
   // a page's margin (inches) with the decorations on: wide enough that the frame and the corner pictures (out to
-  // 0.43 in) never sit on what is printed. Pages with narrow margins (the week in tiles, contact cards) use it.
-  const decoMargin = (m) => (deco.on && (deco.corners || deco.border) ? Math.max(m, 0.45) : m);
+  // 0.43 in) never sit on what is printed, or your own border (Border designer) however deep it is. Pages with narrow
+  // margins (the week in tiles, contact cards) use it. The corner pictures go with Decorations On; the border has its
+  // own choice (Off, Thin frame, My border) in every print window.
+  const decoCorners = () => (deco.on && !(deco.border && deco.style === 'design' && myBorder()) ? deco.corners : 0); // your own border has its own corners
+  const decoMargin = (m) => Math.max(m, decoCorners() ? 0.45 : 0, deco.border ? (deco.style === 'design' && myBorder() ? myBorderInset() + 0.06 : 0.45) : 0);
   function decorateSurface(c, a, b, dpi) {
-    if (!deco.on || (!deco.corners && !deco.border) || !c) return c;
+    if ((!decoCorners() && !deco.border) || !c) return c;
     const g = c.getContext('2d'); if (!g) return c;
     const W = c.width, H = c.height, inch = dpi || 96, t = decoTheme(a, b), lw = Math.max(1, inch / 72 * 1.1);
     const icon = (name, x, y, size) => {
@@ -126,7 +129,8 @@
       if (typeof g.toSVG === 'function') { g.decoPath(d, x, y, s, t.col, lw); return; }
       g.save(); g.translate(x, y); g.scale(s, s); g.lineWidth = lw / s; g.strokeStyle = t.col; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(new Path2D(d)); g.restore();
     };
-    if (deco.border) {
+    if (deco.border && deco.style === 'design' && myBorder()) drawMyBorder(g, W, H, inch);
+    else if (deco.border) {
       const m = inch * 0.2, r = inch * 0.08;
       g.save(); g.strokeStyle = t.col; g.lineWidth = lw * 0.8; g.beginPath(); g.roundRect(m, m, W - 2 * m, H - 2 * m, r); g.stroke();
       g.lineWidth = lw * 0.4; g.beginPath(); g.roundRect(m + inch * 0.04, m + inch * 0.04, W - 2 * m - inch * 0.08, H - 2 * m - inch * 0.08, r * 0.6); g.stroke(); g.restore();
@@ -134,7 +138,7 @@
     // the corners: top right, bottom left, top left, bottom right, in the page's margin (a picture over the frame's corner)
     const size = inch * 0.36, o = inch * 0.05;
     const spots = [[W - o - size, o], [o, H - o - size], [o, o], [W - o - size, H - o - size]];
-    spots.slice(0, deco.corners).forEach(([x, y], i) => {
+    spots.slice(0, decoCorners()).forEach(([x, y], i) => {
       if (deco.border) { g.save(); g.fillStyle = '#ffffff'; g.fillRect(x - inch * 0.02, y - inch * 0.02, size + inch * 0.04, size + inch * 0.04); g.restore(); }
       icon(t.art[i], x, y, size);
     });
@@ -143,12 +147,14 @@
   // a picture as inline SVG (the Calendar's printed page, the controls)
   const decoSvg = (name, col, size) => { const s = h('span', { class: 'deco-ic', style: { color: col } }); s.innerHTML = `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="${DECO_ART[name] || ''}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`; return s; };
   // the overlay for a printed web page (the Calendar tab): fixed, so it lands on every printed page
-  function decoOverlay(a, b) {
-    if (!deco.on || (!deco.corners && !deco.border)) return null;
+  // (paper: [width, height, margin] in inches, for your own border drawn to the printed page's size)
+  function decoOverlay(a, b, paper) {
+    if (!decoCorners() && !deco.border) return null;
     const t = decoTheme(a, b), pos = [{ top: '0', right: '0' }, { bottom: '0', left: '0' }, { top: '0', left: '0' }, { bottom: '0', right: '0' }];
-    return h('div', { class: 'deco-overlay print-only', 'aria-hidden': 'true' },
-      deco.border ? h('div', { class: 'deco-frame', style: { borderColor: t.col } }) : null,
-      pos.slice(0, deco.corners).map((p, i) => h('div', { class: 'deco-corner', style: p }, decoSvg(t.art[i], t.col, 34))));
+    const mine = deco.border && deco.style === 'design' && myBorder() ? myBorderOverlay(paper) : null;
+    return h('div', { class: 'deco-overlay print-only' + (mine ? ' mine' : ''), 'aria-hidden': 'true' },
+      mine || (deco.border ? h('div', { class: 'deco-frame', style: { borderColor: t.col } }) : null),
+      pos.slice(0, decoCorners()).map((p, i) => h('div', { class: 'deco-corner', style: p }, decoSvg(t.art[i], t.col, 34))));
   }
   // the controls, the same in every print window: On, Corners, Border, Design, and the holidays' own pictures
   function decoControls(onChange) {
@@ -158,10 +164,9 @@
     const draw = () => {
       const t = decoTheme(iso(new Date()));
       wrap.replaceChildren(
-        sel('Decorations', deco.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']], (v) => { deco.on = v === 'on'; }),
+        sel('Corner pictures', deco.on ? 'on' : 'off', [['on', 'On'], ['off', 'Off']], (v) => { deco.on = v === 'on'; }),
         ...(deco.on ? [
           sel('Corners', deco.corners, [[0, 'None'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], (v) => { deco.corners = +v; }),
-          sel('Border', deco.border ? 'on' : 'off', [['on', 'On'], ['off', 'Off']], (v) => { deco.border = v === 'on'; }),
           sel('Design', deco.pick, [['random', 'Random (new each week)'], [1, 'Design 1'], [2, 'Design 2'], [3, 'Design 3'], [4, 'Design 4'], [5, 'Design 5']], (v) => { deco.pick = v === 'random' ? 'random' : +v; }),
           h('details', { class: 'deco-hol' }, h('summary', null, `Holiday pictures (${DECO_HOLIDAYS.filter(([k]) => deco.holidays[k]).length} of ${DECO_HOLIDAYS.length})`),
             h('div', { class: 'deco-hol-list' }, DECO_HOLIDAYS.map(([k, l, , col, art]) => h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: !!deco.holidays[k], onchange: (e) => { deco.holidays[k] = e.target.checked; decoSave(); if (onChange) onChange(); } }), ' ', decoSvg(art[0], col, 16), ' ' + l)))),

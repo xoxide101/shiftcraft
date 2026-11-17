@@ -530,6 +530,8 @@ table.cal td.cal-day { padding: 0; }
 @media print {
   body:has(.deco-overlay) .main { padding: 0.34in !important; -webkit-box-decoration-break: clone; box-decoration-break: clone; } /* the room on every page */
   .deco-overlay { display: block; position: fixed; inset: 0; pointer-events: none; z-index: 5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .deco-overlay.mine svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  body:has(.deco-overlay.mine) .main { padding: var(--my-border-pad, 0.34in) !important; }
   .deco-frame { position: absolute; inset: 0.1in; border: 1.4px solid; border-radius: 7px; box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 3.7px currentColor; }
   .deco-corner { position: absolute; background: #fff; padding: 1px; line-height: 0; }
 }
@@ -546,3 +548,9 @@ table.cal td.cal-day { padding: 0; }
 /* a Some days line's switch: + add / = only / − not, one tight row */
 .seg.line-mode { display: inline-flex; flex-wrap: nowrap; flex: none; }
 .seg.line-mode .btn { min-width: 26px; padding: 0 6px; font-weight: 800; }
+
+/* the Border designer: the designer page in a frame of its own (its own styles), filling the window */
+.border-frame { display: block; width: 100%; border: 0; border-radius: 10px; background: #e7eaf0; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.pd-border { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pd-border .pd-bprev { display: inline-flex; width: 52px; height: 40px; border: 1px solid var(--line, #ccd); border-radius: 4px; background: #fff; overflow: hidden; }
+.pd-border .pd-bprev svg { width: 100%; height: 100%; }

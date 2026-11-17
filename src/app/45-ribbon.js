@@ -11,7 +11,7 @@
     const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
     const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
-    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company'];
+    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company', 'border'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
     // Start (the wizard): what do you want to do? Each tile goes to the place (or the window) for that job.
     const go = (start) => () => { const it = item(start); if (it.run) it.run(); };
@@ -74,6 +74,11 @@
         { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [
           ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
           ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
+        ] },
+        { id: 'border', label: 'Border designer', hue: '#9b3fb5', onSelect: () => openBorderDesigner(), groups: [
+          ['Border', [{ label: 'Designer', icon: I.star, big: true, title: 'Design your own page border: lines, shapes, pictures at the corners and along the sides', run: () => openBorderDesigner() },
+            { label: 'Use on printouts', icon: I.check, big: true, title: 'Print with your border (Off, Thin frame or My border is also in every print window)', run: () => { borderUseOnPrint(!borderOnPrint()); toast(borderOnPrint() ? 'Printouts use your border' : 'Printouts use the thin frame'); } }]],
+          ['Print with it', [C('Print the calendar', 'Calendar', I.calendar, { big: true }), C('Print or save week table', 'Week table', I.table, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true })]],
         ] },
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print the calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],

@@ -5,12 +5,18 @@
   // printWindow({ title, opts: [elements], draw: (pv) => text | Promise<text>, actions }) puts the choices on the left
   // and calls draw(pv) to fill the preview on the right; it returns { refresh } to call when a choice changes.
   // The text draw returns shows above the preview (pages, size, where the notes went).
-  function printWindow({ title, opts, draw, actions, onClose }) {
+  // Every print window also gets the Border (Off, Thin frame, My border) and Customize border…, which opens the Border
+  // designer: use (the kind of page, for its room) and reopen (to come back here) say where it was opened from;
+  // keep() is called first so the window's choices are kept, not cancelled.
+  let pwOpen = null; // the open print window's refresh (your border is drawn after its picture is ready)
+  function printWindow({ title, opts, draw, actions, onClose, use, reopen, keep }) {
     const pv = h('div', { class: 'pd-pv', 'aria-label': 'Print preview' }), info = h('div', { class: 'pd-info' });
+    opts = [...opts, borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); })];
     let t = 0, n = 0;
     const refresh = () => { clearTimeout(t); t = setTimeout(async () => { const me = ++n; try { const s = await draw(pv); if (me === n) info.textContent = s || ''; } catch (e) { info.textContent = 'No preview: ' + e.message; } }, 40); };
     const md = modal({ title, wide: true, body: [h('div', { class: 'pd-grid' }, h('div', { class: 'pd-opts' }, opts), h('div', { class: 'pd-right' }, info, pv))], actions, onClose });
     md.el.classList.add('pdlg');
+    pwOpen = refresh;
     refresh();
     return { refresh, close: md.close, el: md.el, info };
   }
@@ -166,7 +172,7 @@
     const tabName = (TABS.find(([k]) => k === ui.tab) || [0, 'This page'])[1];
     const keep = () => { try { localStorage.setItem(KEY + '-pagepr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
     const content = () => [h('div', { class: 'main' }, [...$('#main').children].map((c) => c.cloneNode(true)))];
-    const pw = printWindow({ title: `Print or save · ${tabName}`, opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
+    const pw = printWindow({ title: `Print or save · ${tabName}`, reopen: () => printPageDialog(), opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
       h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },

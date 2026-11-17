@@ -28,6 +28,34 @@ def read(path):
     return data[:-1] if data.endswith(b'\n') else data   # the marker line's own line end stays in the page
 
 
+def border():
+    """The border designer (src/border): its pictures once, the drawing part for printouts, and the designer page.
+
+    border_lab.html is also a page of its own (open it from src/border to try designs without ShiftCraft). Inside
+    ShiftCraft it runs in a frame (its own styles) and reads the pictures and the kept designs from ShiftCraft.
+    """
+    import json
+    b = os.path.join(SRC, 'border')
+    rd = lambda n: open(os.path.join(b, n), encoding='utf-8').read()
+    icons = rd('border_icons.js') + '\n' + rd('border_icons2.js')
+    lab = rd('border_lab.html')
+    main = lab[lab.index("'use strict';"):]
+    engine = main[main.index('// @engine-start'):main.index('// @engine-end')]
+    factory = (
+        "window.makeBorderEngine = function () {\n'use strict';\n"
+        "let drag = null, cur = -1; const LBL = [], flowList = () => [], $ = () => null;\n" + engine +
+        "const render = (design, W, H, over) => { Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, JSON.parse(JSON.stringify(BASE)), "
+        "themeVals(design.theme || BASE.theme), JSON.parse(JSON.stringify(design)), over || {}, { showPts: false }); return drawSvg(W, H, false); };\n"
+        "// how far in from the paper edge the border reaches (inches): the printout starts inside it\n"
+        "const inset = (design, over) => { render(design, 816, 1056, over); return fitted(() => { const r = reach(); return (S.margin * IN + SHIFT + r.inn) / IN; }); };\n"
+        "return { render, inset };\n};\n")
+    tags = '<script src="border_icons.js"></script>\n<script src="border_icons2.js"></script>'
+    assert lab.count(tags) == 1
+    hosted = lab.replace(tags, '<script>window.LAB_ICONS = parent.LAB_ICONS; window.BORDER_HOST = parent.BORDER_HOST;</script>')
+    src = json.dumps(hosted).replace('</', '<\\/')
+    return ('<script>\n' + icons + '\n' + factory + 'window.BORDER_LAB_SRC = ' + src + ';\n</script>').encode('utf-8')
+
+
 def build():
     with open(os.path.join(SRC, 'index.src.html'), 'rb') as f:
         lines = f.read().split(b'\n')
@@ -38,6 +66,8 @@ def build():
             app = os.path.join(SRC, 'app')
             names = sorted(n for n in os.listdir(app) if n.endswith('.js'))
             out.extend(read(os.path.join(app, n)) for n in names)
+        elif mark == b'<!--@border-->':
+            out.append(border())
         elif mark.startswith(b'<!--@include ') and mark.endswith(b'-->'):
             out.append(read(os.path.join(SRC, mark[13:-3].decode())))
         else:
