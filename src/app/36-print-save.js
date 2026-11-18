@@ -124,13 +124,12 @@
       // place. Its code (35-calendar-sheet.js) stays, to bring back or remove later.
       if (!RANGES[o.layout] || o.layout === 'calendar') o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['pretty', 'Calendar 2: the month, pretty (holidays, time off, signs)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'), sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
+      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
         const ds = (key, opts, label) => { const x = h('select', { class: 'input', 'aria-label': label, onchange: () => { availDet[key] = x.value; saveAvailDet(); update(); } }, opts.map(([v, l]) => h('option', { value: v, selected: availDet[key] === v }, l))); return h('label', { class: 'field' }, h('span', null, label), x); };
         checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'));
         return; }
       // (nulls left out: replaceChildren would write them as the word “null”)
       box.replaceChildren(...[
-        sel('layout', [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, one page per day)'], ['pretty', 'Calendar 2: the month, pretty (holidays, time off, signs)'], ['avail', 'Availability and contact list (phones, positions, days)'], ['cards', 'Contact cards with QR codes (scan to add to a phone)']], 'Layout'),
         sel('range', RANGES[o.layout](), 'What'),
         o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
         o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
@@ -169,7 +168,7 @@
       return text;
     };
     build();
-    pw = printWindow({ title: { timeline: 'Visual timeline: print or save', calendar: 'Calendar: print or save' }[o.layout] || 'Print or save', use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
+    pw = printWindow({ title: 'Print or save', kind: o.layout, onKind: (k) => { if (!['table', 'timeline', 'avail', 'cards'].includes(k)) return false; o.layout = k; o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); update(); return true; }, use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {

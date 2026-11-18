@@ -57,14 +57,13 @@
     const prev = h('span', { class: 'pd-bprev' });
     const showPrev = () => { const x = useMine() ? myBorder() : null; prev.innerHTML = x ? myBorderThumb() : ''; prev.title = x ? `Your border: ${x.name}` : ''; prev.hidden = !x; };
     const s = h('select', { class: 'input', 'aria-label': 'Border', style: { width: 'auto' }, onchange: () => {
-      const v = s.value; deco.border = v !== 'off';
+      const v = s.value; if (v === 'designer') { s.value = now; customize(); return; } deco.border = v !== 'off';
       if (v === 'frame') { deco.style = 'frame'; deco.chosen = true; }
       if (v.startsWith('d:')) { deco.style = 'design'; deco.chosen = false; borders.current = v.slice(2); bordersSave(); bInsets.clear(); }
       decoSave(); showPrev(); if (ui.tab === 'calendar') render(); changed(); } },
-      [['off', 'Off'], ['frame', 'Thin frame'], ...borders.designs.map((x) => ['d:' + x.id, 'My border: ' + x.name])].map(([v, l]) => h('option', { value: v, selected: now === v }, l)));
+      [['off', 'Off (none)'], ['frame', 'Thin frame (default)'], ...borders.designs.map((x) => ['d:' + x.id, 'My border: ' + x.name]), ['designer', d ? 'Border designer… (change it)' : 'Border designer… (make one)']].map(([v, l]) => h('option', { value: v, selected: now === v }, l)));
     showPrev();
-    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, prev,
-      h('button', { class: 'btn sm', type: 'button', title: d ? 'Change your border in the Border designer, then come back to this window' : 'Make your own border in the Border designer, then come back to this window', onclick: customize }, d ? 'Customize border…' : 'Make a border…')),
+    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, prev),
       d ? null : h('p', { class: 'hint' }, 'Once you make a border, printouts use it automatically.'));
   }
 
@@ -83,6 +82,7 @@
     back: () => !!borderBack,
     goBack: () => { const f = borderBack; borderBack = null; borderUse = null; ui.tab = borderPrev === 'border' ? 'schedule' : borderPrev; persist(); render(); if (f) setTimeout(f, 60); },
     useOnPrint: (on) => borderUseOnPrint(on),
+    useAndLeave: () => { borderUseOnPrint(true); if (borderBack) window.BORDER_HOST.goBack(); else { borderUse = null; ui.tab = 'schedule'; persist(); render(); toast('Printouts use your border'); } },
     usingOnPrint: () => borderOnPrint(),
   };
   function borderView(main) {

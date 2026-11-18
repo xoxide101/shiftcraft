@@ -91,7 +91,7 @@
         : big ? `At ${o.dpi} DPI this screen would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, too big for a picture file, so it will be saved as SVG (sharp at any size).`
           : `${tabName} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels · ${o.dpi} DPI (the screen is drawn ${scale.toFixed(1)}× sharper than it looks) · prints on ${sheets.length} page${sheets.length > 1 ? 's' : ''}`;
     };
-    pw = printWindow({ title: `Print screen · ${tabName}`, reopen: () => printScreenDialog(), opts: [
+    pw = printWindow({ title: `Print screen · ${tabName}`, kind: 'screen', reopen: () => printScreenDialog(), opts: [
         sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type'),
         sel('dpi', DPI_OPTIONS, 'Resolution'),
         sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper (for printing and PDF)'),

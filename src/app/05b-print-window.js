@@ -9,8 +9,20 @@
   // designer: use (the kind of page, for its room) and reopen (to come back here) say where it was opened from;
   // keep() is called first so the window's choices are kept, not cancelled.
   let pwOpen = null; // the open print window's refresh (your border is drawn after its picture is ready)
-  function printWindow({ title, opts, draw, actions, onClose, use, reopen, keep }) {
+  // Layout: every printout, the same list at the top of every print window; picking another opens its window (kind:
+  // this window's; onKind(k) true when this window shows that one itself)
+  const PRINT_KINDS = [['table', 'Week table (names × days)'], ['timeline', 'Visual timeline (bars, a page a day or 7 small tiles)'], ['hourly', 'Hourly week (7 days, shifts as pills)'], ['calendar', 'Calendar: the month (holidays, time off, signs)'],
+    ['person', 'A person or group (a page each)'], ['avail', 'Availability and contact list'], ['cards', 'Contact cards with QR codes'], ['page', 'This tab as it is'], ['screen', 'Print screen (a picture of the screen)']];
+  function openPrint(kind) {
+    ({ table: () => exportImageDialog({ layout: 'table' }), timeline: () => exportImageDialog({ layout: 'timeline' }), hourly: () => hourlyWeekDialog(),
+      calendar: () => { ui.tab = 'calendar'; persist(); render(); setTimeout(() => calPrintDialog(), 60); }, person: () => printPeopleDialog(),
+      avail: () => exportImageDialog({ layout: 'avail' }), cards: () => exportImageDialog({ layout: 'cards' }), page: () => printPageDialog(), screen: () => printScreenDialog() })[kind]();
+  }
+  function printWindow({ title, opts, draw, actions, onClose, use, reopen, keep, kind, onKind }) {
     const pv = h('div', { class: 'pd-pv', 'aria-label': 'Print preview' }), info = h('div', { class: 'pd-info' });
+    if (kind) { const ks = h('select', { class: 'input', 'aria-label': 'Layout', onchange: () => { const v = ks.value; if (onKind && onKind(v)) return; md.close(); setTimeout(() => openPrint(v), 30); } },
+      PRINT_KINDS.map(([v, l]) => h('option', { value: v, selected: v === kind }, l)));
+      opts = [h('label', { class: 'field pd-layout' }, h('span', null, 'Layout'), ks), ...opts]; }
     opts = [...opts, borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); })];
     let t = 0, n = 0;
     const refresh = () => { clearTimeout(t); t = setTimeout(async () => { const me = ++n; try { const s = await draw(pv); if (me === n) info.textContent = s || ''; } catch (e) { info.textContent = 'No preview: ' + e.message; } }, 40); };
@@ -179,7 +191,7 @@
     const tabName = (TABS.find(([k]) => k === ui.tab) || [0, 'This page'])[1];
     const keep = () => { try { localStorage.setItem(KEY + '-pagepr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
     const content = () => [h('div', { class: 'main' }, [...$('#main').children].map((c) => c.cloneNode(true)))];
-    const pw = printWindow({ title: `Print or save · ${tabName}`, reopen: () => printPageDialog(), opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
+    const pw = printWindow({ title: `Print or save · ${tabName}`, kind: 'page', reopen: () => printPageDialog(), opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
       h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },

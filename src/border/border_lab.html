@@ -520,7 +520,7 @@ function build() {
       el('button', { class: 'btn', onclick: () => saveOut('pdf'), title: 'A PDF the paper’s size, at the resolution below' }, 'Save as PDF'),
       el('button', { class: 'btn', onclick: () => saveOut('png'), title: 'A PNG picture at the resolution below (it keeps its DPI, so it prints at the paper’s size)' }, 'Save as image'),
       el('button', { class: 'btn', onclick: () => resetAll(), title: 'Every setting and picture back to the theme’s (placed pictures stay)' }, 'All back to theme'),
-      HOST ? el('button', { class: 'btn primary', id: 'useCur', onclick: useCurrent, 'aria-pressed': String(HOST.usingOnPrint()), title: 'Print with this border: every printout uses it (you can still pick Off or Thin frame in a print window)' }, HOST.usingOnPrint() ? '✓ Use current' : 'Use current') : null,
+      HOST ? el('button', { class: 'btn primary', id: 'useCur', onclick: useCurrent, 'aria-pressed': String(HOST.usingOnPrint()), title: 'Print with this border, then go back (to the print window you came from, or the Schedule)' }, HOST.usingOnPrint() ? '✓ Use current' : 'Use current') : null,
       el('label', { class: 'dpi' }, el('span', {}, 'Resolution'), (() => { const s = el('select', { 'aria-label': 'Resolution', onchange: () => { outDpi = +s.value; try { localStorage.setItem('border-lab-dpi', s.value); } catch (e) { /* blocked */ } } }, [150, 300, 600, 1200].map((d) => el('option', { value: d, ...(d === outDpi ? { selected: '' } : {}) }, d + ' DPI' + (d === 300 ? ' (print)' : '')))); return s; })()),
       el('div', { class: 'note', id: 'saveNote' })));
   $('#otbox').scrollTop = keep;
@@ -957,7 +957,7 @@ async function saveOut(kind) {
   } catch (e) { saveNote('Could not make the file: ' + e.message); }
 }
 // Use current: printouts use this design
-function useCurrent() { keepNow(); HOST.useOnPrint(true); const b = $('#useCur'); if (b) { b.textContent = '✓ Use current'; b.setAttribute('aria-pressed', 'true'); } saveNote('Printouts use this border now.'); }
+function useCurrent() { keepNow(); if (HOST.useAndLeave) { HOST.useAndLeave(); return; } HOST.useOnPrint(true); const b = $('#useCur'); if (b) { b.textContent = '✓ Use current'; b.setAttribute('aria-pressed', 'true'); } saveNote('Printouts use this border now.'); }
 window.addEventListener('resize', draw);
 $('#paper').addEventListener('pointerdown', onPaperDown); $('#paper').addEventListener('pointermove', onPaperHover);
 window.__S = S; window.__menu = () => menuEl; window.__applyTheme = (k) => { applyTheme(k); refresh(); }; window.__draw = draw; window.__drawSvg = drawSvg; window.__size = size;

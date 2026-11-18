@@ -554,3 +554,77 @@ table.cal td.cal-day { padding: 0; }
 .pd-border { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .pd-border .pd-bprev { display: inline-flex; width: 104px; height: 80px; border: 1px solid var(--line, #ccd); border-radius: 4px; background: #fff; overflow: hidden; }
 .pd-border .pd-bprev svg { width: 100%; height: 100%; }
+
+/* the hourly week printout (33b-hourly-week.js): its own classes, hw- */
+  /* a sheet of paper (its real size in CSS inches) */
+  .hw-paper { position: relative; color: #1d2330; font: 13px/1.3 system-ui, "Segoe UI", Roboto, sans-serif; text-align: left; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .18); overflow: hidden; flex: none; }
+  .hw-paper .hw-in { position: absolute; }
+  .hw-paper .hw-fit { transform-origin: 0 0; }
+  .hw-pv-wrap { position: relative; flex: none; }
+  .hw-sheet, .hw-measure { color: #1d2330; font: 13px/1.3 system-ui, "Segoe UI", Roboto, sans-serif; text-align: left; }
+  .hw-paper * , .hw-measure * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* the heading, the same on every page: the place on the left; on the right the week (large) and, under it, when it
+     was printed, its version and the page */
+  .hw-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1d2330; }
+  .hw-head .hw-l { min-width: 0; }
+  .hw-head h1 { font-size: 17px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hw-head .hw-what { color: #7a8296; font-size: 11px; white-space: nowrap; }
+  .hw-head .hw-r { margin-left: auto; text-align: right; white-space: nowrap; }
+  .hw-head .hw-wk { font-size: 19px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+  .hw-head .hw-stamp { color: #7a8296; font-size: 10px; margin-top: 2px; }
+  /* white space between the days, about a pill high: each day its own band */
+  .hw-grid { display: grid; grid-template-columns: 104px 1fr; }
+  /* between the days: a thick line, rounded at both ends, that cleanly divides them */
+  .hw-divider { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: #b9bfcc; margin: 4px 0; }
+  .hw-hours { position: relative; height: 16px; }
+  .hw-hours span { position: absolute; transform: translateX(-50%); font-size: 10px; color: #7a8296; white-space: nowrap; }
+  .hw-lab { padding: 5px 8px 5px 0; text-align: right; }
+  .hw-lab .hw-dn { font-weight: 700; font-size: 13px; }
+  .hw-lab .hw-dd { color: #7a8296; font-size: 10px; }
+  .hw-lab .hw-x { color: #7a8296; font-size: 10px; margin-top: 2px; }
+  .hw-row { position: relative; background: #f4f5f8; }
+  .hw-row .hw-open { position: absolute; top: 0; bottom: 0; background: #ffffff; }
+  .hw-row .hw-tick { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid #f0f2f6; }
+  .hw-row .hw-tick.hw-h { border-left-color: #e3e6ee; }
+  .hw-closedtxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #7a8296; font-weight: 700; letter-spacing: .1em; }
+  .hw-leftover { margin-left: 12px; font-weight: 600; letter-spacing: 0; font-size: 11px; color: #c2410c; }
+  .hw-row .hw-now { position: absolute; top: 0; bottom: 0; border-left: 2px solid #e5484d; z-index: 1; }
+  .hw-past { opacity: .4; }
+  .hw-pill { position: absolute; display: flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; border: 1px solid; z-index: 2; }
+  .hw-pill .hw-t { font-weight: 400; opacity: .8; font-size: 10px; }
+  .hw-pill.hw-sq { border-radius: 4px; }
+  .hw-pill .hw-nm { overflow: hidden; text-overflow: ellipsis; }
+  sup.hw-n { font-size: 8px; font-weight: 700; vertical-align: super; line-height: 0; }
+  .hw-mono .hw-pill { background: #eef1f7 !important; border-color: #b9c0d0 !important; color: #1d2330 !important; }
+  .hw-bw .hw-pill { background: #fff !important; border-color: #222 !important; color: #000 !important; }
+  .hw-bw .hw-pill.hw-lead { background: #222 !important; color: #fff !important; }
+  .hw-gray { filter: grayscale(1); }
+  .hw-cov { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; }
+  .hw-cov i { position: absolute; bottom: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; font-style: normal; font-size: 9px; color: #7a8296; }
+  .hw-cov i b { position: absolute; bottom: 0; left: 1px; right: 1px; background: #dfe4ee; z-index: -1; }
+  /* signs, holidays and events in the day's name area */
+  .hw-signs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1px 3px; margin-top: 3px; }
+  .hw-ic { display: inline-flex; line-height: 0; border-radius: 50%; }
+  .hw-ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hw-ic.hw-payday { color: #2f9e5f; } .ic.truck { color: #e07a1f; } .ic.inventory { color: #2a9db0; } .ic.insurance { color: #3f7fd6; } .ic.produce { color: #d94141; } .ic.meeting { color: #8b5fd6; }
+  .hw-ic.hw-period { font-size: 8px; font-weight: 800; line-height: 13px; border: 1.5px solid currentColor; border-radius: 2px; padding: 0 2px; color: #1d2330; }
+  /* moved to the open day before a closed day: the same picture, ringed */
+  .hw-ic.hw-moved { border: 1.6px solid #1d2330; padding: 2px; margin: -3px 0; }
+  .hw-ic.hw-moved svg { width: 13px; height: 13px; }
+  .hw-hol { display: inline-block; margin-top: 3px; padding: 0 5px; border-radius: 3px; font-size: 10px; font-weight: 700; line-height: 15px; background: #1d2330; color: #fff; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hw-hol.hw-local { background: #fff; color: #1d2330; box-shadow: inset 0 0 0 1.3px #1d2330; }
+  .hw-lab .hw-ev { font-size: 10px; margin-top: 2px; line-height: 1.2; }
+  .hw-mark { position: absolute; top: -1px; transform: translateX(-50%); z-index: 4; }
+  .hw-mark .hw-ic { background: #fff; padding: 1px; box-shadow: 0 0 0 1px #e3e6ee; }
+  .hw-mark .hw-ic svg { width: 12px; height: 12px; }
+  .hw-mark .hw-flag { display: block; font-size: 9px; font-weight: 700; background: #fff; border: 1px solid #8b93a7; border-radius: 3px; padding: 0 4px; line-height: 12px; white-space: nowrap; }
+  .hw-row .hw-evline { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #8b93a7; z-index: 1; }
+  .hw-legend { display: flex; gap: 4px 14px; flex-wrap: wrap; margin-top: 8px; font-size: 10px; color: #7a8296; align-items: center; }
+  .hw-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .hw-legend em { display: inline-block; width: 20px; height: 10px; border-radius: 999px; border: 1px solid; }
+  .hw-notes h3 { font-size: 12px; margin: 10px 0 4px; }
+  .hw-notes ol { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 22px; font-size: 10px; line-height: 1.35; }
+  .hw-notes li { break-inside: avoid; margin-bottom: 2px; }
+  .hw-notes li b { display: inline-block; min-width: 16px; }
+  .hw-notes .hw-when { color: #7a8296; }
+.pd-head { margin: 10px 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
