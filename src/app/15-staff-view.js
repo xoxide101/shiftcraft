@@ -150,7 +150,7 @@
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
         h('button', { class: 'btn sm', onclick: () => openFile() }, 'Load team…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.length, onclick: () => confirmBox('Clear the staff list?', 'Everyone is removed, along with all their shifts in this plan. Save the list first if you want to keep it. You can undo this.', 'Clear list', () => change(() => { plan.staff = []; plan.shifts = {}; plan.example = false; })) }, 'Clear list')),
-      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, k === 'timeoff' && waiting ? `${l} (${waiting} to approve)` : l))),
+      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, l, k === 'timeoff' && waiting ? h('span', { class: 'st-n' }, `${waiting} to approve`) : null))),
       h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, hint),
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))),

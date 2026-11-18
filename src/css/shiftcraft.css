@@ -849,3 +849,23 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
   .dialog.pdlg { height: min(900px, calc(100dvh - 32px)); }
 }
 @media (max-width: 760px) { .backdrop { padding: 8px; } .dialog { padding: 14px; } }
+
+/* Tabs, one look everywhere (the Schedule's lower tabs, Company & Location, Staff): a raised tab, its own colour on the
+   top edge and on its count when picked, a light tint of it otherwise. The colours go round: blue, teal, violet, amber,
+   rose, green, orange. */
+.staff-tabs { display: flex; align-items: flex-end; gap: 4px; border-bottom: 2px solid var(--line); margin: 8px 0 8px; padding: 0; }
+.staff-tabs .tab { position: relative; bottom: -2px; display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px 6px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 9px 9px 0 0; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.staff-tabs .tab:hover { color: var(--fg); background: var(--panel-2); }
+.staff-tabs .tab[aria-selected="true"] { color: var(--fg); background: var(--panel); border-color: var(--line); border-bottom-color: var(--panel); font-weight: 600; }
+.st-tab, .staff-tabs .tab { --tab-hue: #3e63dd; }
+.st-tab:nth-of-type(7n+2), .staff-tabs .tab:nth-of-type(7n+2) { --tab-hue: #12a594; }
+.st-tab:nth-of-type(7n+3), .staff-tabs .tab:nth-of-type(7n+3) { --tab-hue: #8e4ec6; }
+.st-tab:nth-of-type(7n+4), .staff-tabs .tab:nth-of-type(7n+4) { --tab-hue: #e5a00d; }
+.st-tab:nth-of-type(7n+5), .staff-tabs .tab:nth-of-type(7n+5) { --tab-hue: #e5484d; }
+.st-tab:nth-of-type(7n+6), .staff-tabs .tab:nth-of-type(7n+6) { --tab-hue: #46a758; }
+.st-tab:nth-of-type(7n+7), .staff-tabs .tab:nth-of-type(7n+7) { --tab-hue: #f76b15; }
+.st-tab, .staff-tabs .tab { box-shadow: inset 0 3px 0 color-mix(in srgb, var(--tab-hue) 35%, transparent); }
+.st-tab:hover, .staff-tabs .tab:hover { background: color-mix(in srgb, var(--tab-hue) 9%, var(--panel)); }
+.st-tab[aria-selected="true"], .staff-tabs .tab[aria-selected="true"] { box-shadow: inset 0 3px 0 var(--tab-hue); background: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); border-bottom-color: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); }
+.st-tab .st-n, .staff-tabs .tab .st-n { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 9px; background: color-mix(in srgb, var(--tab-hue) 18%, var(--panel)); color: var(--fg); }
+.st-tab[aria-selected="true"] .st-n, .staff-tabs .tab[aria-selected="true"] .st-n { background: var(--tab-hue); color: #fff; }
