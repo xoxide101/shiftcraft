@@ -793,3 +793,17 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 /* Availability days with hours: a dark middle so the times read, the day's colour on the top and bottom edges */
 .avcell.tm { background: #14181f; color: #fff; border: 0; border-top: 4px solid var(--good); border-bottom: 4px solid var(--good); font-weight: 600; }
 .avcell.tm.hl { border-top-color: #ffd400; border-bottom-color: #ffd400; }
+
+/* wide areas: no scrollbar; the ‹ › at the edges (01b-edge-scroll.js) */
+.es-host { position: relative; }
+.es-wrap { scrollbar-width: none; -ms-overflow-style: none; }
+.es-wrap::-webkit-scrollbar { display: none; }
+.es-btn { position: absolute; top: 0; bottom: 0; z-index: 6; width: 24px; padding: 0; border: 0; cursor: pointer; color: var(--fg); display: block; }
+.es-btn[hidden] { display: none; }
+.es-btn.l { left: 0; border-radius: 10px 0 0 10px; background: linear-gradient(to right, color-mix(in srgb, var(--panel) 96%, transparent), color-mix(in srgb, var(--panel) 70%, transparent)); box-shadow: 3px 0 6px -3px rgba(0, 0, 0, .35); }
+.es-btn.r { right: 0; border-radius: 0 10px 10px 0; background: linear-gradient(to left, color-mix(in srgb, var(--panel) 96%, transparent), color-mix(in srgb, var(--panel) 70%, transparent)); box-shadow: -3px 0 6px -3px rgba(0, 0, 0, .35); }
+.es-btn .es-ch { position: absolute; left: 1px; top: 8px; display: block; width: 22px; height: 36px; line-height: 33px; font-size: 24px; font-weight: 700; text-align: center; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+.es-btn:hover .es-ch { background: var(--accent); color: var(--accent-ink); }
+.es-btn:focus-visible { outline: 2px solid var(--accent); }
+@media print { .es-btn { display: none !important; } }
+.pd-print .es-btn { display: none !important; }
