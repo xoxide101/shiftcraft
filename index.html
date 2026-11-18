@@ -828,6 +828,34 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .crb-tabs .crb-extra .ctb-chip:last-child { flex: none; max-width: none; }
 .crb-tabs .crb-extra .ctb-chip:first-child { flex: 0 1 auto; min-width: 60px; }
 @media (max-width: 1350px) { .ctb .ctb-title { display: none; } }
+
+/* phones (Pixel 6 Pro / 10 Pro XL, flip phones): the title bar on two rows (what you act on, then the AI switch and search),
+   so the page fits the phone and scrolls; nothing wider than the screen */
+@media (max-width: 760px) {
+  .ctb.ctb { flex-wrap: wrap; height: auto; padding: 4px 6px; row-gap: 4px; }
+  .ctb.ctb > .ctb-left:first-child { order: 1; }
+  .ctb.ctb > .ctb-left:not(:first-child) { order: 2; flex: 1 1 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .ctb.ctb > .ctb-left::-webkit-scrollbar { display: none; }
+  .ctb.ctb > .ctb-right { order: 3; }
+  .ctb.ctb::after { content: ''; order: 4; flex-basis: 100%; height: 0; }
+  .ctb.ctb > .ctb-ai { order: 5; margin-right: 4px !important; }
+  .ctb.ctb > .ctb-search { order: 6; flex: 1 1 140px; min-width: 0; }
+  .ctb.ctb > .ctb-mid { display: none; }
+  .main { padding: 10px 8px; }
+}
+
+/* tab rows that run past the edge (phones): they scroll sideways, with the ‹ › edges */
+.st-bar, .staff-tabs { overflow-x: auto; overflow-y: hidden; }
+.st-bar .st-tab, .staff-tabs .tab { flex: none; }
+
+/* touch screens: a swipe that starts on a shift scrolls (dragging is for a mouse; on touch: tap, double tap, long press) */
+@media (pointer: coarse) { .shift { touch-action: pan-x pan-y; } }
+/* phones: windows fit the screen that is showing (the address bar comes and goes), so their buttons stay in reach */
+@supports (height: 100dvh) {
+  .dialog { max-height: calc(100dvh - 32px); }
+  .dialog.pdlg { height: min(900px, calc(100dvh - 32px)); }
+}
+@media (max-width: 760px) { .backdrop { padding: 8px; } .dialog { padding: 14px; } }
 </style>
 </head>
 <body>
@@ -2056,7 +2084,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // only when there is more that way. Click scrolls most of a screen; hold keeps going. Shift+wheel and touchpads still
   // scroll. Every .table-wrap, .tl-wrap and .tr-wrap gets them, wherever it is (the screens, windows, print windows).
   // ===================================================================
-  const ES_SEL = '.table-wrap, .tl-wrap, .tr-wrap, .crb-body';
+  const ES_SEL = '.table-wrap, .tl-wrap, .tr-wrap, .crb-body, .st-bar, .staff-tabs';
   function edgeScroll(w) {
     if (w.dataset.es || w.closest('.pd-print, .pd-pv, #print-area')) return;
     w.dataset.es = '1';
@@ -2929,7 +2957,18 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // Drag to move, drag edges to resize; click removes, double-click edits.
   let lastClick = { id: null, t: 0 }, clickTimer = null;
   function attachDrag(bar, s, d, pxPerMin) {
+    // on a phone or tablet (touch): a swipe that starts on a shift scrolls the page (no drag); a tap opens the notes, a
+    // double tap edits the times, a long press gives the menu
+    bar.addEventListener('click', () => {
+      if (bar._touch !== true) return;
+      const now = Date.now();
+      if (lastClick.id === s.id && now - lastClick.t < 380) { clearTimeout(clickTimer); lastClick = { id: null, t: 0 }; editShift(d, s.id); return; }
+      lastClick = { id: s.id, t: now }; clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => { lastClick = { id: null, t: 0 }; noteDialog(d, s.id); }, 390);
+    });
     bar.addEventListener('pointerdown', (e) => {
+      bar._touch = e.pointerType === 'touch';
+      if (bar._touch) return;
       if (e.button !== 0) return;
       e.preventDefault();
       const mode = e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'm';

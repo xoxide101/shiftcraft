@@ -80,7 +80,18 @@
   // Drag to move, drag edges to resize; click removes, double-click edits.
   let lastClick = { id: null, t: 0 }, clickTimer = null;
   function attachDrag(bar, s, d, pxPerMin) {
+    // on a phone or tablet (touch): a swipe that starts on a shift scrolls the page (no drag); a tap opens the notes, a
+    // double tap edits the times, a long press gives the menu
+    bar.addEventListener('click', () => {
+      if (bar._touch !== true) return;
+      const now = Date.now();
+      if (lastClick.id === s.id && now - lastClick.t < 380) { clearTimeout(clickTimer); lastClick = { id: null, t: 0 }; editShift(d, s.id); return; }
+      lastClick = { id: s.id, t: now }; clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => { lastClick = { id: null, t: 0 }; noteDialog(d, s.id); }, 390);
+    });
     bar.addEventListener('pointerdown', (e) => {
+      bar._touch = e.pointerType === 'touch';
+      if (bar._touch) return;
       if (e.button !== 0) return;
       e.preventDefault();
       const mode = e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'm';
