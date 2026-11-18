@@ -3320,7 +3320,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['avail', '1 · Availability', 'When each person can work, Monday to Sunday: Any time, hours (two stretches for a split day), OFF, Call first; Validated; pending training'], ['wk', '2 · Weekday shift', 'Monday to Friday: the usual shift (what they get when you click their name)'], ['we', '3 · Weekend shift', 'Saturday and Sunday: the usual shift'], ['contact', '4 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)']];
+    const SECTIONS = [['avail', '1 · Availability', 'When each person can work, Monday to Sunday: Any time, hours (two stretches for a split day), OFF, Call first; Validated; pending training'], ['wk', '2 · Weekday shift', 'Monday to Friday: the usual shift (what they get when you click their name)'], ['we', '3 · Weekend shift', 'Saturday and Sunday: the usual shift'], ['contact', '4 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)'], ['former', '7 · Former staff', 'People who have left: kept with all their details; Rehire brings them back as they were']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => { const soon = (p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied'); return h('td', { class: 'nowrap' }, ibs(
@@ -3383,7 +3383,19 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     // can't-work hours as "not …", and class times while the term is on (from the School tab, not saved into the day)
     let head, rows, foot = null, empty = null, asked = 0;
     const people = sortStaff(plan.staff.filter((p) => !p.left));
-    if (staffTab === 'timeoff') {
+    // people who have left: everything about them is kept here, and Rehire brings them back as they were
+    const former = sortStaff(plan.staff.filter((p) => p.left));
+    if (staffTab === 'former') {
+      head = ['Name', 'Role', 'Phone', 'Email', 'Left', 'Last day', 'Note', ''];
+      empty = 'Nobody has left. Left… on a person (Availability or another tab) moves them here, with everything about them kept.';
+      foot = h('tr', null, h('td', { colspan: head.length, class: 'small muted', style: { fontWeight: 400 } }, `${former.length} former staff · kept with all their details; not on the schedule or lists`));
+      rows = former.map((p) => h('tr', null,
+        h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label), h('td', { class: 'nowrap' }, p.phone || ''), h('td', null, p.email || ''),
+        h('td', null, LEFT_WHY[p.left.why] || p.left.why), h('td', { class: 'nowrap' }, p.left.on ? shortDate(p.left.on) : ''), h('td', { class: 'small' }, p.left.note || ''),
+        h('td', { class: 'nowrap' }, ibs(ib('edit', 'Edit the reason, date or note', () => leftDialog(p)),
+          ib('rehire', 'Rehire: back on the team with everything as it was', () => change(() => { delete p.left; p.active = true; }), { cls: 'good' }),
+          ib('trash', `Delete ${p.name} and their details for good`, () => confirmBox(`Delete ${p.name} for good?`, 'Their details are removed from this plan (shifts already worked are removed too). You can undo this.', 'Delete', () => change(() => { plan.staff = plan.staff.filter((x) => x !== p); Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((x) => x.staffId !== p.id); }); })), { cls: 'danger' })))));
+    } else if (staffTab === 'timeoff') {
       ({ head, rows, foot, empty, asked } = timeOffRows());
     } else if (staffTab === 'school') {
       ({ head, rows, foot, empty } = schoolRows());
@@ -3445,31 +3457,20 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       school: 'Tick In school, then the school, the term (first and last day) and the class times (+ adds a line for days with other class hours). Can’t work during class (exclusion): ticked, class times come out of their availability and a shift over them gets N/A · class; unticked, school is a note only and their availability is exactly as set on the Availability tab (for someone with hours set by hand). Unticking In school keeps what you set, for next term.',
       schoolOld: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. It is a note about the person (In school, and when): it does not limit when they can work and gives no warnings; their hours are set on the Weekdays, Weekend and Day by day tabs. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
+      former: 'People who have left: everything about them is kept (phone, availability, training, tasks, past shifts). Edit the reason, date or note; Rehire brings them back on the team as they were; Delete removes them for good (you can undo it).',
       contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
     main.append(h('div', { class: 'card' },
       h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Staff list · ${plan.staff.filter((p) => !p.left).length} people`), h('span', { class: 'muted small' }, counts), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: saveStaff }, 'Save team…'),
         h('button', { class: 'btn sm', onclick: () => openFile() }, 'Load team…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.length, onclick: () => confirmBox('Clear the staff list?', 'Everyone is removed, along with all their shifts in this plan. Save the list first if you want to keep it. You can undo this.', 'Clear list', () => change(() => { plan.staff = []; plan.shifts = {}; plan.example = false; })) }, 'Clear list')),
-      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, l, k === 'timeoff' && waiting ? h('span', { class: 'st-n' }, `${waiting} to approve`) : null))),
+      h('div', { class: 'tabs staff-tabs', role: 'tablist', 'aria-label': 'Staff sections' }, SECTIONS.map(([k, l, t]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(staffTab === k), title: t, onclick: () => { staffTab = k; try { localStorage.setItem('shiftcraft-staff-tab', k); } catch (e) {} render(); } }, l, k === 'timeoff' && waiting ? h('span', { class: 'st-n' }, `${waiting} to approve`) : k === 'former' && former.length ? h('span', { class: 'st-n' }, String(former.length)) : null))),
       h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, hint),
       h('div', { class: 'table-wrap' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: head.length, class: 'muted' }, empty || 'No one yet. Add your team below, or load a saved list.'))),
         foot ? h('tfoot', null, foot) : h('tfoot', null, h('tr', null, h('td', null, newName), h('td', null, roleSel('TM', (v) => { newRole = v; })), h('td', { colspan: head.length - 2 }, h('button', { class: 'btn primary', onclick: addPerson }, '+ Add person'))))))));
     if (staffTab === 'contact') main.append(trainedGrid());
-    // people who have left: everything about them is kept here, and Rehire brings them back as they were
-    const former = sortStaff(plan.staff.filter((p) => p.left));
-    if (former.length) main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Former staff · ${former.length}`), h('span', { class: 'muted small' }, 'Kept with all their details; not on the schedule or lists.')),
-      h('div', { class: 'table-wrap' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['Name', 'Role', 'Phone', 'Email', 'Left', 'Last day', 'Note', ''].map((x) => h('th', null, x)))),
-        h('tbody', null, former.map((p) => h('tr', null,
-          h('td', null, h('b', null, p.name)), h('td', null, ROLES[p.role].label), h('td', { class: 'nowrap' }, p.phone || ''), h('td', null, p.email || ''),
-          h('td', null, LEFT_WHY[p.left.why] || p.left.why), h('td', { class: 'nowrap' }, p.left.on ? shortDate(p.left.on) : ''), h('td', { class: 'small' }, p.left.note || ''),
-          h('td', { class: 'nowrap' }, ibs(ib('edit', 'Edit the reason, date or note', () => leftDialog(p)),
-            ib('rehire', 'Rehire: back on the team with everything as it was', () => change(() => { delete p.left; p.active = true; }), { cls: 'good' }),
-            ib('trash', `Delete ${p.name} and their details for good`, () => confirmBox(`Delete ${p.name} for good?`, 'Their details are removed from this plan (shifts already worked are removed too). You can undo this.', 'Delete', () => change(() => { plan.staff = plan.staff.filter((x) => x !== p); Object.keys(plan.shifts).forEach((d) => { plan.shifts[d] = plan.shifts[d].filter((x) => x.staffId !== p.id); }); })), { cls: 'danger' }))))))))));
   }
   const LEFT_WHY = { resigned: 'Resigned', terminated: 'Terminated', other: 'Left' };
   // Someone leaving: why, their last day and a note; shifts after the last day can come off the schedule

@@ -408,6 +408,7 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Title bar**: the top line keeps what you act on (menu, quick buttons, search, Log in, theme, help); the store and the week are always on the second line, at the right of the ribbon's tabs.
 - **Phones** (Pixel 6 Pro / 10 Pro XL, flip phones): the title bar on two rows, the page fits the screen and scrolls; on the timeline a swipe scrolls (tap a shift for its notes, double tap to edit, long press for the menu); windows fit the visible screen.
 - **Tabs, one look**: the Schedule's lower tabs, Company & Location, Staff, the Border designer, and the week choosers (the Week page, Week out, Forecast): each tab its own colour on its top edge and count (blue, teal, violet, amber, rose, green, orange); week 3 is the same colour everywhere.
+- **Staff › 7 · Former staff**: people who have left, on a tab of their own (with a count): edit, Rehire, or Delete for good.
 - **The Week page** looks back or ahead past the plan: ‹ › a week, « » five weeks, This week to come back; weeks outside the plan show their dates.
 
 ## Every file has a name of its own
