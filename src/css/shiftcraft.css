@@ -685,3 +685,25 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .pic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; max-height: 52vh; overflow: auto; padding: 2px; }
 .pic-tile { aspect-ratio: 1; border: 1px solid var(--line, #d5d9e2); border-radius: 8px; background: #fff; padding: 5px; cursor: pointer; }
 .pic-tile:hover { outline: 2px solid #3e63dd; } .pic-tile svg { width: 100%; height: 100%; }
+
+/* the day's bands (20-calendar.js): header, top (events), middle (time off), bottom (the whole store) */
+.cal-band.top, .cal-lanes { position: relative; }
+.cal-in { padding-bottom: calc(var(--botv, 0) * 20px + 5px) !important; }
+.cal-bottom { left: 4px !important; right: 4px !important; bottom: 3px !important; }
+.cal-bottom > * { margin-top: 2px; height: 18px; }
+.cal-bottom .cal-hol { position: relative; z-index: 2; border-radius: 4px; }
+.cal-span.ev { background: var(--accent-soft); color: var(--fg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); font-weight: 500; }
+.cal-hol.sp { background: color-mix(in srgb, var(--warn) 30%, var(--panel)); color: var(--fg); text-shadow: none; }
+.cal-hol.sp.shut { background: color-mix(in srgb, var(--bad) 28%, var(--panel)); }
+.cal-lane-x { display: none !important; }
+.cal-flip { position: absolute; right: -2px; top: -2px; z-index: 4; display: inline-flex; align-items: center; gap: 1px; font-size: 10px; line-height: 14px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 9px; padding: 0 2px; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.cal-flip button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 700; padding: 0 3px; cursor: pointer; }
+.cal-notemark { flex: none; border: 0; background: none; padding: 0 2px; font-size: 12px; line-height: 1; cursor: pointer; color: var(--fg); }
+@media print {
+  .cal-in { padding-bottom: calc(var(--bota, 0) * 20px + 5px) !important; }
+  .cal-lane-x { display: block !important; }
+  .cp-no-events .cal-span.ev { display: none; }
+  .cal-hol.sp { background: #fff !important; color: #000 !important; box-shadow: inset 0 0 0 1.5px #000; }
+  .cal-hol.sp.shut { background: #000 !important; color: #fff !important; }
+  .cal-span.ev { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

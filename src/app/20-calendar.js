@@ -318,9 +318,9 @@
   // what the Calendar shows (kept in this browser, and in Save everything with the other choices)
   const CAL_KEY = 'shiftcraft-calendar';
   const CAL_SHOW = { requested: true, approved: true, denied: false, special: true, event: true };
-  const cal = { ym: '', view: 'month', q: '', show: { ...CAL_SHOW }, range: 'upcoming', sort: 'from', dir: 1 };
-  try { const c = JSON.parse(localStorage.getItem(CAL_KEY) || '{}'); ['view', 'range', 'sort'].forEach((k) => { if (typeof c[k] === 'string') cal[k] = c[k]; }); if (c.dir === -1) cal.dir = -1; if (c.show) Object.assign(cal.show, c.show); } catch (e) { /* blocked */ }
-  const calSave = () => { try { localStorage.setItem(CAL_KEY, JSON.stringify({ view: cal.view, show: cal.show, range: cal.range, sort: cal.sort, dir: cal.dir })); } catch (e) { /* blocked */ } };
+  const cal = { ym: '', view: 'month', q: '', show: { ...CAL_SHOW }, range: 'upcoming', sort: 'from', dir: 1, bands: 'fixed' };
+  try { const c = JSON.parse(localStorage.getItem(CAL_KEY) || '{}'); ['view', 'range', 'sort', 'bands'].forEach((k) => { if (typeof c[k] === 'string') cal[k] = c[k]; }); if (c.dir === -1) cal.dir = -1; if (c.show) Object.assign(cal.show, c.show); } catch (e) { /* blocked */ }
+  const calSave = () => { try { localStorage.setItem(CAL_KEY, JSON.stringify({ view: cal.view, show: cal.show, range: cal.range, sort: cal.sort, dir: cal.dir, bands: cal.bands })); } catch (e) { /* blocked */ } };
   const calShown = (it) => (it.kind === 'timeoff' ? cal.show[it.status] : cal.show[it.kind]) && cal.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => calText(it).includes(w));
   const calList = () => { cal.view = 'list'; calSave(); calGo(); };
 
@@ -356,6 +356,7 @@
         show('denied', 'Denied', (it) => it.kind === 'timeoff' && it.status === 'denied', 'Denied time off (kept as a record)'),
         show('special', 'Store hours', (it) => it.kind === 'special', 'Special store hours: holidays and other days'),
         show('event', 'Events', (it) => it.kind === 'event', 'Events and notes for a day'),
+        isList ? null : h('div', { class: 'no-print', title: 'Fixed rows: every day keeps the same rows (a strip over several days lines up; a flipper shows more). Fit each day: each day shows just its own.' }, calSeg('Rows', [['fixed', 'Fixed rows'], ['fit', 'Fit each day']], cal.bands === 'fit' ? 'fit' : 'fixed', (v) => { cal.bands = v; calSave(); render(); })),
         h('label', { class: 'check small', title: 'Holidays: a bar along the bottom of the day' }, h('input', { type: 'checkbox', checked: cal.show.holiday !== false, onchange: (e) => { cal.show.holiday = e.target.checked; calSave(); render(); } }), h('span', { class: 'cal-key holiday' }), ' Holidays')),
       h('div', { class: 'inline no-print', style: { marginTop: '10px' } },
         h('button', { class: 'btn sm primary', onclick: () => eventDialog(null, { from: isList ? today : ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst }) }, '+ Event'),
@@ -372,66 +373,87 @@
     const numOf = (it) => (it.kind === 'special' ? pbook.add(noteKey.sp(it.x), noteSpecial(it.x)) : it.kind === 'event' ? pbook.add(noteKey.ev(it.x), noteEvent(it.x)) : pbook.add(noteKey.to(it.p, it.t), noteTimeOff(it.p, it.t)));
     const chipN = (it) => { const c = calChip(it); if (notesWhere !== 'off') c.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' ')); return c; };
     const start = mondayOf(mFirst), weeks = Math.ceil((Math.round((parseIso(mLast) - parseIso(start)) / 864e5) + 1) / 7);
-    const MAX = 6;
-    // time off: one bar a person a week, running across their days off (name and dates), in lanes
-    // so two never overlap; every day of that week keeps the lanes' room, so the bars line up
-    const multi = (it) => it.kind === 'timeoff'; // every day off, one day or more, is a bar (lined up with the others)
-    const spans = Array.from({ length: weeks }, (_, w) => {
-      const w0 = addDays(start, w * 7), w1 = addDays(w0, 6), lanes = [];
-      shown.filter((it) => multi(it) && it.from <= w1 && it.to >= w0).sort((a, b) => a.from.localeCompare(b.from) || b.to.localeCompare(a.to)).forEach((it) => {
+    // The day in bands, the same on every day (and the Schedule): the header (the date, signs, the day's pictures and
+    // note, the store's hours), then the top band (events), the middle band (time off), and the bottom band (the whole
+    // store: holidays, special hours, closed). Fixed (the default): each band keeps the same rows across the week, so a
+    // strip over several days lines up; a band with more rows than fit gets a flipper (‹ 1/2 ›), and prints them all.
+    // Fit each day: each day shows only its own, as pills.
+    const fit = cal.bands === 'fit', CAP = { top: 3, mid: 3, bot: 2 };
+    const isHolIt = (it) => (it.kind === 'special' ? holSpecial(it.x) : it.kind === 'event' ? holEvent(it.x) : false);
+    const signOf = (it) => it.kind === 'event' && !isHolIt(it) && markOf(it.x);
+    const bandOf = (it) => (it.kind === 'timeoff' ? 'mid' : it.kind === 'special' ? 'bot' : isHolIt(it) && cal.show.holiday !== false ? 'bot' : signOf(it) ? 'head' : 'top');
+    // the built-in holidays on a day that no entry stands for (by name)
+    const builtinsOn = (d) => { if (cal.show.holiday === false) return []; const sp = specialOn(d), named = [...eventsOn(d).flatMap((x) => [[x.title], ...(x.replaces ? [[x.replaces]] : [])]), ...(sp ? [[sp.name, true]] : [])];
+      return builtinOn(d).filter((b) => !named.some(([nm, loose]) => holLike(nm, b.name, loose))).map((b) => ({ kind: 'builtin', b, from: d, to: d, title: b.name })); };
+    // a band's lanes for a week: its entries in rows, so two never overlap
+    const laneize = (list, w0, w1) => { const lanes = [];
+      list.filter((it) => it.from <= w1 && it.to >= w0).sort((a, b) => a.from.localeCompare(b.from) || b.to.localeCompare(a.to) || calOrder(a, b)).forEach((it) => {
         const s = it.from < w0 ? w0 : it.from, e = it.to > w1 ? w1 : it.to, seg = { it, s, e, n: dayDiff(s, e) + 1 };
-        let lane = lanes.find((l) => l.every((x) => x.e < s || x.s > e)); if (!lane) lanes.push((lane = [])); lane.push(seg);
-      });
-      return lanes;
+        let lane = lanes.find((l) => l.every((x) => x.e < s || x.s > e)); if (!lane) lanes.push((lane = [])); lane.push(seg); });
+      return lanes; };
+    const weekBands = Array.from({ length: weeks }, (_, w) => {
+      const w0 = addDays(start, w * 7), w1 = addDays(w0, 6), inWeek = shown.filter((it) => it.from <= w1 && it.to >= w0);
+      const bot = [...inWeek.filter((it) => bandOf(it) === 'bot'), ...Array.from({ length: 7 }, (_, i) => builtinsOn(addDays(w0, i))).flat()];
+      return { top: laneize(inWeek.filter((it) => bandOf(it) === 'top'), w0, w1), mid: laneize(inWeek.filter((it) => bandOf(it) === 'mid'), w0, w1), bot: laneize(bot, w0, w1) };
     });
-    const spanBar = (seg) => {
-      const it = seg.it, el = h('button', { type: 'button', class: `cal-span ${it.status}`, style: { width: `calc(${seg.n} * (100% + 9px) - 9px)` }, title: calTip(it), onclick: (e) => { e.stopPropagation(); calOpen(it); } },
-        `${it.status === 'requested' ? '? ' : ''}${it.who} · ${datesOnly(it)}${it.hours ? `, ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`);
-      if (notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' '));
+    // the flipper's page for a week's band (on screen; printed, every row shows)
+    cal.flip = cal.flip || {};
+    const pageOf = (w, band) => { const n = Math.ceil(weekBands[w][band].length / CAP[band]), k = `${addDays(start, w * 7)}:${band}`; return Math.min(cal.flip[k] || 0, Math.max(0, n - 1)); };
+    const shownLane = (w, band, li) => fit || (li >= pageOf(w, band) * CAP[band] && li < (pageOf(w, band) + 1) * CAP[band]);
+    const flipper = (w, band) => { const n = Math.ceil(weekBands[w][band].length / CAP[band]); if (fit || n < 2) return null; const k = `${addDays(start, w * 7)}:${band}`, p = pageOf(w, band);
+      const go = (dir) => (e) => { e.stopPropagation(); cal.flip[k] = (p + dir + n) % n; render(); };
+      return h('span', { class: 'cal-flip no-print', title: `${weekBands[w][band].length} rows this week: flip to see the others (printed, all show)` }, h('button', { type: 'button', 'aria-label': 'Rows before', onclick: go(-1) }, '‹'), `${p + 1}/${n}`, h('button', { type: 'button', 'aria-label': 'More rows', onclick: go(1) }, '›')); };
+    // one entry as a pill (one day) or a strip (its days this week)
+    const barLabel = (it) => (it.kind === 'timeoff' ? `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.from === it.to ? it.title : datesOnly(it)}${it.hours ? `, ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}`
+      : it.kind === 'special' ? it.x.name || (it.x.closed ? 'Closed' : 'Special hours') : it.kind === 'builtin' ? it.b.name : `${it.x.repeat ? '↻ ' : ''}${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`);
+    const barEl = (it, n, d) => {
+      const width = n > 1 ? { width: `calc(${n} * (100% + 9px) - 9px)` } : null;
+      const cls = it.kind === 'timeoff' ? `cal-span ${it.status}` : it.kind === 'event' && !isHolIt(it) ? `cal-span ev${it.x.movedFrom ? ' urgent' : ''}`
+        : `cal-hol ${it.kind === 'builtin' ? it.b.type : it.kind === 'special' ? (holSpecial(it.x) ? holSpecialType(it.x) : 'sp' + (it.x.closed ? ' shut' : '')) : holEventType(it.x)}`;
+      const el = h('button', { type: 'button', class: cls, style: width, title: it.kind === 'builtin' ? `${it.b.name} (${it.b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details` : calTip(it),
+        onclick: (e) => { e.stopPropagation(); if (it.kind === 'builtin') eventDialog(null, { from: d, to: d, title: it.b.name, holiday: it.b.type, replaces: it.b.name }); else calOpen(it); } }, barLabel(it));
+      if (it.kind !== 'builtin' && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(it)) + ' '));
       return el;
     };
+    // a band in a day: fixed, every row of the week (the day's own strip starts here; a row another day's strip runs
+    // through stays empty); fit, just the day's own, as pills
+    const bandEl = (w, band, d, cls) => {
+      const lanes = weekBands[w][band];
+      if (fit) { const mine = lanes.flat().filter((x) => x.s <= d && d <= x.e).map((x) => x.it), more = mine.length - CAP[band];
+        return mine.length ? h('div', { class: cls }, mine.slice(0, more > 0 ? CAP[band] - 1 : CAP[band]).map((it) => barEl(it, 1, d)), more > 0 ? h('button', { type: 'button', class: 'cal-more', onclick: (e) => { e.stopPropagation(); dayDialog(d); } }, `+${more + 1} more`) : null) : null; }
+      if (!lanes.length) return null;
+      return h('div', { class: cls }, lanes.map((l, li) => { const seg = l.find((x) => x.s <= d && d <= x.e), el = seg && seg.s === d ? barEl(seg.it, seg.n, d) : h('div', { class: 'cal-lane' });
+        if (!shownLane(w, band, li)) el.classList.add('cal-lane-x'); return el; }), dayIdx(d) === 6 ? flipper(w, band) : null);
+    };
     const cells = Array.from({ length: weeks }, (_, w) => Array.from({ length: 7 }, (_, i) => {
-      const d = addDays(start, w * 7 + i), its = shown.filter((it) => it.from <= d && d <= it.to && !multi(it)).sort(calOrder), sp = specialOn(d), st = storeHoursOn(d);
-      const n = planDays().includes(d) ? shiftsOn(d).length : 0;
-      // holidays: special hours or events that are one, then the list's own (unless an entry that day has its name)
-      const isHol = (it) => (it.kind === 'special' ? holSpecial(it.x) : it.kind === 'event' ? holEvent(it.x) : false);
-      const holIts = cal.show.holiday === false ? [] : its.filter(isHol), named = [...eventsOn(d).flatMap((x) => [[x.title], ...(x.replaces ? [[x.replaces]] : [])]), ...(sp ? [[sp.name, true]] : [])];
-      const bars = [...holIts.map((it) => ({ it, label: it.kind === 'special' ? it.x.name || 'Holiday' : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}`, type: it.kind === 'special' ? holSpecialType(it.x) : holEventType(it.x) })),
-        ...(cal.show.holiday === false ? [] : builtinOn(d).filter((b) => !named.some(([n, loose]) => holLike(n, b.name, loose))).map((b) => ({ label: b.name, type: b.type })))]
-        .sort((x, y) => (x.type === 'national') - (y.type === 'national'));
-      const marked = its.filter((it) => it.kind === 'event' && !holIts.includes(it) && markOf(it.x)), eop = marked.find((it) => markOf(it.x) === 'period');
-      const rest = its.filter((it) => !holIts.includes(it) && !marked.includes(it)), evs = rest.filter((it) => it.kind === 'event'), evShow = evs.slice(0, 3);
-      const topAll = [...rest.filter((it) => it.kind !== 'event'), ...evs.slice(3)], room = Math.max(1, MAX - evShow.length - bars.length - spans[w].length), topShow = topAll.length > room ? topAll.slice(0, room - 1) : topAll, more = topAll.slice(topShow.length);
-      const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
-        bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else eventDialog(null, { from: d, to: d, title: b.label, holiday: b.type, replaces: b.label }); } }, b.label);
-          if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
-      const look = dayLook(d), bare = (e) => !e.target.closest('button, a, input');
-      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (d < today ? ' cal-past' : '') + (st && st.closed ? ' cal-closed' : '') + (look ? ' cal-look' : ''), 'data-d': d, style: lookStyle(d),
-        onclick: (e) => { if (bare(e)) pickDay(d, e); }, ondblclick: (e) => { if (bare(e)) dayDialog(d); }, oncontextmenu: (e) => { if (bare(e) || e.target.closest('.cal-num')) dayMenu(d, e); } },
-        dayPicsEl(d),
-        // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
-        h('div', { class: 'cal-in', style: { paddingBottom: (evShow.length * 20 + bars.length * 19 + 5) + 'px' } },
+      const d = addDays(start, w * 7 + i), sp = specialOn(d), st = storeHoursOn(d), look = dayLook(d), bare = (e) => !e.target.closest('button, a, input');
+      const marked = shown.filter((it) => it.from <= d && d <= it.to && bandOf(it) === 'head').sort(calOrder), eop = marked.find((it) => markOf(it.x) === 'period');
+      // the bottom band's room (fixed: the rows shown; printed: all of them)
+      const botAll = fit ? 0 : weekBands[w].bot.length, botShown = fit ? 0 : Math.min(botAll, CAP.bot);
+      const bottom = bandEl(w, 'bot', d, 'cal-bottom');
+      const botFit = fit && bottom ? bottom.children.length : 0;
+      const inn = h('div', { class: 'cal-in' },
         h('div', { class: 'cal-head' },
           h('button', { type: 'button', class: 'cal-num' + (eop ? ' eop' : ''), title: `${longDate(d)}${eop ? ' · ' + eop.title : ''}: see everything on this day and add to it`, onclick: () => dayDialog(d) }, String(parseIso(d).getDate())),
           eop && notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(eop))) : null,
           // the signs next to the date (payday, truck, inventory, insurance, meeting)
           marked.filter((it) => it !== eop).map((it) => h('button', { type: 'button', class: 'cal-mark' + (it.x.movedFrom ? ' urgent' : ''), title: calTip(it), 'aria-label': it.title, onclick: (e) => { e.stopPropagation(); calOpen(it); } }, markSvg(markOf(it.x)), notesWhere !== 'off' ? h('span', { class: 'cal-n' }, supNum(numOf(it))) : null)),
+          look && look.note ? h('button', { type: 'button', class: 'cal-notemark', title: 'Note: ' + look.note, 'aria-label': 'Note: ' + look.note, onclick: (e) => { e.stopPropagation(); dayDialog(d); } }, '✎') : null,
           h('button', { type: 'button', class: 'cal-add no-print', title: 'Add an event, special hours or time off on this day', 'aria-label': `Add to ${longDate(d)}`, onclick: () => dayDialog(d) }, '+')),
         // the store's hours that day: special hours (a holiday) win over the usual ones
-        // and how many are on the schedule, at its right (the date's line stays one line: the time off bars line up)
         h('div', { class: 'cal-hrs' + (st && sp ? ' special' : '') + (st && st.closed ? ' closed' : '') }, st ? h('span', { class: 'cal-hrs-t', title: sp ? `${sp.name || 'Special hours'}: ${specialText(sp).toLowerCase()} (usual: ${usualText(usualOn(d))})` : `Usual hours on ${WEEKDAYS[dayIdx(d)]}s` }, st.closed ? 'Closed' : (() => { const u = usualOn(d), now = `${clockShort(st.open)}–${clockShort(st.close)}`;
           // changed hours (still open): the usual hours struck through, the day's own next to them
-          return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null,
-          n ? h('span', { class: 'cal-cnt' + (st && st.closed ? ' shut' : ''), title: st && st.closed ? `${n} on the schedule, but the store is closed: Check schedule points them out (not printed)` : `${n} on the schedule` }, `${n} sched.`) : null),
-        // the week's time off bars: this day's own starts here; a lane another day's bar runs through is kept empty
-        spans[w].length ? h('div', { class: 'cal-lanes' }, spans[w].map((l) => { const seg = l.find((x) => x.s <= d && d <= x.e); return seg && seg.s === d ? spanBar(seg) : h('div', { class: 'cal-lane' }); })) : null,
-        look && look.note ? h('div', { class: 'cal-dnote', title: look.note }, look.note) : null, // under the time off bars (they line up across the week)
-        topShow.map(chipN),
-        more.length ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${more.length} more`) : null,
-        // printed: the ones that don't fit as numbers only
-        more.length && notesWhere !== 'off' ? h('div', { class: 'cal-n cal-nmore' }, more.map((it) => supNum(numOf(it))).join(',')) : null,
-        bottom));
+          return sp && u && !u.closed && u.open != null && (u.open !== st.open || u.close !== st.close) ? [h('s', { class: 'cal-was' }, `${clockShort(u.open)}–${clockShort(u.close)}`), ' ', now] : now; })()) : null),
+        bandEl(w, 'top', d, 'cal-band top'),
+        bandEl(w, 'mid', d, 'cal-lanes'),
+        look && look.note ? h('div', { class: 'cal-dnote', title: look.note }, look.note) : null, // in the free room (nothing under it has to line up)
+        bottom);
+      inn.style.setProperty('--botv', fit ? botFit : botShown); inn.style.setProperty('--bota', fit ? botFit : botAll);
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (d < today ? ' cal-past' : '') + (st && st.closed ? ' cal-closed' : '') + (look ? ' cal-look' : ''), 'data-d': d, style: lookStyle(d),
+        onclick: (e) => { if (bare(e)) pickDay(d, e); }, ondblclick: (e) => { if (bare(e)) dayDialog(d); }, oncontextmenu: (e) => { if (bare(e) || e.target.closest('.cal-num')) dayMenu(d, e); } },
+        dayPicsEl(d), inn);
     }));
+    const spans = weekBands.map((b) => b.mid); // (the legend in the empty days needs the time off rows)
     // the legend (what the signs mean)
     const legendEl = () => { const used = new Set(shown.filter((it) => it.kind === 'event' && it.from <= addDays(start, weeks * 7 - 1) && it.to >= start && !holEvent(it.x)).map((it) => markOf(it.x)).filter(Boolean));
         // and the heads up: something moved to the day before a closed holiday (circled)

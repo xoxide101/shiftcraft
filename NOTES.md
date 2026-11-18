@@ -395,6 +395,13 @@ Every printout opens the same kind of window (05b-print-window.js, `printWindow`
 - **Paper size and orientation** are now picked for the Calendar, person sheets and Print this page too (`setPrintPage` sets the paper just before printing).
 - **The Calendar's choices** show at once in the preview and on the Calendar behind it. Cancel puts back what was there before.
 
+## Calendar: every day in the same bands
+
+Every day is built the same way, top to bottom: the **header** (the date, signs such as payday or truck, the day's pictures, ✎ for its note, the store's hours), the **top band** (events: a pill for one day, a strip across several), the **middle band** (time off: pills and strips), and the **bottom band** (the whole store: holidays, special hours, closed days). Schedule counts are not on the month: they are in the Day details (double-click a day) and on the Schedule.
+
+- **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
+- **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
+
 ## Calendar: a day's details and its own look
 
 - **Day details** (double-click a day, click its number, or right-click › Day details…): everything on the day in clear sections: Store hours, Holidays, Events, Time off, On the schedule, and This day's look, each with its own add buttons.
