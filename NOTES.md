@@ -402,6 +402,14 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
 - **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
 
+## Screens, phones and tabs
+
+- **Wide areas** (tables, the timeline, the ribbon, tab rows): no scrollbars; Office-style ‹ › at an edge only when there is more that way (click scrolls, hold keeps going), level with the middle of what is on screen. The page never runs wider than the window.
+- **Title bar**: the top line keeps what you act on (menu, quick buttons, search, Log in, theme, help); the store and the week are always on the second line, at the right of the ribbon's tabs.
+- **Phones** (Pixel 6 Pro / 10 Pro XL, flip phones): the title bar on two rows, the page fits the screen and scrolls; on the timeline a swipe scrolls (tap a shift for its notes, double tap to edit, long press for the menu); windows fit the visible screen.
+- **Tabs, one look**: the Schedule's lower tabs, Company & Location, Staff, the Border designer, and the week choosers (the Week page, Week out, Forecast): each tab its own colour on its top edge and count (blue, teal, violet, amber, rose, green, orange); week 3 is the same colour everywhere.
+- **The Week page** looks back or ahead past the plan: ‹ › a week, « » five weeks, This week to come back; weeks outside the plan show their dates.
+
 ## Every file has a name of its own
 
 Every file saved or exported (printouts as PDF or pictures, schedules, teams, iCal, the Border designer's) gets the moment it was made before its extension, to the second: `… v2026.11.18.14.05.33.pdf`. Pages saved together share one stamp. (Saving again to the file you opened, with Save, writes that same file.)

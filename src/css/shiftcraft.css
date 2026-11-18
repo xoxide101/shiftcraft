@@ -885,3 +885,9 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .weekout > .btn[aria-pressed="true"], .weeks > .btn[aria-pressed="true"] { color: var(--fg); background: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); border-color: var(--line); border-bottom-color: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); box-shadow: inset 0 3px 0 var(--tab-hue); }
 .weekout > .btn b { color: var(--tab-hue); }
 .weekout > .btn[aria-pressed="true"] .muted { color: var(--fg); }
+
+/* the Week page: ‹ › a week, « » five weeks, on either side of the week tabs; weeks outside the plan in italics */
+.wk-browse { display: flex; align-items: flex-end; gap: 4px; flex-wrap: wrap; }
+.wk-browse .wk-nav { align-self: center; min-width: 30px; font-weight: 700; }
+.weeks > .btn.out { font-style: italic; }
+.wk-browse .wk-nav { font-size: 16px; line-height: 1; padding: 3px 9px; }

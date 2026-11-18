@@ -1,7 +1,21 @@
   // ---------- Week overview ----------
+  // the week looked at: any week, before or after the plan too (for looking back or ahead); it follows the day picked
+  // elsewhere, and the arrows move it a week (‹ ›) or a set of five (« »)
+  const weekBrowse = { w: null, day: null };
   function weekView(main) {
-    const w = weekOf(ui.day), days = weekDays(w);
-    const weeks = h('div', { class: 'weeks no-print' }, Array.from({ length: plan.weeks }, (_, k) => h('button', { class: 'btn sm', 'aria-pressed': String(k === w), onclick: () => { ui.day = weekDays(k)[0]; persist(); render(); } }, `Week ${k + 1}`)));
+    if (weekBrowse.day !== ui.day || weekBrowse.w == null) { weekBrowse.w = weekOf(ui.day); weekBrowse.day = ui.day; }
+    const w = weekBrowse.w, days = weekDays(w), inPlan = (k) => k >= 0 && k < plan.weeks;
+    const go = (k) => () => { weekBrowse.w = k; if (inPlan(k)) { ui.day = weekDays(k)[0]; weekBrowse.day = ui.day; persist(); } render(); };
+    // the five tabs: the set the week is in (plan weeks keep their numbers; others show their Monday)
+    const set0 = inPlan(w) && plan.weeks <= 7 ? 0 : Math.floor(w / 5) * 5, set = inPlan(w) && plan.weeks <= 7 ? Array.from({ length: plan.weeks }, (_, k) => k) : Array.from({ length: 5 }, (_, k) => set0 + k);
+    const label = (k) => (inPlan(k) ? `Week ${k + 1}` : shortDate(weekDays(k)[0]));
+    const nav = (txt, k, title) => h('button', { class: 'btn sm wk-nav', title, 'aria-label': title, onclick: go(k) }, txt);
+    const thisWeek = weekOf(iso(new Date()));
+    const weeks = h('div', { class: 'wk-browse no-print' },
+      nav('«', w - 5, 'Back five weeks'), nav('‹', w - 1, 'The week before'),
+      h('div', { class: 'weeks' }, set.map((k) => h('button', { class: 'btn sm' + (inPlan(k) ? '' : ' out'), 'aria-pressed': String(k === w), title: `${shortDate(weekDays(k)[0])} – ${shortDate(weekDays(k)[6])}${inPlan(k) ? '' : k < 0 ? ' (before the plan)' : ' (after the plan)'}`, onclick: go(k) }, label(k)))),
+      nav('›', w + 1, 'The week after'), nav('»', w + 5, 'Ahead five weeks'),
+      w !== thisWeek ? h('button', { class: 'btn sm ghost', title: 'Back to this week', onclick: go(thisWeek) }, 'This week') : null);
     const staff = sortStaff(plan.staff.filter((p) => p.active || days.some((d) => shiftsOn(d).some((s) => s.staffId === p.id))));
     let lastGroup = null;
     const rows = [];
@@ -16,7 +30,7 @@
     });
     const foot = (label, fn, cls) => h('tr', null, h('td', null, label), days.map((d) => { const v = fn(d); return h('td', { class: 'num ' + (cls ? cls(d) : '') }, v); }), h('td', null, ''));
     main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' }, h('h1', { style: { textAlign: 'left', minWidth: 0 } }, `${placeName()} · Week ${w + 1}: ${shortDate(days[0])} – ${shortDate(days[6])}`), h('span', { class: 'spacer' }), weeks,
+      h('div', { class: 'daynav' }, h('h1', { style: { textAlign: 'left', minWidth: 0 } }, `${placeName()} · ${inPlan(w) ? `Week ${w + 1}: ` : 'Week of '}${shortDate(days[0])} – ${shortDate(days[6])}${inPlan(w) ? '' : w < 0 ? ' (before the plan)' : ' (after the plan)'}`), h('span', { class: 'spacer' }), weeks,
         h('button', { class: 'btn sm no-print', onclick: () => copyWeekDialog(w) }, 'Copy week to…'),
         h('button', { class: 'btn sm no-print', onclick: checkDialog }, 'Check schedule…'),
         h('button', { class: 'btn sm no-print', onclick: () => printPageDialog() }, 'Print…')),
