@@ -754,7 +754,7 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .st-body > .card { border: 0; box-shadow: none; padding: 0; margin: 0; background: none; }
 .st-body > .card > .inline:first-child h2 { display: none; }
 .summary { position: relative; }
-.sum-jump { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.sum-jump { align-self: center; margin: 0 10px 0 auto; }
 
 /* the Schedule's Training and Forecast tabs */
 .tr-tab td, .tr-tab th, .fc-tab td, .fc-tab th { vertical-align: top; }
@@ -763,3 +763,10 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .fc-tab .tot { font-weight: 700; }
 .fc-tab td.good { color: var(--good); } .fc-tab td.warn { color: var(--warn); } .fc-tab td.bad { color: var(--bad); }
 .tr-wrap { overflow-x: auto; }
+
+/* the numbers at the top, tighter: the day, then the week (a little apart) */
+.summary .tile { padding: 6px 14px; min-width: 0; }
+.summary .tile span { font-size: 10.5px; letter-spacing: .04em; }
+.summary .tile b { font-size: 17px; line-height: 1.25; }
+.summary .tile.wk { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.summary .tile:not(.wk) + .tile.wk { border-left: 2px solid var(--line); }

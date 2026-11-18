@@ -20,13 +20,16 @@
     const wv = weekDays(w).map(varianceHours);
     const weekVar = wv.every((v) => v == null) ? null : wv.reduce((a, v) => a + (v || 0), 0);
     const f = forecastOf(d), t = targetHours(d), v = varianceHours(d);
-    const tile = (label, value, cls, title) => h('div', { class: 'tile', title }, h('span', null, label), h('b', { class: cls || '' }, value));
+    const tile = (label, value, cls, title) => h('div', { class: 'tile' + (cls === 'wk' || /^Week/.test(label) ? ' wk' : ''), title }, h('span', null, label), h('b', { class: cls === 'wk' ? '' : cls || '' }, value));
     return h('div', { class: 'summary' },
       tile('Forecast', money(f), '', plan.forecast[d] != null && plan.forecast[d] !== '' ? 'Your forecast' : 'Trend from past sales'),
       tile('Target hours', t == null ? '—' : hrs(t), '', `Forecast ÷ $${plan.splh} per labor hour`),
       tile('Scheduled hours', hrs(dayHours(d))),
       tile('Hours variance', v == null ? '—' : signed(v), varClass(v), 'Scheduled minus target. Negative = fewer hours than target.'),
-      tile('Hours variance week', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'),
+      // the week: scheduled so far (Monday to this day), the whole week, and the week against its target
+      tile('Week so far', hrs(weekDays(w).filter((x) => x <= d).reduce((t, x) => t + dayHours(x), 0)), 'wk', `Scheduled hours Monday to ${dayName(d)}`),
+      tile('Week total', hrs(weekDays(w).reduce((t, x) => t + dayHours(x), 0)), 'wk', 'Scheduled hours, the whole week'),
+      tile('Week variance', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'),
       h('button', { type: 'button', class: 'btn sm sum-jump no-print', title: 'The Forecast: sales by day, the trend, and the hours they call for', onclick: () => { ui.tab = 'forecast'; persist(); render(); } }, 'Forecast ›'));
   }
 

@@ -23,14 +23,8 @@
           h('tbody', null, rows),
           h('tfoot', null, h('tr', null, h('td', null, `${label} total`), h('td', { class: 'num' }, hrs(sum((id) => hoursOn(id, d)))), h('td', { class: 'num' }, hrs(sum((id) => weekSoFar(id, d)))), h('td', { class: 'num' }, hrs(sum((id) => personWeekHours(id, w))))))));
     }).filter(Boolean);
-    const soFar = days.filter((x) => x <= d).reduce((t, x) => t + dayHours(x), 0), whole = days.reduce((t, x) => t + dayHours(x), 0);
-    const tile = (label, value, cls) => h('div', { class: 'tile' }, h('span', null, label), h('b', { class: cls || '' }, value));
     return h('div', { class: 'card' },
       h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'Hours by section'), h('span', { class: 'muted small' }, `Today is ${dayName(d)}. Week so far counts Monday to ${dayName(d)}.`)),
-      cols.length ? h('div', { class: 'sec-grid' }, cols) : h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Nobody is scheduled this week yet.'),
-      h('div', { class: 'summary totals' },
-        tile('Total hours today', hrs(dayHours(d))),
-        tile('Total week so far', hrs(soFar)),
-        tile('Total whole week', hrs(whole))));
+      cols.length ? h('div', { class: 'sec-grid' }, cols) : h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Nobody is scheduled this week yet.')); // (the totals are in the numbers at the top)
   }
 

@@ -761,7 +761,7 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .st-body > .card { border: 0; box-shadow: none; padding: 0; margin: 0; background: none; }
 .st-body > .card > .inline:first-child h2 { display: none; }
 .summary { position: relative; }
-.sum-jump { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.sum-jump { align-self: center; margin: 0 10px 0 auto; }
 
 /* the Schedule's Training and Forecast tabs */
 .tr-tab td, .tr-tab th, .fc-tab td, .fc-tab th { vertical-align: top; }
@@ -770,6 +770,13 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .fc-tab .tot { font-weight: 700; }
 .fc-tab td.good { color: var(--good); } .fc-tab td.warn { color: var(--warn); } .fc-tab td.bad { color: var(--bad); }
 .tr-wrap { overflow-x: auto; }
+
+/* the numbers at the top, tighter: the day, then the week (a little apart) */
+.summary .tile { padding: 6px 14px; min-width: 0; }
+.summary .tile span { font-size: 10.5px; letter-spacing: .04em; }
+.summary .tile b { font-size: 17px; line-height: 1.25; }
+.summary .tile.wk { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.summary .tile:not(.wk) + .tile.wk { border-left: 2px solid var(--line); }
 </style>
 </head>
 <body>
@@ -2705,13 +2712,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const wv = weekDays(w).map(varianceHours);
     const weekVar = wv.every((v) => v == null) ? null : wv.reduce((a, v) => a + (v || 0), 0);
     const f = forecastOf(d), t = targetHours(d), v = varianceHours(d);
-    const tile = (label, value, cls, title) => h('div', { class: 'tile', title }, h('span', null, label), h('b', { class: cls || '' }, value));
+    const tile = (label, value, cls, title) => h('div', { class: 'tile' + (cls === 'wk' || /^Week/.test(label) ? ' wk' : ''), title }, h('span', null, label), h('b', { class: cls === 'wk' ? '' : cls || '' }, value));
     return h('div', { class: 'summary' },
       tile('Forecast', money(f), '', plan.forecast[d] != null && plan.forecast[d] !== '' ? 'Your forecast' : 'Trend from past sales'),
       tile('Target hours', t == null ? '—' : hrs(t), '', `Forecast ÷ $${plan.splh} per labor hour`),
       tile('Scheduled hours', hrs(dayHours(d))),
       tile('Hours variance', v == null ? '—' : signed(v), varClass(v), 'Scheduled minus target. Negative = fewer hours than target.'),
-      tile('Hours variance week', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'),
+      // the week: scheduled so far (Monday to this day), the whole week, and the week against its target
+      tile('Week so far', hrs(weekDays(w).filter((x) => x <= d).reduce((t, x) => t + dayHours(x), 0)), 'wk', `Scheduled hours Monday to ${dayName(d)}`),
+      tile('Week total', hrs(weekDays(w).reduce((t, x) => t + dayHours(x), 0)), 'wk', 'Scheduled hours, the whole week'),
+      tile('Week variance', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'),
       h('button', { type: 'button', class: 'btn sm sum-jump no-print', title: 'The Forecast: sales by day, the trend, and the hours they call for', onclick: () => { ui.tab = 'forecast'; persist(); render(); } }, 'Forecast ›'));
   }
 
@@ -4669,15 +4679,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
           h('tbody', null, rows),
           h('tfoot', null, h('tr', null, h('td', null, `${label} total`), h('td', { class: 'num' }, hrs(sum((id) => hoursOn(id, d)))), h('td', { class: 'num' }, hrs(sum((id) => weekSoFar(id, d)))), h('td', { class: 'num' }, hrs(sum((id) => personWeekHours(id, w))))))));
     }).filter(Boolean);
-    const soFar = days.filter((x) => x <= d).reduce((t, x) => t + dayHours(x), 0), whole = days.reduce((t, x) => t + dayHours(x), 0);
-    const tile = (label, value, cls) => h('div', { class: 'tile' }, h('span', null, label), h('b', { class: cls || '' }, value));
     return h('div', { class: 'card' },
       h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'Hours by section'), h('span', { class: 'muted small' }, `Today is ${dayName(d)}. Week so far counts Monday to ${dayName(d)}.`)),
-      cols.length ? h('div', { class: 'sec-grid' }, cols) : h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Nobody is scheduled this week yet.'),
-      h('div', { class: 'summary totals' },
-        tile('Total hours today', hrs(dayHours(d))),
-        tile('Total week so far', hrs(soFar)),
-        tile('Total whole week', hrs(whole))));
+      cols.length ? h('div', { class: 'sec-grid' }, cols) : h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Nobody is scheduled this week yet.')); // (the totals are in the numbers at the top)
   }
 
   // ---------- iCal (.ics) files: out to other calendars, and back in ----------
