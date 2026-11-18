@@ -16,7 +16,7 @@
 
   function schoolRows() {
     const people = sortStaff(plan.staff.filter((p) => !p.left));
-    const head = ['Name', 'Role', 'In school', 'School', 'Term: first day – last day', 'Class times (they can’t work these hours)', 'Note'];
+    const head = ['Name', 'Role', 'In school', 'School', 'Term: first day – last day', 'Class times', 'Note'];
     const cols = head.length;
     const dayBtns = (c) => h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Class days' }, SCHOOL_DAYS.map((i) => { const on = c.days.includes(i), wd = WEEKDAYS[i];
       return h('button', { type: 'button', class: 'dt use' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${on ? 'Class' : 'No class'} on ${wd}s (click to change)`, onclick: () => change(() => { c.days = on ? c.days.filter((x) => x !== i) : [...c.days, i].sort(); }) }, wd[0]); }));
@@ -44,12 +44,13 @@
           h('td', { class: 'nowrap' }, h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, date('from', 'First day of the term'), '–', date('to', 'Last day of the term')),
             h('div', { class: 'small ' + (now ? 'good' : 'muted'), style: { marginTop: '2px' } }, now ? 'In term now' : sc.to && sc.to < today ? 'Term over (classes not counted)' : 'Term not started yet'),
             // include or leave out: a note only, or class times are hours they can't work
-            h('label', { class: 'check small', title: 'Ticked: class times are hours they can’t work (shown in their availability, and a shift over them gets the ! mark). Unticked: school is just a note.' },
-              h('input', { type: 'checkbox', checked: !!sc.count, onchange: (e) => change(() => { if (e.target.checked) sc.count = true; else delete sc.count; }) }), ' Count class times')),
+            h('label', { class: 'check small', title: 'Ticked: class times are an exclusion, hours they can’t work: they come out of their availability (shown on the Availability tab) and a shift over them gets N/A · class. Unticked: school is a note only, and their availability is just as you set it.' },
+              h('input', { type: 'checkbox', checked: !!sc.count, onchange: (e) => change(() => { if (e.target.checked) sc.count = true; else delete sc.count; }) }), ' Can’t work during class (exclusion)'),
+            h('div', { class: 'small ' + (sc.count ? 'warn' : 'muted') }, sc.count ? 'Class times come out of their availability' : 'A note only: availability as set')),
           h('td', null, c0 ? classLine(p, c0, true) : null),
           h('td', null, txt('note', 'e.g. exams in June · summer: any time', 'Note', '140px'))),
         ...more.map((c) => h('tr', { class: 'subrow', style: { opacity: p.active ? 1 : 0.55 } }, h('td', { colspan: 5, class: 'small' }, h('span', { class: 'sub-arrow' }, '↳ '), 'Other class times'), h('td', null, classLine(p, c, false)), h('td')))];
     });
     const inSchool = people.filter((p) => p.school && p.school.on !== false).length;
-    return { head, rows, empty: 'No one yet. Add your team on the Weekdays tab.', foot: h('tr', null, h('td', { colspan: cols, class: 'small muted', style: { fontWeight: 400 } }, `${inSchool} of ${people.length} in school. During the term, class times count as hours they can't work: a shift over them gets the ! mark. Before the first day or after the last day, they don't count.`)) };
+    return { head, rows, empty: 'No one yet. Add your team on the Weekdays tab.', foot: h('tr', null, h('td', { colspan: cols, class: 'small muted', style: { fontWeight: 400 } }, `${inSchool} of ${people.length} in school. With Can’t work during class ticked, class times (during the term) come out of that person’s availability: a shift over them gets N/A · class. Unticked, school is a note only. Before the first day or after the last day, classes don’t count.`)) };
   }
