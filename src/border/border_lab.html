@@ -100,7 +100,10 @@
   .otop { padding: 12px 14px 0; }
   .opts .tabs { margin: 8px 14px 0; }
   .otbox { flex: 1; overflow-y: auto; overflow-x: hidden; margin: 0 14px; border: 1px solid #c9cedb; border-top: 0; border-radius: 0 0 8px 8px; padding: 6px 10px 10px; }
-  .ofoot { padding: 8px 14px 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .ofoot { padding: 8px 14px 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .ofoot .dpi { display: flex; gap: 6px; align-items: center; flex: 1 1 100%; }
+  .ofoot .dpi > span { min-width: 0 !important; }
+  .ofoot .note { flex: 1 1 100%; min-height: 1em; }
   .sub { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 2px; border-top: 1px solid var(--line); padding-top: 6px; }
   .sub:first-child { border-top: 0; margin-top: 2px; padding-top: 0; }
   .rs { visibility: hidden; border: 0; background: none; color: #2453c7; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; flex: none; }
@@ -223,7 +226,8 @@ const LINESETS = {
 const SHAPES = [['straight', 'Straight'], ['scallopOut', 'Scallops out'], ['scallopIn', 'Scallops in'], ['wave', 'Waves'], ['zigzag', 'Zigzag'], ['bumps', 'Bumps (half circles out)']];
 const TREATS = [['through', 'Through it (the line passes)'], ['round', 'Rounded (corners)'], ['notch', 'Notch: around it, inside'], ['bulge', 'Bulge: around it, outside'], ['ring', 'Ring round it, line stops'], ['gap', 'Gap: line stops short']];
 const FLOWS = [['none', 'None'], ['dips-in', 'In the dips, inside'], ['dips-out', 'In the dips, outside'], ['dips-alt', 'In every dip, both sides'], ['line', 'Threaded on the line']];
-const PAPERS = { letter: [8.5, 11], legal: [8.5, 14], tabloid: [11, 17] };
+const PAPERS = { letter: [8.5, 11], legal: [8.5, 14], tabloid: [11, 17], half: [5.5, 8.5], a3: [11.69, 16.54], a4: [8.27, 11.69], a5: [5.83, 8.27], p4x6: [4, 6], p5x7: [5, 7], p8x10: [8, 10] };
+const PAPER_NAMES = { letter: 'Letter 8.5 × 11 in', legal: 'Legal 8.5 × 14 in', tabloid: 'Tabloid 11 × 17 in', half: 'Half letter 5.5 × 8.5 in', a3: 'A3 297 × 420 mm', a4: 'A4 210 × 297 mm', a5: 'A5 148 × 210 mm', p4x6: 'Photo 4 × 6 in', p5x7: 'Photo 5 × 7 in', p8x10: 'Photo 8 × 10 in' };
 // what the border is for: how much room that page leaves for it (inches in from the printer margin). The whole design is
 // drawn smaller, in proportion, to fit that room, so a border made here never eats into the printout.
 const USES = [['free', 'Any page (no limit)', 0], ['calendar', 'ShiftCraft month calendar', 0.5], ['week', 'ShiftCraft week schedule', 0.5], ['hourly', 'ShiftCraft timeline', 0.45], ['person', 'ShiftCraft person sheet', 0.6], ['notes', 'ShiftCraft notes page', 0.6], ['poster', 'Sign or certificate', 1]];
@@ -490,7 +494,7 @@ function setSlot(key, id) { S[key] = id; points(frame(1000, 1300, 0)).forEach((p
 
 const OTABS = [['page', 'Page'], ['lines', 'Lines'], ['shape', 'Shape'], ['spots', 'Spots'], ['flow', 'Flow']];
 const PANES = {
-  page: () => [sel('paper', 'Paper', Object.keys(PAPERS).map((k) => [k, k[0].toUpperCase() + k.slice(1)])), sel('orient', 'Turned', [['portrait', 'Portrait'], ['landscape', 'Landscape']]),
+  page: () => [sel('paper', 'Paper', Object.keys(PAPERS).map((k) => [k, PAPER_NAMES[k] || k])), sel('orient', 'Turned', [['portrait', 'Portrait'], ['landscape', 'Landscape']]),
     tick('bw', 'Black and white (line art)'), tick('showPts', 'Show the 16 spots (C1, M1, O1…)'),
     sub('Made for'), sel('use', 'Page', USES.map(([k, l]) => [k, l]), false, () => { const u = USES.find((x) => x[0] === S.use); if (u[2]) S.room = u[2]; build(); }),
     S.use === 'free' ? tiny('No limit. Pick a page to keep the border inside the room that page leaves.') : rng('room', 'Room (in)', 0.1, 1.5, 0.05),
@@ -511,7 +515,14 @@ function build() {
   o.append(el('div', { class: 'otop' }, HOST ? designBar() : [el('h1', {}, 'Border lab'), el('div', { class: 'note' }, 'Right-click anything for more.')], theme, el('div', { class: 'fitnote', id: 'fitNote' })),
     el('div', { class: 'tabs', id: 'optTabs', role: 'tablist' }, OTABS.map(([k, l]) => el('button', { class: 'tab', role: 'tab', 'data-otab': k, 'aria-selected': String(optTab === k), onclick: () => setOptTab(k) }, l))),
     el('div', { class: 'otbox', id: 'otbox' }, PANES[optTab]()),
-    el('div', { class: 'ofoot' }, el('button', { class: 'btn primary', onclick: saveSvg, title: 'Vector: prints sharp at any size' }, 'Save as SVG'), el('button', { class: 'btn', onclick: () => resetAll(), title: 'Every setting and picture back to the theme’s (placed pictures stay)' }, 'All back to the theme')));
+    el('div', { class: 'ofoot' },
+      el('button', { class: 'btn', onclick: saveSvg, title: 'Vector: sharp at any size, at the paper’s real size' }, 'Save as SVG'),
+      el('button', { class: 'btn', onclick: () => saveOut('pdf'), title: 'A PDF the paper’s size, at the resolution below' }, 'Save as PDF'),
+      el('button', { class: 'btn', onclick: () => saveOut('png'), title: 'A PNG picture at the resolution below (it keeps its DPI, so it prints at the paper’s size)' }, 'Save as image'),
+      el('button', { class: 'btn', onclick: () => resetAll(), title: 'Every setting and picture back to the theme’s (placed pictures stay)' }, 'All back to theme'),
+      HOST ? el('button', { class: 'btn primary', id: 'useCur', onclick: useCurrent, 'aria-pressed': String(HOST.usingOnPrint()), title: 'Print with this border: every printout uses it (you can still pick Off or Thin frame in a print window)' }, HOST.usingOnPrint() ? '✓ Use current' : 'Use current') : null,
+      el('label', { class: 'dpi' }, el('span', {}, 'Resolution'), (() => { const s = el('select', { 'aria-label': 'Resolution', onchange: () => { outDpi = +s.value; try { localStorage.setItem('border-lab-dpi', s.value); } catch (e) { /* blocked */ } } }, [150, 300, 600, 1200].map((d) => el('option', { value: d, ...(d === outDpi ? { selected: '' } : {}) }, d + ' DPI' + (d === 300 ? ' (print)' : '')))); return s; })()),
+      el('div', { class: 'note', id: 'saveNote' })));
   $('#otbox').scrollTop = keep;
 }
 
@@ -545,7 +556,6 @@ function designBar() {
       btn('Copy', 'A copy of this design to change', () => { keepNow(); const d = { id: newId(), name: nm + ' (copy)', s: designOf() }; const all = HOST.get(); all.designs.push(d); all.current = d.id; HOST.put(all); loadDesign(d); refresh(); }),
       btn('Rename…', 'Give this design a name', () => { const n = prompt('Name for this border design:', nm); if (n && n.trim()) { design.name = n.trim().slice(0, 60); keepNow(); build(); } }),
       btn('Delete', 'Delete this design', () => { const all = HOST.get(); if (all.designs.length < 2) { alert('This is the only design. Make a new one first, or change this one.'); return; } if (!confirm(`Delete the design “${nm}”? This cannot be undone.`)) return; all.designs = all.designs.filter((x) => x.id !== design.id); all.current = all.designs[0].id; HOST.put(all); loadDesign(all.designs[0]); refresh(); })),
-    el('label', { class: 'useprint' }, el('input', { type: 'checkbox', ...(HOST.usingOnPrint() ? { checked: '' } : {}), onchange: (e) => { keepNow(); HOST.useOnPrint(e.target.checked); } }), 'Use this border on printouts'),
     HOST.back() ? el('button', { class: 'btn primary', type: 'button', onclick: () => { keepNow(); HOST.goBack(); } }, '← Back to printing') : null,
     el('div', { class: 'note' }, 'Kept in ShiftCraft as you change it. Right-click anything for more.'));
 }
@@ -900,7 +910,54 @@ function draw() {
   markChg();
   if (tilesBw !== null && tilesBw !== S.bw) { fillGrid(); fillStrip(); fillMap(); }
 }
-function saveSvg() { const [W, H] = size(), blob = new Blob([drawSvg(W, H, false)], { type: 'image/svg+xml' }), a = el('a', { href: URL.createObjectURL(blob), download: `border ${THEMES[S.theme].name}.svg` }); document.body.append(a); a.click(); a.remove(); }
+// ---------------- saving: SVG (vector), PDF and PNG at a resolution, every paper size ----------------
+let outDpi = 300; try { outDpi = +localStorage.getItem('border-lab-dpi') || 300; } catch (e) { /* blocked */ }
+const outName = () => `${HOST && design ? design.name : 'border ' + THEMES[S.theme].name} ${(PAPER_NAMES[S.paper] || S.paper).split(' ')[0]} ${S.orient}`.replace(/[\\/:*?"<>|]+/g, ' ');
+function download(blob, name) { const a = el('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+const saveNote = (t) => { const n = $('#saveNote'); if (n) n.textContent = t; };
+function saveSvg() { const [W, H] = size(); download(new Blob([drawSvg(W, H, false)], { type: 'image/svg+xml' }), outName() + '.svg'); saveNote('Saved as SVG: sharp at any size.'); }
+// the page as a picture at dpi (smaller if the browser cannot make one that big: the dpi it got is returned)
+async function pagePicture(dpi) {
+  const [W, H] = size(); let k = Math.min(dpi / IN, 16000 / W, 16000 / H, Math.sqrt(2.4e8 / (W * H)));
+  const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(drawSvg(W, H, false).replace(/ width="[^"]*in" height="[^"]*in"/, ` width="${c.width}" height="${c.height}"`)); await img.decode();
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return { c, dpi: Math.round(k * IN) };
+}
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return (b) => { let c = 0xffffffff; for (const x of b) c = t[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }; })();
+// a PNG that knows its DPI (pHYs), so it prints at the paper's size
+function pngWithDpi(buf, dpi) {
+  const ppm = Math.round(dpi / 0.0254), d = new Uint8Array(21), v = new DataView(d.buffer);
+  v.setUint32(0, 9); d.set([112, 72, 89, 115], 4); v.setUint32(8, ppm); v.setUint32(12, ppm); d[16] = 1; v.setUint32(17, CRC(d.subarray(4, 17)));
+  const out = new Uint8Array(buf.length + 21); out.set(buf.subarray(0, 33)); out.set(d, 33); out.set(buf.subarray(33), 54); return out;
+}
+// a one-page PDF the paper's size with the page as a JPEG picture
+function pdfOfJpeg(bytes, wPx, hPx, wIn, hIn) {
+  const W = +(wIn * 72).toFixed(2), H = +(hIn * 72).toFixed(2), enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const add = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; add(`${n} 0 obj\n`); body(); add('\nendobj\n'); };
+  add('%PDF-1.4\n');
+  obj(1, () => add('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, () => add('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
+  obj(3, () => add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
+  obj(4, () => { add(`<< /Type /XObject /Subtype /Image /Width ${wPx} /Height ${hPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`); add(bytes); add('\nendstream'); });
+  const cs = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+  obj(5, () => add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`));
+  const x = len; add('xref\n0 6\n0000000000 65535 f \n' + offs.slice(1).map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`);
+  return new Blob(parts, { type: 'application/pdf' });
+}
+async function saveOut(kind) {
+  saveNote('Making the file…');
+  try {
+    const { c, dpi } = await pagePicture(kind === 'pdf' ? Math.min(outDpi, 600) : outDpi), [W, H] = size();
+    const blob = await new Promise((r) => c.toBlob(r, kind === 'pdf' ? 'image/jpeg' : 'image/png', 0.95)), bytes = new Uint8Array(await blob.arrayBuffer());
+    if (kind === 'pdf') download(pdfOfJpeg(bytes, c.width, c.height, W / IN, H / IN), outName() + '.pdf');
+    else download(new Blob([pngWithDpi(bytes, dpi)], { type: 'image/png' }), outName() + '.png');
+    saveNote(`Saved as ${kind === 'pdf' ? 'PDF' : 'PNG'}: ${c.width.toLocaleString()} × ${c.height.toLocaleString()} pixels, ${dpi} DPI` + (dpi < (kind === 'pdf' ? Math.min(outDpi, 600) : outDpi) - 1 ? ' (the most this browser can make at this paper size; Save as SVG is sharp at any size)' : kind === 'pdf' && outDpi > 600 ? ' (PDFs go up to 600 DPI)' : '') + '.');
+  } catch (e) { saveNote('Could not make the file: ' + e.message); }
+}
+// Use current: printouts use this design
+function useCurrent() { keepNow(); HOST.useOnPrint(true); const b = $('#useCur'); if (b) { b.textContent = '✓ Use current'; b.setAttribute('aria-pressed', 'true'); } saveNote('Printouts use this border now.'); }
 window.addEventListener('resize', draw);
 $('#paper').addEventListener('pointerdown', onPaperDown); $('#paper').addEventListener('pointermove', onPaperHover);
 window.__S = S; window.__menu = () => menuEl; window.__applyTheme = (k) => { applyTheme(k); refresh(); }; window.__draw = draw; window.__drawSvg = drawSvg; window.__size = size;
