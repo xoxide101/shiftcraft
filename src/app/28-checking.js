@@ -46,6 +46,8 @@
           ...(['paid', 'unpaid'].includes(t.paid) ? { paid: t.paid } : {}), ...(ok(t.decided) ? { decided: t.decided } : {}), ...(typeof t.ics === 'string' && t.ics ? { ics: t.ics.slice(0, 300) } : {}) })) : [];
         if (!q.timeOff.length) delete q.timeOff;
       }
+      // availability: the seven days, one entry each (older settings turned into them once)
+      if (q.av2 && Array.isArray(q.avail)) q.avail = Array.from({ length: 7 }, (_, i) => { const a = q.avail[i]; return a && ['any', 'off', 'times', 'note', 'unk'].includes(a.k) ? a : { k: 'any' }; });
       if (!q.id || ids.has(q.id)) { q.id = uid(); fixes++; }
       ids.add(q.id);
       return q;

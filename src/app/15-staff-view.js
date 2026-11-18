@@ -1,6 +1,6 @@
   // ---------- Staff ----------
-  let staffTab = 'wk';
-  try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'wk'; } catch (e) {}
+  let staffTab = 'avail';
+  try { staffTab = localStorage.getItem('shiftcraft-staff-tab') || 'avail'; } catch (e) {}
   // a day-by-day cell as lines: the hours (each stretch its own line) and what they can’t do
   const avCellLines = (p, i, a, noSchool) => {
     const out = [];
@@ -19,7 +19,7 @@
   function staffView(main) {
     const roleSel = (v, on) => h('select', { class: 'input', onchange: (e) => on(e.target.value) }, Object.entries(ROLES).map(([k, r]) => h('option', { value: k, selected: k === v }, `${r.label} (${r.short})`)));
     const shiftCount = (id) => Object.values(plan.shifts).reduce((n, list) => n + list.filter((s) => s.staffId === id).length, 0);
-    const SECTIONS = [['wk', '1 · Weekdays', 'Monday to Friday: usual shift, the hours they can work, AM / MID / PM and days off'], ['we', '2 · Weekend', 'Saturday and Sunday: their own usual shift, hours, AM / MID / PM and days off'], ['contact', '3 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['avail', '4 · Day by day', 'Each day on its own: Any, Off, hours they can and can’t work, notes; Validated; pending training'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)']];
+    const SECTIONS = [['avail', '1 · Availability', 'When each person can work, Monday to Sunday: Any time, hours (two stretches for a split day), OFF, Call first; Validated; pending training'], ['wk', '2 · Weekday shift', 'Monday to Friday: the usual shift (what they get when you click their name)'], ['we', '3 · Weekend shift', 'Saturday and Sunday: the usual shift'], ['contact', '4 · Contact & training', 'Email, phone number, notes, and the positions each person is trained in'], ['timeoff', '5 · Time off', 'Days, weeks or a few hours off: reason, requested or approved, notes'], ['school', '6 · School', 'Who is in school: the school, the term and the class times (hours they can’t work)']];
     const nameCell = (p) => { const name = h('input', { class: 'input', value: p.name, 'aria-label': 'Name', style: { width: '100%' } }); name.addEventListener('change', () => { if (name.value.trim()) change(() => { p.name = name.value.trim(); }); }); return h('td', { style: { minWidth: '170px' } }, name); };
     const roleCell = (p) => h('td', null, roleSel(p.role, (v) => change(() => { p.role = v; })));
     const actions = (p) => { const soon = (p.timeOff || []).some((t) => t.to >= iso(new Date()) && t.status !== 'denied'); return h('td', { class: 'nowrap' }, ibs(
@@ -41,31 +41,16 @@
       const a = timePicker(st.start, 'Usual start'), b = timePicker(st.end, 'Usual finish');
       const saveTimes = () => { if (b.value > a.value) change(() => setSet(p, k, { start: Math.max(DAY_START, a.value), end: Math.min(DAY_END, b.value) })); else toast('The usual finish must be after the start.'); };
       a.addEventListener('change', saveTimes); b.addEventListener('change', saveTimes);
-      const any = st.from == null || st.to == null;
-      const fa = timePicker(any ? DAY_START : st.from, 'Available from'), fb = timePicker(any ? DAY_END : st.to, 'Available until');
-      [fa, fb].forEach((tp) => tp.querySelectorAll('select').forEach((x) => { x.disabled = any; }));
-      // if one end passes the other, the other moves along by an hour (no error to fix first)
-      const saveWin = (moved) => { let f = fa.value, t = fb.value; if (t <= f) { if (moved === 'from') t = Math.min(DAY_END, f + 60); else f = Math.max(DAY_START, t - 60); } change(() => setSet(p, k, { from: f, to: t })); };
-      fa.addEventListener('change', () => saveWin('from')); fb.addEventListener('change', () => saveWin('to'));
-      const anyBox = h('input', { type: 'checkbox', checked: any, onchange: (e) => change(() => setSet(p, k, e.target.checked ? { from: null, to: null } : { from: Math.max(DAY_START, st.start - 60), to: Math.min(DAY_END, st.end + 60) })) });
       const dayIdx = k === 'we' ? [5, 6] : [0, 1, 2, 3, 4];
       // one cell, lined up in three columns (label | hours | button): the usual shift on top, then the hours they can work
       // (greyed while Any time is ticked). These two lines stay; + adds Some days lines under the person, and only those can go.
       return [
-        h('td', null, h('div', { class: 'hgrid' },
-          h('span', { class: 'small hlabel', title: `The usual ${k === 'we' ? 'weekend' : 'weekday'} shift: what they get when you click their name under Unscheduled` }, 'Usual shift'), h('div', { class: 'inline', style: { flexWrap: 'nowrap' } }, a, '–', b),
-          ib('addTime', '+ Some days: other hours on some days only. Adds a line under this person where you pick the days and the hours. Add two lines for a split day (for example 7am–11am and 4pm–9pm)', () => change(() => { if (st.from == null) setSet(p, k, { from: Math.max(DAY_START, st.start - 60), to: Math.min(DAY_END, st.end + 60) }); /* a line means set hours: Any time goes off */ (p.lines = p.lines || []).push({ tab: k, days: [], from: st.start, to: st.end }); })),
-          h('label', { class: 'check small hlabel', style: { margin: 0 }, title: any ? 'Untick to set the hours they can work' : 'Tick if they can work any time' }, anyBox, ' Any time'), h('div', { class: 'inline' + (any ? ' dim' : ''), style: { flexWrap: 'nowrap' } }, fa, '–', fb), h('span'))),
-        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Parts of the day they can work' }, PARTS.map(([pk, l]) => {
-          const on = st.parts.includes(pk);
-          return h('button', { type: 'button', class: 'pt' + (on ? ' on' : ''), 'aria-pressed': String(on), title: `${l}: ${pk === 'am' ? 'opening to ' + clock(plan.midStart) : pk === 'mid' ? clock(plan.midStart) + ' to ' + clock(plan.pmStart) : clock(plan.pmStart) + ' to closing'} on ${partWord(k)} (click to change)`,
-            onclick: () => change(() => { const next = on ? st.parts.filter((x) => x !== pk) : [...st.parts, pk]; setSet(p, k, { parts: next.length ? next : st.parts }); }) }, l);
-        }))),
-        // daily availability: each day's colour, the same as Day by day (click goes green › yellow › red › black; right-click picks)
-        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Daily availability' }, dayIdx.map((i) => {
-          const a = avOf(p, i) || avFromSets(p, i), c = avClass(a), wd = WEEKDAYS[i];
-          return h('button', { type: 'button', class: 'dt av-' + c, title: `${wd}: ${(AV_STATES.find(([s]) => s === c) || [])[1] || ''}${avText(a) ? ' · ' + avText(a) : ''}. Click to change the colour; right-click to pick one or edit the hours.`,
-            onclick: () => cycleAv(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, k === 'we' ? wd.slice(0, 3) : wd[0]);
+        h('td', null, h('div', { class: 'inline', style: { flexWrap: 'nowrap' }, title: `The usual ${k === 'we' ? 'weekend' : 'weekday'} shift: what they get when you click their name under People today` }, a, '–', b)),
+        // their availability those days (the same as the Availability tab): click a day to set it
+        h('td', null, h('div', { class: 'daytoggles', role: 'group', 'aria-label': 'Availability' }, dayIdx.map((i) => {
+          const a = avOf(p, i), c = avClass(a), wd = WEEKDAYS[i];
+          return h('button', { type: 'button', class: 'dt av-' + c, title: `${wd}: ${avText(a)}. Click to set this day; right-click for quick choices.`,
+            onclick: () => availEditor(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, k === 'we' ? wd.slice(0, 3) : wd[0]);
         }))),
       ];
     };
@@ -104,11 +89,10 @@
     } else if (staffTab === 'avail') {
       head = ['Name', 'Role', 'Phone', ...WEEKDAYS.map((w) => w.slice(0, 3)), 'Validated', 'Pending training', ''];
       rows = people.map((p) => h('tr', { style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), h('td', { style: { minWidth: '130px' } }, (() => { const ph = h('input', { class: 'input' + (p.phone ? '' : ' need'), type: 'tel', value: p.phone || '', placeholder: 'Phone needed', 'aria-label': 'Phone number for ' + p.name, title: 'Phone numbers are listed on the availability list', style: { width: '100%' } }); ph.addEventListener('change', () => change(() => { p.phone = ph.value.trim(); })); return ph; })()),
-        WEEKDAYS.map((w, i) => { const own = avOf(p, i), a = own || avFromSets(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a) + (own ? '' : ' sys'), title: `${w}: ${avText(a)}${own ? '' : ' (from the weekday / weekend settings)'}. Click to change the colour (green, yellow, red, black); right-click to pick one or edit the hours.`, onclick: () => cycleAv(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, avCellLines(p, i, a))); }),
+        WEEKDAYS.map((w, i) => { const a = avOf(p, i); return h('td', { class: 'c', style: { padding: '2px' } }, h('button', { type: 'button', class: 'avcell ' + avClass(a), title: `${w}: ${avText(a)}. Click to set this day; right-click for quick choices.`, onclick: () => availEditor(p, i), oncontextmenu: (e) => { e.preventDefault(); avMenu(p, i, e.clientX, e.clientY); } }, avCellLines(p, i, a))); }),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.validated, 'aria-label': 'Validated', title: p.validatedOn ? 'Validated ' + p.validatedOn : 'Tick when the person has checked their availability', onchange: (e) => change(() => { p.validated = e.target.checked; p.validatedOn = e.target.checked ? new Date().toISOString().slice(0, 10) : null; }) })),
         h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.pending, 'aria-label': 'Pending training', onchange: (e) => change(() => { p.pending = e.target.checked; }) })),
-        h('td', { class: 'nowrap' }, ibs(ib('wand', 'From usual: fill the week from this person’s weekday and weekend settings', () => change(() => { p.avail = WEEKDAYS.map((_, i) => avFromSets(p, i)); })),
-          ib('clear', 'Clear the day-by-day availability', () => change(() => { delete p.avail; }), { disabled: !Array.isArray(p.avail) })))));
+        h('td', { class: 'nowrap' }, ibs(ib('clear', `Any time, all week (start ${p.name.split(' ')[0]} over)`, () => confirmBox(`${p.name}: any time, all week?`, 'Every day goes back to Any time. You can undo this.', 'Any time all week', () => change(() => { p.av2 = true; p.avail = WEEKDAYS.map(() => ({ k: 'any' })); })))))));
     } else if (staffTab === 'contact') {
       // their IDs and notes first, then how to reach them (phone, email, address) together
       head = ['Name', 'Role', 'Employee ID', 'Shift code', 'Notes', 'Phone number', 'Email', ...(addrInUse() ? ['Home address'] : []), ''];
@@ -131,7 +115,7 @@
       });
     } else {
       const k = staffTab;
-      head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift · hours they can work`, 'Can work', 'Daily availability', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
+      head = ['Name', 'Role', `Usual ${k === 'we' ? 'weekend' : 'weekday'} shift`, 'Availability (click a day)', ...(k === 'wk' ? ['Max h/wk', 'Active'] : []), ''];
       rows = people.flatMap((p) => {
         const extra = [];
         if (k === 'wk') {
@@ -139,7 +123,7 @@
           max.addEventListener('change', () => change(() => { p.maxHours = +max.value || 0; }));
           extra.push(h('td', null, max), h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.active, 'aria-label': 'Active', onchange: (e) => change(() => { p.active = e.target.checked; }) })));
         }
-        const subs = lineRows(p, k, head.length);
+        const subs = [];
         return [h('tr', { class: subs.length ? 'has-sub' : '', style: { opacity: p.active ? 1 : 0.55 } }, nameCell(p), roleCell(p), ...scheduleCells(p, k), ...extra, actions(p)), ...subs];
       });
     }
@@ -148,15 +132,15 @@
     const addPerson = () => {
       const n = newName.value.trim(); if (!n) { newName.focus(); return; }
       const defaults = { GM: [360, 900], AGM: [600, 1140], SM: [480, 1020], TM: [600, 960], NH: [600, 900] }[newRole];
-      change(() => { plan.staff.push({ id: uid(), name: n, role: newRole, active: true, defStart: defaults[0], defEnd: defaults[1], maxHours: ['TM', 'NH'].includes(newRole) ? 32 : 45, notes: '', tasks: [] }); });
+      change(() => { plan.staff.push({ id: uid(), name: n, role: newRole, active: true, defStart: defaults[0], defEnd: defaults[1], maxHours: ['TM', 'NH'].includes(newRole) ? 32 : 45, notes: '', tasks: [], av2: true, avail: WEEKDAYS.map(() => ({ k: 'any' })) }); });
       setTimeout(() => { const i = $('input[aria-label="New person name"]'); i && i.focus(); });
     };
     newName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
     const today0 = iso(new Date()), waiting = plan.staff.reduce((n, p) => n + (p.left ? 0 : (p.timeOff || []).filter((t) => t.status === 'requested' && t.to >= today0).length), 0);
     const counts = Object.keys(ROLES).map((k) => `${plan.staff.filter((p) => p.role === k && p.active).length} ${ROLES[k].short}`).join(' · ');
-    const hint = { wk: 'Weekdays (Monday to Friday). Usual shift: what a person gets when you click their name under Unscheduled. Below it, the hours they can work: untick Any time and set the hours they are free on weekdays. These two lines always stay; + adds a Some days line under the person for the days you pick, with a switch: + adds its hours to the hours above (7am–11:30am on Tue and Thu as well as 1:30pm–9pm), = makes them the only hours those days, − takes them out (can’t work then). Adding one unticks Any time. Only those lines can be removed. Can work: AM, MID, PM. Daily availability: click a day to change its colour: green available, yellow call or arrange first, red unavailable, black not given; right-click to pick one or edit that day’s hours. Untick Active for people who are away.',
-      we: 'Weekend (Saturday and Sunday), set apart from weekdays: many people can work any time at the weekend but not on weekdays. Their usual weekend shift is used when you add them on a Saturday or Sunday.',
-      avail: 'Each day on its own, as on the availability and contact list (Print & share › Availability list). Click a day: Any, Off, a note (Mornings, Emergency, If you ask…), or hours: + adds a range they can work or can’t work (where they overlap, can’t wins). “From usual” fills the week from the weekday and weekend settings, then make any day different. A day not set on its own shows (lighter) and prints what those settings give.',
+    const hint = { wk: 'Monday to Friday: the usual shift, what a person gets when you click their name under People today. The days show their availability (the same as the Availability tab): click a day to set it.',
+      we: 'Saturday and Sunday: the usual weekend shift, used when you add them on a Saturday or Sunday. Click a day to set their availability.',
+      avail: 'When each person can work, Monday to Sunday, one box a day: Any time, Hours (add another stretch for a split day, e.g. 11am–12pm and 1:30pm–9pm), OFF, a note, or Not given; tick Call first for yellow. What you set here is what prints on the availability list and what the schedule checks. Click a day to set it; right-click for quick choices. Same Mon to Fri and Same every day copy a day across.',
       school: 'School as its own tab: tick In school, then the school, the term (first and last day) and the class times. It is a note about the person (In school, and when): it does not limit when they can work and gives no warnings; their hours are set on the Weekdays, Weekend and Day by day tabs. + adds a line for days with different class hours. Unticking keeps what you set, for next term.',
       timeoff: 'Time off for anyone: whole days, weeks, or just a few hours, with the reason, whether it is requested or approved, and a note. A shift on someone’s time off gets the N/A mark, and they show as away under Unscheduled. Time off… on a person adds it for them.',
       contact: 'How to reach each person, their Employee ID and Shift code (as in the company’s own system; shown on the Hand-off page), and notes about them. ✉ writes an email and ☎ calls (on a phone, or a computer set up for calls). Below: the positions each person is trained in.' }[staffTab];
@@ -219,53 +203,49 @@
   const AV_STATES = [['on', 'Available (green)'], ['hl', 'Call or arrange first (yellow)'], ['off', 'Unavailable (red)'], ['none', 'Not given (black)']];
   function setAv(p, i, st) {
     change(() => {
-      if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map(() => null);
-      const cur = p.avail[i] || avFromSets(p, i);
-      if (p.off && p.off[i]) p.off[i] = false; // the day's own colour says it now
+      bakeAvail(p);
+      const cur = p.avail[i] || { k: 'any' };
       let base = cur.was ? { ...cur.was } : cur.k === 'off' || cur.k === 'unk' ? { k: 'any' } : { ...cur };
       delete base.hl; delete base.was;
       if (st === 'on' && avClass(base) === 'hl') base = { k: 'any' }; // a note like If you ask is yellow by itself
       // green that is just Any (or what the settings give anyway) follows the weekday / weekend settings again, so the
       // hours and Some days lines show; green with hours of the day's own keeps them
-      const plainGreen = st === 'on' && (base.k === 'any' || JSON.stringify(base) === JSON.stringify(avFromSets(p, i)));
-      p.avail[i] = plainGreen ? null : st === 'on' ? base : st === 'hl' ? { ...base, hl: true } : { k: st === 'off' ? 'off' : 'unk', ...(base.k !== 'any' ? { was: base } : {}) };
+      p.avail[i] = st === 'on' ? base : st === 'hl' ? { ...base, hl: true } : { k: st === 'off' ? 'off' : 'unk', ...(base.k !== 'any' ? { was: base } : {}) };
     });
   }
-  const cycleAv = (p, i) => { const c = avClass(avOf(p, i) || avFromSets(p, i)), k = AV_STATES.findIndex(([s]) => s === c); setAv(p, i, AV_STATES[(k + 1) % 4][0]); };
+  const cycleAv = (p, i) => { const c = avClass(avOf(p, i)), k = AV_STATES.findIndex(([s]) => s === c); setAv(p, i, AV_STATES[(k + 1) % 4][0]); };
   function avMenu(p, i, x, y) {
-    const c = avClass(avOf(p, i) || avFromSets(p, i));
-    popMenu(x, y, `${p.name} · ${WEEKDAYS[i]}`, [...AV_STATES.map(([s, l]) => [l, () => setAv(p, i, s), c === s ? 'on' : '']),
-      ['Edit the hours or note…', () => availEditor(p, i)],
-      ...(avOf(p, i) ? [['Use the weekday / weekend settings', () => change(() => { p.avail[i] = null; if (p.avail.every((v) => !v)) delete p.avail; })]] : [])]);
+    const c = avClass(avOf(p, i));
+    popMenu(x, y, `${p.name} · ${WEEKDAYS[i]}`, [['Set the hours, Any time, OFF…', () => availEditor(p, i)], ...AV_STATES.map(([s, l]) => [l, () => setAv(p, i, s), c === s ? 'on' : ''])]);
   }
   // One day's availability: Any, Off, a note, or hours (+ adds a range they can work or can't work)
   function availEditor(p, i) {
-    const cur = JSON.parse(JSON.stringify(avOf(p, i) || avFromSets(p, i)));
-    let kind = cur.k, note = cur.note || 'Mornings', ranges = cur.r && cur.r.length ? cur.r : [[OPEN, CLOSE, '+']];
+    const cur = JSON.parse(JSON.stringify(avOf(p, i)));
+    let kind = cur.k, note = cur.note || 'Mornings', ranges = cur.r && cur.r.length ? cur.r : [[setOf(p, i >= 5 ? 'we' : 'wk').start, setOf(p, i >= 5 ? 'we' : 'wk').end, '+']];
     const times = [[OPEN, 'Open'], ...Array.from({ length: (DAY_END - DAY_START) / 15 + 1 }, (_, k) => DAY_START + k * 15).map((m) => [m, clockShort(m)]), [CLOSE, 'Close']];
     const timeSel = (v, on) => h('select', { class: 'input', style: { width: 'auto' }, onchange: (e) => on(+e.target.value) }, times.map(([m, l]) => h('option', { value: m, selected: m === v }, l)));
     const box = h('div', { class: 'grid', style: { gap: '10px' } });
     const hl = h('input', { type: 'checkbox', checked: !!cur.hl });
     const draw = () => {
       box.replaceChildren(...[
-        h('div', { class: 'seg', role: 'group' }, [['any', 'Any'], ['off', 'Off'], ['times', 'Hours'], ['note', 'A note'], ['unk', 'Not given']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
+        h('div', { class: 'seg', role: 'group' }, [['any', 'Any time'], ['times', 'Hours'], ['off', 'OFF'], ['note', 'A note'], ['unk', 'Not given']].map(([k, l]) => h('button', { type: 'button', class: 'btn', 'aria-pressed': String(kind === k), onclick: () => { kind = k; draw(); } }, l))),
         kind === 'note' ? h('div', { class: 'inline' }, AV_NOTES.map((n) => h('button', { type: 'button', class: 'btn sm' + (note === n ? ' primary' : ''), onclick: () => { note = n; draw(); } }, n)),
           h('input', { class: 'input', value: AV_NOTES.includes(note) ? '' : note, placeholder: 'or your own words', style: { width: '160px' }, oninput: (e) => { if (e.target.value.trim()) note = e.target.value.trim(); } })) : null,
         kind === 'times' ? h('div', { class: 'grid', style: { gap: '6px' } },
           ranges.map((r, j) => h('div', { class: 'inline' },
-            h('select', { class: 'input', style: { width: 'auto' }, onchange: (e) => { r[2] = e.target.value; } }, h('option', { value: '+', selected: r[2] !== '-' }, 'Can work'), h('option', { value: '-', selected: r[2] === '-' }, 'Can’t work')),
+            h('span', { class: 'av-what' + (r[2] === '-' ? ' not' : '') }, r[2] === '-' ? 'Not' : ranges.filter((x) => x[2] !== '-').indexOf(r) ? 'And' : 'From'),
             timeSel(r[0], (v) => { r[0] = v; }), h('span', null, 'to'), timeSel(r[1], (v) => { r[1] = v; }),
-            h('button', { type: 'button', class: 'btn sm ghost', title: 'Take this range away', disabled: ranges.length < 2, onclick: () => { ranges.splice(j, 1); draw(); } }, '×'))),
-          h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([OPEN, CLOSE, '+']); draw(); } }, '+ Can work'), h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([720, 780, '-']); draw(); } }, '+ Can’t work')),
-          h('p', { class: 'hint' }, 'Where a can’t-work range overlaps a can-work range, can’t wins. With no can-work range, they can work any time apart from the can’t-work ranges.')) : null,
+            h('button', { type: 'button', class: 'btn sm ghost', title: 'Take these hours away', disabled: ranges.length < 2, onclick: () => { ranges.splice(j, 1); draw(); } }, '×'))),
+          h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { ranges.push([960, 1260, '+']); draw(); } }, '+ Another stretch (a split day)'), h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { ranges.push([720, 780, '-']); draw(); } }, '+ Hours they can’t work')),
+          h('p', { class: 'hint' }, 'They can work the hours above: two stretches make a split day (for example 11am to 12pm and 1:30pm to 9pm). Hours they can’t work come out of them.')) : null,
         h('label', { class: 'check' }, hl, ' Call or arrange first (yellow on the list)')].filter(Boolean));
     };
     draw();
     const entry = () => (kind === 'times' ? { k: 'times', r: ranges.map((r) => [r[0], r[1], r[2] === '-' ? '-' : '+']) } : kind === 'note' ? { k: 'note', note } : { k: kind });
-    const save = (days) => change(() => { if (!Array.isArray(p.avail)) p.avail = WEEKDAYS.map((_, k) => avFromSets(p, k)); days.forEach((k) => { p.avail[k] = { ...entry(), ...(hl.checked ? { hl: true } : {}) }; }); });
+    const save = (days) => change(() => { bakeAvail(p); days.forEach((k) => { p.avail[k] = { ...entry(), ...(hl.checked ? { hl: true } : {}) }; }); });
     modal({ title: `${p.name} · ${WEEKDAYS[i]}`, body: box, wide: true, actions: [
-      { label: 'Use the weekday / weekend settings', onClick: () => change(() => { if (Array.isArray(p.avail)) { p.avail[i] = null; if (p.avail.every((x) => !x)) delete p.avail; } }) },
-      { label: i >= 5 ? 'Same for the weekend' : 'Same for weekdays', onClick: () => save(i >= 5 ? [5, 6] : [0, 1, 2, 3, 4]) },
+      { label: 'Cancel', left: true },
+      { label: i >= 5 ? 'Same for Sat and Sun' : 'Same Mon to Fri', onClick: () => save(i >= 5 ? [5, 6] : [0, 1, 2, 3, 4]) },
       { label: 'Same every day', onClick: () => save([0, 1, 2, 3, 4, 5, 6]) },
       { label: 'Save', primary: true, onClick: () => save([i]) }] });
   }

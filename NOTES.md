@@ -402,6 +402,13 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
 - **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
 
+## Availability: one table, seven days
+
+- **One place**: Staff › **1 · Availability**: each person, Monday to Sunday, one box a day: **Any time**, **Hours** (one stretch, or **+ Another stretch** for a split day, e.g. 11am–12pm and 1:30pm–9pm; hours they can't work come out), **OFF**, **a note**, or **Not given**; tick **Call first** for yellow. Click a day to set it (also from the Weekday shift and Weekend shift tabs); Same Mon to Fri / Same for Sat and Sun / Same every day copy it across; right-click for quick choices. What is set is exactly what prints on the availability list and what the schedule checks.
+- **Older files** are turned into the seven days the first time a person's availability is looked at, as the list showed them (the day-by-day entries first, then the off days, Some days lines and weekday / weekend hours); those older settings go. **AM / MID / PM** were only tags to help find people: they never set availability and are no longer on the screen.
+- **Call first** days: a yellow **Call first** mark on that person's shift, a reminder when they are added, and "· call first" by their name under People today. They can still be scheduled.
+- The usual shift (what they get when their name is clicked) is on the Weekday shift and Weekend shift tabs.
+
 ## Company & Location in tabs; store hours; copying forecasts
 
 - **Company & Location** is in tabs (the last one picked is kept): **Company & location** (names, address, phone, email, website, contact details kept, notes), **Store hours** (the usual hours Monday to Sunday, special hours coming up, + Special hours…, + Special hours for a week…), **Positions**. The Calendar's **Store hours…** opens the Store hours tab.

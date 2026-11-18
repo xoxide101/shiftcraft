@@ -36,11 +36,19 @@
   const avDay = (d) => (parseIso(d).getDay() + 6) % 7;
   // a day's own entry; a plain Any (green, nothing else) gives way when the person has hours or Some days lines set on
   // the Weekdays / Weekend tab, so those show (clicking a day green used to save Any, which hid them)
-  const avOf = (p, i) => {
+  // Availability is one thing: p.avail, seven days (p.av2). Older files (weekday / weekend hours, Some days lines, the
+  // off days, AM / MID / PM) are turned into the seven days once, the first time a person's availability is looked at (bakeAvail).
+  const avOf = (p, i) => { if (!p.av2) bakeAvail(p); return (Array.isArray(p.avail) && p.avail[i]) || { k: 'any' }; };
+  // (how a day showed with the older settings: what bakeAvail starts from)
+  const avOfOld = (p, i) => {
     const a = (Array.isArray(p.avail) && p.avail[i]) || null;
     if (a && a.k === 'any' && !a.hl && (linesOn(p, i).length || setOf(p, i >= 5 ? 'we' : 'wk').from != null)) return null;
     return a;
   };
+  // Call first: the day is marked call or arrange first (yellow), or its note says so (Emergency, If you ask…): they can
+  // be scheduled, with a reminder to ask them first
+  const callFirst = (p, d) => { const a = avOf(p, avDay(d)); return !!a && a.k !== 'off' && a.k !== 'unk' && (!!a.hl || (a.k === 'note' && /emergenc|if you ask|call|arrange/i.test(a.note || ''))); };
+  const callFirstText = (p, d) => `${p.name.split(' ')[0]} asked to be called (or arranged with) before being scheduled on ${dayName(d)}s${avOf(p, avDay(d)).k === 'note' ? ' (' + avOf(p, avDay(d)).note + ')' : ''}`;
   const offOn = (p, d) => { const a = avOf(p, avDay(d)); return a ? a.k === 'off' : !!(p.off && p.off[avDay(d)]); };
   const clockShort = (m) => { const h24 = Math.floor(m / 60) % 24, mm = m % 60; return `${h24 % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${h24 < 12 ? 'am' : 'pm'}`; };
   const endWord = (m) => (m === OPEN ? 'Open' : m === CLOSE ? 'Close' : clockShort(m));
@@ -86,6 +94,20 @@
     if (st.parts.length === 3) return { k: 'any' };
     const names = { am: 'Mornings', mid: 'Afternoons', pm: 'Evenings' };
     return st.parts.length === 1 ? { k: 'note', note: names[st.parts[0]] } : { k: 'any' };
+  }
+  // the older settings, as they showed, into the seven days (once), and the old layers go: from now on each day says it
+  // all. AM / MID / PM were only tags to help find people, never when they can work: they are left out.
+  function bakeAvail(p) {
+    if (p.av2) return;
+    p.avail = WEEKDAYS.map((_, i) => {
+      const own = avOfOld(p, i); if (own) return JSON.parse(JSON.stringify(own));
+      if (p.off && p.off[i]) return { k: 'off' };
+      const e = linesEntry(p, i); if (e) return e;
+      const st = setOf(p, i >= 5 ? 'we' : 'wk');
+      return st.from != null && st.to != null ? { k: 'times', r: [[st.from, st.to, '+']] } : { k: 'any' };
+    });
+    delete p.lines; delete p.off; delete p.from; delete p.to; if (p.we) { delete p.we.from; delete p.we.to; }
+    p.av2 = true;
   }
   // Weekdays (Mon–Fri) and the weekend (Sat–Sun) each have their own usual shift, available hours and parts of the day.
   // The weekday set is p.defStart, p.defEnd, p.parts, p.from, p.to; the weekend set is p.we (missing parts = same as weekdays).

@@ -83,6 +83,7 @@
       return h('button', { type: 'button', class: 'chip pg-' + kind, title: tip, onclick: click, oncontextmenu: kind === 'sched' ? (e) => e.preventDefault() : menuFor(p) },
         `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${kind === 'sched' ? mine.map((s) => `${clockShort(s.start)}–${clockShort(s.end)}`).join(', ') : hrs(wh) + ' h'}${away.some((t) => t.hours) && !allDay.length ? ' · off ' + away.filter((t) => t.hours).map((t) => `${clock(t.hours[0], true)}–${clock(t.hours[1], true)}`).join(', ') : ''}`,
           kind !== 'sched' && why ? h('span', { class: 'na-why' }, ' · ' + why) : kind !== 'sched' && range ? h('span', { class: 'na-range', title: availIssue(p, d, { start: st0.start, end: st0.end }) }, ' · ' + range) : null,
+          callFirst(p, d) && kind !== 'off' && kind !== 'asked' ? h('span', { class: 'na-cf', title: callFirstText(p, d) }, ' · call first') : null,
           kind !== 'sched' && over ? h('span', { class: wh >= p.maxHours ? 'na-why' : 'na-range', title: `${hrs(wh)} h this week; their usual shift (${hrs(len)} h) would make ${hrs(wh + len)} h, over their ${p.maxHours} h max` }, ` · O${p.maxHours}`) : null));
     };
     const G = [['sched', 'Scheduled', 'On the schedule today, with their hours'], ['can', 'Can work', 'Free today, their usual shift fits: click to add'], ['asked', 'Asked off', 'Asked for the day off, still to approve'],

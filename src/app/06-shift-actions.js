@@ -8,7 +8,7 @@
       (plan.shifts[d] = plan.shifts[d] || []).push(clampShift({ id: uid(), staffId, start: st.start, end: st.end }));
     });
     const added = plan.shifts[d][plan.shifts[d].length - 1], issue = availIssue(p, d, added);
-    toast(issue ? `Added ${p.name}. Heads up: ${issue}.` : `Added ${p.name}, ${clock(added.start)} – ${clock(added.end)}`);
+    toast(issue ? `Added ${p.name}. Heads up: ${issue}.` : callFirst(p, d) ? `Added ${p.name}, ${clock(added.start)} – ${clock(added.end)}. Call first: ${callFirstText(p, d)}.` : `Added ${p.name}, ${clock(added.start)} – ${clock(added.end)}`);
   }
   function removeShift(d, id) {
     const s = shiftsOn(d).find((x) => x.id === id); if (!s) return;

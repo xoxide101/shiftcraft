@@ -52,7 +52,7 @@
         const tk = tasksOn(p, d);
         const bar = h('div', { class: 'shift ' + g, title: `${p.name} (${ROLES[p.role].label})\n${span(s)} · ${hrs(len(s))} h · ${hrs(weekSoFar(p.id, d))} h this week so far${tk.length ? '\nTasks: ' + tk.map((t) => (t.done ? '✓ ' : '') + t.text).join('; ') : ''}\nDrag to move, drag an edge to change start or finish.\nClick for notes, double-click to edit, right-click for more.${over ? `\nOver ${p.maxHours} h this week!` : ''}`,
           style: { left: (s.start - DAY_START) * pxPerMin + 'px', width: (s.end - s.start) * pxPerMin + 'px', top: laneTop[s._lane] + 5 + 'px' } },
-          h('span', { class: 'edge l' }), over ? h('span', { class: 'w' }, '!') : null, availIssue(p, d, s) ? h('span', { class: 'w na', title: availIssue(p, d, s) }, 'N/A · ' + naShort(p, d, s)) : null,
+          h('span', { class: 'edge l' }), over ? h('span', { class: 'w' }, '!') : null, availIssue(p, d, s) ? h('span', { class: 'w na', title: availIssue(p, d, s) }, 'N/A · ' + naShort(p, d, s)) : callFirst(p, d) ? h('span', { class: 'w cf', title: callFirstText(p, d) }, 'Call first') : null,
           h('b', null, p.name), h('span', null, `(${ROLES[p.role].label})`), h('span', { class: 't' }, `${clock(s.start, true)}–${clock(s.end, true)}`),
           othersToday(d, s).length ? h('span', { class: 'tk', title: 'Split shift: also ' + othersToday(d, s).map(spanShort).join(', ') }, 'split') : null,
           tk.length ? h('span', { class: 'tk' }, `${tk.length} task${tk.length > 1 ? 's' : ''}`) : null, s.note ? h('span', { class: 'tk nt' }, 'Note') : null,

@@ -781,3 +781,11 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .co-pos td { padding-top: 2px; padding-bottom: 2px; }
 .co-pos .input { padding-top: 3px; padding-bottom: 3px; }
 .co-pos .btn.sm { padding: 1px 6px; }
+
+/* the availability window: From / And / Not before each stretch */
+.av-what { display: inline-block; min-width: 44px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.av-what.not { color: var(--bad); }
+
+/* Call first: a reminder, not a block */
+.shift .w.cf { background: #ffe58a; color: #3a2a00; white-space: nowrap; }
+.chip .na-cf { color: #b7791f; font-weight: 600; }
