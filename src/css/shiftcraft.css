@@ -770,3 +770,6 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .summary .tile b { font-size: 17px; line-height: 1.25; }
 .summary .tile.wk { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .summary .tile:not(.wk) + .tile.wk { border-left: 2px solid var(--line); }
+
+/* the store hours heading, when jumped to from the Calendar, clear of the bars at the top */
+#co-hours { scroll-margin-top: 200px; }

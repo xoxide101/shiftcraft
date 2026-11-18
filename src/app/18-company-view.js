@@ -27,13 +27,13 @@
         field('address', 'Address', 'e.g. 1234 Main St, Denver CO 80202', true),
         field('phone', 'Phone', 'e.g. (303) 555-0142'), field('email', 'Email', 'e.g. manager@example.com'), field('website', 'Website', 'e.g. www.example.com')),
       err,
-      h('h3', { class: 'co-h3' }, 'Opening hours (Monday – Sunday)'),
+      h('h3', { class: 'co-h3', id: 'co-hours' }, 'Opening hours (Monday – Sunday)'),
       usualHoursEditor(),
       h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
       (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
         return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
           : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
-      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
+      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: () => { const m = mondayOf(ui.day); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
       h('h3', { class: 'co-h3' }, 'Contact details we keep'),
       h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),

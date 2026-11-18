@@ -220,6 +220,8 @@
       h('p', { class: 'hint', style: { marginTop: 0 } }, 'Other opening hours for a holiday or any day: they take the place of the usual hours on those days. Nothing on the schedule moves; Check schedule points out shifts on a closed day or well outside these hours.'),
       fieldOf('Holiday', hol), fieldOf('Name', name),
       pair2(fieldOf('First day', from), fieldOf('Last day (the same for one day)', to)),
+      h('div', { class: 'inline sp-quick' }, h('span', { class: 'muted small' }, 'Quick:'), [['One day', 0, 0], ['Its week (Mon–Sun)', 0, 6], ['The next week', 7, 13], ['Two weeks', 0, 13]].map(([l, a0, b0]) =>
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { const base = from.value || at, m = a0 === 0 && b0 === 0 ? base : mondayOf(base); from.value = addDays(m, a0); to.value = addDays(m, b0); sync(); } }, l))),
       h('div', { class: 'field' }, h('span', null, 'The store is'), seg), hoursRow, info,
       fieldOf('Note', note)], actions });
   }
@@ -360,12 +362,14 @@
         h('label', { class: 'check small', title: 'Holidays: a bar along the bottom of the day' }, h('input', { type: 'checkbox', checked: cal.show.holiday !== false, onchange: (e) => { cal.show.holiday = e.target.checked; calSave(); render(); } }), h('span', { class: 'cal-key holiday' }), ' Holidays')),
       h('div', { class: 'inline no-print', style: { marginTop: '10px' } },
         h('button', { class: 'btn sm primary', onclick: () => eventDialog(null, { from: isList ? today : ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst }) }, '+ Event'),
-        h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special store hours'),
+        h('button', { class: 'btn sm', title: 'Other opening hours (or closed) for a day or a range of days', onclick: () => { const s = [...calPick.days].sort(); specialDialog(null, s.length ? { from: s[0], to: s[s.length - 1] } : { from: ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst }); } }, '+ Special hours…'),
+        h('button', { class: 'btn sm', title: 'Other opening hours for a whole week, Monday to Sunday (change the days in the window)', onclick: () => { const s = [...calPick.days].sort(), m = mondayOf(s[0] || (ui.day.slice(0, 7) === cal.ym ? ui.day : mFirst)); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'),
         h('button', { class: 'btn sm', disabled: !plan.staff.some((p) => !p.left), onclick: () => timeOffDialog(null, null, { status: 'requested', why: 'personal' }) }, '+ Time off request'),
         h('span', { class: 'spacer' }),
+        h('button', { class: 'btn sm', title: 'The usual opening hours, Monday to Sunday, are with the store’s details (Company & Location)', onclick: storeHoursGo }, 'Store hours…'),
         h('button', { class: 'btn sm', title: 'Bring in an iCal (.ics) file from Outlook, Google Calendar, Apple Calendar or ShiftCraft: holidays, time off, events', onclick: icalImport }, 'Import iCal…'),
         h('button', { class: 'btn sm', title: 'Save time off, store hours and events as an iCal (.ics) file for Outlook, Google Calendar or Apple Calendar', onclick: () => icalExportDialog() }, 'Export iCal…'))));
-    if (isList) { main.append(calListCard(shown, today, mFirst, mLast), usualHoursCard()); return; }
+    if (isList) { main.append(calListCard(shown, today, mFirst, mLast)); return; }
 
     // the month, Monday first. Printed, every entry gets a number (in date order) and the numbered notes say what it is,
     // under the month or on a page of their own (29-page-notes.js); on screen the colours do that
@@ -480,7 +484,6 @@
       availDetails([start, addDays(start, weeks * 7 - 1)], { show: cal.show, tables: calp.tables, condense: calp.condense, num: { sp: (x) => pbook.add(noteKey.sp(x), noteSpecial(x)), ev: (x) => pbook.add(noteKey.ev(x), noteEvent(x)), to: (p, t) => pbook.add(noteKey.to(p, t), noteTimeOff(p, t)) } })));
     // printed: the decorations for these weeks, over every page
     { const ov = decoOverlay(start, addDays(start, weeks * 7 - 1), calp.paper ? [...paperOf(calp), 10 / 25.4] : null); if (ov) main.append(ov); }
-    main.append(usualHoursCard());
     setTimeout(paintPicks, 0);
   }
   // the Calendar's print button: where the numbered notes go, then print
@@ -527,6 +530,8 @@
         { label: 'Save', primary: true, onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp), sec = sections(); savePrintout({ name: fileStem('calendar', monthLabel(cal.ym)), pw: w, ph: hgt, o: calp, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt, m: MARGIN }, k) }); } }] });
   }
   // the usual hours as a card on the Calendar
+  // the usual hours, in the store's details: Company & Location
+  const storeHoursGo = () => { ui.tab = 'company'; persist(); render(); setTimeout(() => $('#co-hours')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80); };
   function usualHoursCard() {
     return h('div', { class: 'card no-print', id: 'cal-usual' }, h('h2', { style: { margin: '0 0 2px', fontSize: '16px' } }, 'Usual store hours (Monday – Sunday)'),
       h('p', { class: 'muted small', style: { margin: '0 0 6px' } }, usualSummary() || 'Not set yet.'), usualHoursEditor());
@@ -570,7 +575,7 @@
         return h('button', { type: 'button', class: 'cal-sign' + (x.movedFrom ? ' urgent' : ''), title: `${x.title}${x.hours ? ` · ${clockShort(x.hours[0])}–${clockShort(x.hours[1])}` : ''}${x.movedFrom ? `\nMoved here from ${dayName(x.movedFrom, 'short')} ${shortDate(x.movedFrom)}: the store is closed that day` : ''}${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => open(x) },
           k === 'period' ? h('span', { class: 'cal-eop-key' }, String(parseIso(d).getDate())) : markSvg(k), ` ${x.title}${x.hours ? ' ' + clockShort(x.hours[0]) : ''}`); })) : null,
       shut || sp || plain.length ? h('div', { class: 'cal-strip' },
-        shut ? h('button', { type: 'button', class: 'cal-chip special closed', title: `The store is usually closed on ${WEEKDAYS[dayIdx(d)]}s\nClick to see the usual hours`, onclick: () => { calGo(); setTimeout(() => $('#cal-usual')?.scrollIntoView({ block: 'center' }), 50); } }, `Store closed (usual on ${WEEKDAYS[dayIdx(d)]}s)`) : null,
+        shut ? h('button', { type: 'button', class: 'cal-chip special closed', title: `The store is usually closed on ${WEEKDAYS[dayIdx(d)]}s\nClick to see the usual hours`, onclick: storeHoursGo }, `Store closed (usual on ${WEEKDAYS[dayIdx(d)]}s)`) : null,
         sp ? h('button', { type: 'button', class: 'cal-chip special' + (sp.closed ? ' closed' : ''), title: `Special store hours${sp.note ? '\nNote: ' + sp.note : ''}\nClick to see or change them`, onclick: () => specialDialog(sp) },
           `${sp.closed ? 'Store closed' : `Store open ${clock(sp.open)} – ${clock(sp.close)}`} · ${sp.name || 'special hours'}`) : null,
         plain.map((x) => h('button', { type: 'button', class: 'cal-chip event', title: `Event${x.note ? '\n' + x.note : ''}\nClick to see or change it`, onclick: () => open(x) }, `${x.hours ? `${clockShort(x.hours[0])}–${clockShort(x.hours[1])} ` : ''}${x.title}`))) : null);

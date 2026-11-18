@@ -166,6 +166,7 @@
         [`Colour, hatching, pictures for the ${n} days…`, () => daysLookDialog(days)],
         ['Add a picture to all of them…', () => picturePicker((p) => setLook(days, (x) => { x.pics = [...(x.pics || []), { ...p, pos: 'corner' }].slice(0, 6); }))],
         [`Add an event from ${shortDate(days[0])} to ${shortDate(days[n - 1])}…`, () => eventDialog(null, { from: days[0], to: days[n - 1] })],
+        [`Special store hours from ${shortDate(days[0])} to ${shortDate(days[n - 1])}…`, () => specialDialog(null, { from: days[0], to: days[n - 1] })],
         [`Time off request from ${shortDate(days[0])} to ${shortDate(days[n - 1])}…`, () => timeOffDialog(null, null, { from: days[0], to: days[n - 1], status: 'requested', why: 'personal' })],
         ['Clear colour, hatching, pictures and notes', () => setLook(days, (x) => { Object.keys(x).forEach((k) => delete x[k]); })],
         ['Clear picks', () => { calPick.days.clear(); paintPicks(); }]]);
