@@ -628,3 +628,16 @@ table.cal td.cal-day { padding: 0; }
   .hw-notes li b { display: inline-block; min-width: 16px; }
   .hw-notes .hw-when { color: #7a8296; }
 .pd-head { margin: 10px 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
+
+/* the printed calendar's heading: the month large on the left, centre or right; who and when printed (its version) on a free side */
+.cal-stamp { display: none; }
+@media print {
+  .cal-phead { display: grid !important; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 0 16px; }
+  .cal-phead > * { grid-row: 1; }
+  .cal-phead h1 { font-size: 34px !important; font-weight: 800; letter-spacing: -.01em; margin: 0; white-space: nowrap; }
+  .cal-phead .cal-stamp { display: block; font-size: 10px; line-height: 1.35; color: #555; white-space: nowrap; }
+  .cal-phead .spacer { display: none; }
+  .ct-left h1 { grid-column: 1 / span 2; text-align: left !important; } .ct-left .cal-stamp { grid-column: 3; justify-self: end; text-align: right; }
+  .ct-center { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important; } .ct-center h1 { grid-column: 2; text-align: center !important; } .ct-center .cal-stamp { grid-column: 3; justify-self: end; text-align: right; white-space: normal; } .cal-stamp > div:first-child { font-weight: 600; }
+  .ct-right h1 { grid-column: 2 / span 2; text-align: right !important; } .ct-right .cal-stamp { grid-column: 1; justify-self: start; text-align: left; }
+}

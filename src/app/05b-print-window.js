@@ -83,15 +83,29 @@
     const card = meas.querySelector('.cal-card'); if (!card) return z;
     const bottom = card.getBoundingClientRect().bottom - meas.getBoundingClientRect().top;
     if (bottom <= ch || bottom > ch * 1.45) return z;
-    const z2 = z * (ch / bottom) * 0.99; meas.firstChild.style.zoom = z2; return z2;
+    const z2 = z * (ch / bottom) * 0.97; meas.firstChild.style.zoom = z2; return z2;
+  }
+  const zoomOf = (meas, node, cw) => { if (!node.pdZoom) return fitWide(meas, cw); if (node.pdZoom !== 1) meas.firstChild.style.zoom = node.pdZoom; return node.pdZoom; };
+  // a month with its details under it that do not all fit on one page: the month on a page of its own, the details from
+  // the next (each starts at the top of its page, so no cut can land in the month's legend)
+  function splitMonth(node, cw, ch) {
+    const card = node.querySelector(':scope > .cal-card'), notes = node.querySelector(':scope > .cal-pnotes'); if (!card || !notes) return [node];
+    const meas = h('div', { class: 'pd-print pd-measure', style: { width: cw + 'px' } }, node.cloneNode(true)); document.body.append(meas);
+    const z = fitWide(meas, cw), tall = meas.scrollHeight; meas.remove(); if (tall <= ch) return [node];
+    const kids = [...node.children], i = kids.indexOf(card), a = node.cloneNode(false), b = node.cloneNode(false);
+    kids.forEach((k, j) => { if (j <= i) a.append(k.cloneNode(true)); else if (k.classList.contains('cal-pnotes')) b.append(k.cloneNode(true)); }); // the month, then the details (what is after them is screen-only)
+    // both at the month's size (made smaller to fit its page, if it had to be): the details as they were under it
+    const m2 = h('div', { class: 'pd-print pd-measure', style: { width: cw + 'px' } }, a.cloneNode(true)); document.body.append(m2);
+    const zm = fitTall(m2, ch, fitWide(m2, cw)); m2.remove(); a.pdZoom = zm; b.pdZoom = Math.min(z, zm);
+    return [a, b];
   }
   // sections: elements, each starting on a new page (a person each, the notes on their own page); paper in inches
   function pvDom(pv, sections, { pw, ph, m = 0.4 }) {
     pvPrintCss(); m = domBorderM(m);
     const IN = 96, cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, w = pvWidth(pv), k = w / (pw * IN), pages = [];
-    sections.filter(Boolean).forEach((node) => {
+    sections.filter(Boolean).flatMap((n) => splitMonth(n, cw, ch)).forEach((node) => {
       const meas = h('div', { class: 'pd-print pd-measure', style: { width: cw + 'px' } }, node.cloneNode(true)); document.body.append(meas);
-      const z = fitTall(meas, ch, fitWide(meas, cw)); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
+      const z = fitTall(meas, ch, zoomOf(meas, node, cw)); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
     });
     const MAX = 12;
     pv.replaceChildren(...pages.slice(0, MAX).flatMap((p, i) => {
@@ -151,9 +165,9 @@
     const IN = 96, W = Math.round(pw * IN), H = Math.round(ph * IN), cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, out = [];
     const host = h('div', { style: { position: 'fixed', left: '-40000px', top: '0' } }); document.body.append(host);
     try {
-      sections.filter(Boolean).forEach((node) => {
+      sections.filter(Boolean).flatMap((n) => splitMonth(n, cw, ch)).forEach((node) => {
         const meas = h('div', { class: 'pd-print', style: { width: cw + 'px' } }, node.cloneNode(true)); host.append(meas);
-        const z = fitTall(meas, ch, fitWide(meas, cw)), cuts = pageCuts(meas, ch); meas.remove();
+        const z = fitTall(meas, ch, zoomOf(meas, node, cw)), cuts = pageCuts(meas, ch); meas.remove();
         for (const [off, len] of cuts) {
           const sheet = h('div', { class: 'pd-print', style: { position: 'relative', width: W + 'px', height: H + 'px', background: '#fff', overflow: 'hidden' } },
             h('div', { style: { position: 'absolute', left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: len + 'px', overflow: 'hidden' } },

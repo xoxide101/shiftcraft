@@ -361,11 +361,12 @@
     const show = (k, label, f, title) => h('label', { class: 'check small', title }, h('input', { type: 'checkbox', checked: !!cal.show[k], onchange: (e) => { cal.show[k] = e.target.checked; calSave(); render(); } }), h('span', { class: 'cal-key ' + k }), ` ${label} (${count(f)})`);
     const isList = cal.view === 'list';
     main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' },
+      h('div', { class: 'daynav cal-phead ct-' + (calp.title || 'left') },
         isList ? null : h('div', { class: 'inline no-print' },
           h('button', { class: 'btn icon', 'aria-label': 'Previous month', onclick: () => toMonth(-1) }, '‹'),
           h('button', { class: 'btn icon', 'aria-label': 'Next month', onclick: () => toMonth(1) }, '›')),
         h('h1', { style: { textAlign: 'left', minWidth: 0 } }, isList ? 'Calendar · list' : `Calendar · ${monthLabel(cal.ym)}`),
+        h('div', { class: 'cal-stamp' }, (() => { const n = new Date(), p2 = (x) => String(x).padStart(2, '0'); return [[plan.company, plan.location].filter(Boolean).join(' · '), `Printed ${n.toLocaleDateString()} ${n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, `Version ${n.getFullYear()}.${p2(n.getMonth() + 1)}.${p2(n.getDate())}.${p2(n.getHours())}.${p2(n.getMinutes())}`].filter(Boolean).map((t) => h('div', null, t)); })()),
         isList ? null : h('button', { class: 'btn sm no-print', disabled: cal.ym === today.slice(0, 7), onclick: () => { cal.ym = today.slice(0, 7); render(); } }, 'This month'),
         h('span', { class: 'spacer' }),
         h('div', { class: 'no-print' }, calSeg('Show as', [['month', 'Month'], ['list', 'List']], cal.view, (v) => { cal.view = v; calSave(); render(); })),
@@ -505,6 +506,7 @@
     pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`, use: 'calendar', kind: 'calendar', reopen: () => calPrintDialog(), keep: () => { kept = true; calpSave(); },
       opts: [...paperChoices(calp, changed),
         field('On the month', tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
+        field('Month heading', calSeg('Month heading', [['left', 'Large left'], ['center', 'Large centre'], ['right', 'Large right']], calp.title || 'left', (v) => { calp.title = v; changed(); })),
         field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),
         field('Days before the 1st and after the last day (blank: the legend can go there)', calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], calp.out, (v) => { calp.out = v; changed(); })),
         field('Details: store hours, time off, events and holidays, with the numbers from the month', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })),

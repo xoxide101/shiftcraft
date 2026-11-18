@@ -357,7 +357,7 @@ function borderBody(W, H) {
     }
   }
   if (S.flow !== 'none' && S.flow !== 'line' && list.length) {
-    let n = 0; const sz = S.szFlow, zones = P.map((p) => (treatOf(p) === 'through' ? 0 : radOf(p) + sz * 0.6));
+    let n = 0; const sz = S.szFlow, zones = P.map((p) => (treatOf(p) === 'through' ? 0 : radOf(p) + sz * 0.6)), inDepth = set.length > 1 ? set[set.length - 1][0] + set[set.length - 1][1] / 2 : 0;
     for (let i = 0; i < 16; i++) {
       const a = P[i], b = P[(i + 1) % 16], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
       const spots = [];
@@ -373,7 +373,7 @@ function borderBody(W, H) {
         if (sp.edge && (sp.t === 0 || sp.t === 1) && i % 4 === 3 && sp.t === 1) return;
         const x0 = a.x + dx * sp.t, y0 = a.y + dy * sp.t, o = bend(sp.t, len);
         if (P.some((p, j) => zones[j] && Math.hypot(p.x - x0, p.y - y0) < zones[j])) return;
-        let off = o; if (sp.side !== 0) off = o + (roomIn ? 1 : -1) * (sz * 0.62 + S.weight * 2);
+        let off = o; if (sp.side !== 0) off = o + (roomIn ? sz * 0.62 + S.weight * 2 + inDepth : -(sz * 0.62 + S.weight * 2));
         if (S.flow === 'line') off = 0;
         const x = x0 + nx * off, y = y0 + ny * off, id = list[n++ % list.length];
         if (S.flow === 'line') out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(sz * 0.62).toFixed(1)}" fill="#fff"/>`;
@@ -407,7 +407,7 @@ function reach() {
   points(frame(1000, 1300, 0)).forEach((p, j) => { if (!ICONS[ptId(j, p)]) return; const h = szOf(p) / 2; out = Math.max(out, h - depth / 2); inn = Math.max(inn, depth / 2 + h); });
   const list = (S.list || '').split(',').filter((x) => ICONS[x]), sz = S.szFlow;
   if (list.length && S.flow === 'line') { const d = Math.max(sz * 0.62, depth / 2 + w * 2 + 2); out = Math.max(out, d - depth / 2); inn = Math.max(inn, depth / 2 + d); }
-  else if (list.length && S.flow !== 'none') { const far = sz * 0.62 + w * 2 + sz / 2; if (S.flow !== 'dips-out') inn = Math.max(inn, ai + far); if (S.flow !== 'dips-in') out = Math.max(out, ao + far); }
+  else if (list.length && S.flow !== 'none') { const far = sz * 0.62 + w * 2 + sz / 2; if (S.flow !== 'dips-out') inn = Math.max(inn, ai + far + (set.length > 1 ? depth : 0)); if (S.flow !== 'dips-in') out = Math.max(out, ao + far); }
   return { out, inn };
 }
 const SCALED = ['weight', 'gap', 'amp', 'rCorner', 'rCenter', 'rOff', 'szCorner', 'szCenter', 'szOff', 'szFlow'];
