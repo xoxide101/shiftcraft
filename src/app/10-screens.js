@@ -35,7 +35,8 @@
       return h('button', { class: 'btn sm', 'aria-pressed': String(weekOf(ui.day) === w), title: `${shortDate(days[0])} – ${shortDate(days[6])}`, onclick: () => { ui.day = days[(parseIso(ui.day).getDay() + 6) % 7]; persist(); render(); } },
         h('b', null, String(w + 1)), h('span', { class: 'muted small' }, ` ${shortDate(days[0])}–${parseIso(days[6]).getMonth() === parseIso(days[0]).getMonth() ? parseIso(days[6]).getDate() : shortDate(days[6])}`));
     }));
-    const days = h('div', { class: 'days' }, weekDays(weekOf(ui.day)).map((d) => h('button', { class: 'day', 'aria-current': String(d === ui.day), onclick: () => { ui.day = d; persist(); render(); } },
+    const days = h('div', { class: 'days' }, weekDays(weekOf(ui.day)).map((d) => h('button', { class: 'day', 'aria-current': String(d === ui.day), style: dayLook(d) && dayLook(d).color && d !== ui.day ? { backgroundImage: `linear-gradient(${dayLook(d).color}26, ${dayLook(d).color}26)` } : null, onclick: () => { ui.day = d; persist(); render(); }, ondblclick: () => dayDialog(d), oncontextmenu: (e) => { calPick.days.clear(); dayMenu(d, e); } },
+      dayBandLines(d),
       h('b', null, `${dayName(d, 'short')} ${parseIso(d).getDate()}`, ' ', eventsOn(d).filter((x) => markOf(x) && markOf(x) !== 'period' && !holEvent(x)).map((x) => h('span', { class: 'cal-wksign' + (x.movedFrom ? ' urgent' : ''), title: x.title }, markSvg(markOf(x))))), h('small', null, `${hrs(dayHours(d))} h · ${shiftsOn(d).length} ppl`)))); // the day's signs by its name
     return [weeks, days];
   }

@@ -14,7 +14,7 @@
         h('button', { class: 'btn sm', title: 'Copy this whole week onto other weeks', onclick: () => copyWeekDialog(weekOf(d)) }, 'Copy week to…'),
         h('button', { class: 'btn sm', disabled: !shiftsOn(d).length, onclick: () => confirmBox(`Clear ${dayName(d)}?`, 'Everyone on this day goes back to Unscheduled. You can undo this.', 'Clear day', () => change(() => { plan.shifts[d] = []; })) }, 'Clear day'),
         h('button', { class: 'btn sm', disabled: !weekDays(weekOf(d)).some((x) => shiftsOn(x).length), onclick: () => clearRange('week') }, 'Clear week')),
-      calStrip(d),
+      dayBandsEl(d), // the day's bands, as on the Calendar (20c-day-bands.js)
       h('div', { style: { marginTop: '12px', display: 'grid', gap: '8px' } }, dayPicker())));
 
     const wrap = h('div', { class: 'tl-wrap' });
@@ -30,6 +30,9 @@
     wrap.append(tl);
     const hoursRow = h('div', { class: 'hours' });
     for (let m = DAY_START; m < DAY_END; m += 60) hoursRow.append(h('span', { style: { left: (m - DAY_START) * pxPerMin + 'px' } }, hourLabel(m)));
+    // the events with a time today: a flag over the hours and a dashed line down the day
+    const evAt = timedEvents(d);
+    evAt.forEach((it) => hoursRow.append(h('div', { class: 'tl-evflag', title: calTip(it), style: { left: (it.hours[0] - DAY_START) * pxPerMin + 'px' }, onclick: () => calOpen(it) }, `${clockShort(it.hours[0])} ${it.title}`)));
     tl.append(h('div', { class: 'tl-row tl-head' }, h('div', { class: 'tl-label' }, 'Job group'), hoursRow));
 
     const week = weekOf(d);
@@ -67,31 +70,12 @@
           lanes.append(note);
         }
       });
+      evAt.forEach((it) => lanes.append(h('div', { class: 'tl-evline', style: { left: (it.hours[0] - DAY_START) * pxPerMin + 'px' } })));
       tl.append(h('div', { class: 'tl-row' }, h('div', { class: 'tl-label' }, label, h('small', null, `${shifts.length} · ${hrs(hoursG)} h`)), lanes));
     });
 
-    const offToday = timeOffToday(d); if (offToday) main.append(offToday);
-    const scheduled = new Set(shiftsOn(d).map((s) => s.staffId));
-    const free = sortStaff(plan.staff.filter((p) => p.active && !scheduled.has(p.id)));
-    main.append(h('div', { class: 'card' },
-      h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'Unscheduled'), h('span', { class: 'muted small' }, 'Click a name to add them with their usual shift; right-click for other times or a day off request. Someone already working can get a second (split) shift: right-click their shift.')),
-      free.length ? h('div', { class: 'unsched' }, free.map((p) => {
-        const wh = personWeekHours(p.id, week);
-        // why they can't (or shouldn't) work today, in words: the time off's reason (Vacation…), their OFF day, or their
-        // usual shift is outside the hours they gave (out of range)
-        const st0 = setFor(p, d), allDay = timeOffOn(p, d).filter((t) => !t.hours);
-        const why = allDay.length ? [...new Set(allDay.map((t) => (TIME_OFF_WHY[t.why] || 'Time off') + (t.status === 'requested' ? ' (asked)' : '')))].join(', ') : offOn(p, d) ? 'OFF day' : '';
-        const range = !why && st0.start != null && st0.end != null && !!availIssue(p, d, { start: st0.start, end: st0.end });
-        // too many hours: their usual shift today would take them over their weekly max (O32 = over 32); red when already over
-        const len = st0.start != null && st0.end != null && st0.end > st0.start ? (st0.end - st0.start) / 60 : 0, over = !why && p.maxHours > 0 && wh + len > p.maxHours;
-        const away = timeOffOn(p, d), awayTxt = away.length ? timeOffIssue(p, d, null) || `${p.name.split(' ')[0]} has time off ${away.map((t) => `${clock(t.hours[0])} – ${clock(t.hours[1])} (${timeOffLabel(t)}${t.note ? ' – ' + t.note : ''})`).join(', ')}` : '';
-        return h('button', { class: 'chip' + (offOn(p, d) || offAllDay(p, d) ? ' na' : ''), title: (awayTxt ? awayTxt + '\n' : offOn(p, d) ? availIssue(p, d) + '\n' : '') + (setFor(p, d).parts.length < 3 ? `Works ${setFor(p, d).parts.map((x) => x.toUpperCase()).join(' / ')}\n` : '') + (setFor(p, d).from != null ? `Available ${clock(setFor(p, d).from)} – ${clock(setFor(p, d).to)}\n` : '') + `Usual ${isWkend(d) ? 'weekend' : 'weekday'} shift ${clock(setFor(p, d).start)} – ${clock(setFor(p, d).end)} · ${hrs(wh)} h this week${p.notes ? '\n' + p.notes : ''}\nRight-click for other times or a day off request`, onclick: () => addShift(d, p.id),
-          oncontextmenu: (e) => { e.preventDefault(); popMenu(e.clientX, e.clientY, `${p.name} · ${dayName(d)}`, [['Add with the usual shift', () => addShift(d, p.id)], ['Add at other times…', () => anotherShiftDialog(d, p.id)], ['Day off request…', () => dayOffRequest(p, d)], ['Not available some hours (appointment)…', () => dayOffRequest(p, d, [540, 660])], ['Time off…', () => timeOffDialog(p)]]); } },
-          `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${hrs(wh)} h${away.length && !offAllDay(p, d) ? ' · off ' + away.filter((t) => t.hours).map((t) => `${clock(t.hours[0], true)}–${clock(t.hours[1], true)}`).join(', ') : ''}`,
-            why ? h('span', { class: 'na-why' }, ' · ' + why) : range ? h('span', { class: 'na-range' }, ' · out of range') : null,
-            over ? h('span', { class: wh >= p.maxHours ? 'na-why' : 'na-range', title: `${hrs(wh)} h this week; their usual shift (${hrs(len)} h) would make ${hrs(wh + len)} h, over their ${p.maxHours} h max` }, ` · O${p.maxHours}`) : null));
-      })) : h('p', { class: 'hint', style: { padding: '10px 0 0' } }, plan.staff.length ? 'Everyone is scheduled.' : 'No staff yet. Add people on the Staff tab.'),
-      h('div', { class: 'legend no-print', style: { marginTop: '8px' } }, 'Tips: drag a shift to move it · drag its left or right edge to change start or finish (15-minute steps) · click for notes · double-click to type exact times · right-click to edit, split, add another shift that day, a day off request, or remove · Ctrl+Z undoes')));
+    main.append(peopleCard(d));
+    const offToday = timeOffToday(d); if (offToday) main.append(offToday); // the people today, in groups (20c-day-bands.js)
     main.append(hoursPanel(d));
   }
 

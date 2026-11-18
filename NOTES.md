@@ -402,6 +402,13 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
 - **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
 
+## The Schedule: the same bands, and the people in groups
+
+- **Above the timeline**: the day's bands as on the Calendar: Day (store hours, signs, the day's pictures and note), Events, Time off, Store (holidays, special hours, closed). Double-click for the Day details; right-click for more.
+- **The day buttons** (Mon–Sun): a thin line for each band with something in it (events blue, time off orange, the whole store dark), the day's colour as a tint; double-click or right-click as on the Calendar.
+- **Events with a time**: a flag over the hours and a dashed line down the day.
+- **People today**, in groups: Scheduled (with their hours), Can work (click to add), Asked off (adds after asking), Off (approved time off: click to see it), Can't work (OFF day, out of their hours, or over their weekly max: click adds anyway). Groups with nobody are left out.
+
 ## Calendar: a day's details and its own look
 
 - **Day details** (double-click a day, click its number, or right-click › Day details…): everything on the day in clear sections: Store hours, Holidays, Events, Time off, On the schedule, and This day's look, each with its own add buttons.
