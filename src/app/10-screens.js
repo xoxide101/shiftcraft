@@ -26,7 +26,8 @@
       tile('Target hours', t == null ? '—' : hrs(t), '', `Forecast ÷ $${plan.splh} per labor hour`),
       tile('Scheduled hours', hrs(dayHours(d))),
       tile('Hours variance', v == null ? '—' : signed(v), varClass(v), 'Scheduled minus target. Negative = fewer hours than target.'),
-      tile('Hours variance week', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'));
+      tile('Hours variance week', weekVar == null ? '—' : signed(weekVar), varClass(weekVar == null ? null : weekVar / 3), 'Whole week, scheduled minus target. Days you have not scheduled yet count as 0 hours.'),
+      h('button', { type: 'button', class: 'btn sm sum-jump no-print', title: 'The Forecast: sales by day, the trend, and the hours they call for', onclick: () => { ui.tab = 'forecast'; persist(); render(); } }, 'Forecast ›'));
   }
 
   function dayPicker() {

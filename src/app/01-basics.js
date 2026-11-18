@@ -40,6 +40,9 @@
     edit: '<path d="M4 20h4L19 9l-4-4L4 16Z" class="fill"/><path d="m13 7 4 4"/>',
     rehire: '<circle cx="10" cy="8" r="4" class="fill"/><path d="M3 21c1-4 3.8-6 7-6s4.5 1 5.5 2.5M19 13v7M15.5 16.5h7"/>',
     approve: '<path d="m5 12 4 4 10-10"/>',
+    event: '<rect x="3" y="5" width="18" height="16" rx="2" class="fill"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/>',
+    appt: '<circle cx="12" cy="13" r="8" class="fill"/><path d="M12 9v4l3 2M9 3h6"/>',
+    store: '<path d="M4 10v10h16V10" class="fill"/><path d="M3 10l2-6h14l2 6ZM9 20v-6h6v6"/>',
     deny: '<path d="M6 6l12 12M18 6 6 18"/>',
     qr: '<path d="M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4Z" class="fill"/><path d="M14 14h2v2M20 14v2M14 20h2M18 18h2v2M17 17h0"/>',
   };

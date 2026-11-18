@@ -130,5 +130,21 @@
     const bad = Object.entries(win).filter(([k, [a, b]]) => !parts.includes(k) && s.start < b && s.end > a).map(([k]) => k.toUpperCase());
     return bad.length ? `${first} only works ${parts.map((x) => x.toUpperCase()).join(' / ')}; this shift runs into ${bad.join(' and ')}` : '';
   }
+  // why someone can't (or shouldn't) work a shift, in a few words (the N/A on a shift, the People today names)
+  function naShort(p, d, s) {
+    const away = timeOffOn(p, d).filter((t) => !s || !t.hours || (s.start < t.hours[1] && s.end > t.hours[0]));
+    if (away.length) return [...new Set(away.map((t) => (TIME_OFF_WHY[t.why] || 'Time off') + (t.status === 'requested' ? ' (asked)' : '')))].join(', ');
+    const why = availIssue(p, d, s); if (!why) return '';
+    const short = (x) => x.replace(/:00/g, '').replace(/ – /g, '–');
+    let m;
+    if (/is not available on/.test(why)) return `OFF ${dayName(d, 'short')}s`;
+    if (/emergenc/i.test(why)) return 'emergencies only';
+    if ((m = why.match(/prefers (\w+)/))) return 'prefers ' + m[1];
+    if ((m = why.match(/only available (.+?) on /))) return 'only ' + short(m[1]);
+    if ((m = why.match(/only works ([^;]+);/))) return 'works ' + m[1].replace(/ \/ /g, '/');
+    if (/class|school/i.test(why)) return 'class';
+    if ((m = why.match(/available (.+?)(?: on|$)/))) return 'only ' + short(m[1]);
+    return why.replace(/^\S+ /, '').slice(0, 28);
+  }
   const varClass = (v) => (v == null ? '' : Math.abs(v) <= 2 ? 'good' : Math.abs(v) <= 6 ? 'warn' : 'bad');
 

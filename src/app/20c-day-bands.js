@@ -24,15 +24,21 @@
         : `cal-hol ${it.kind === 'builtin' ? it.b.type : it.kind === 'usualshut' ? 'sp shut' : it.kind === 'special' ? (holSpecial(it.x) ? holSpecialType(it.x) : 'sp' + (it.x.closed ? ' shut' : '')) : holEventType(it.x)}`;
       const text = it.kind === 'timeoff' ? `${it.status === 'requested' ? '? ' : ''}${it.who} · ${it.title}${it.hours ? ` ${clockShort(it.hours[0])}–${clockShort(it.hours[1])}` : ''}${when}`
         : it.kind === 'special' ? `${it.x.name || 'Special hours'} · ${specialShort(it.x)}${when}` : it.kind === 'builtin' || it.kind === 'usualshut' ? it.title : `${it.hours ? clockShort(it.hours[0]) + ' ' : ''}${it.title}${when}`;
-      return h('button', { type: 'button', class: 'db-pill ' + cls, title: it.kind === 'builtin' ? `${it.b.name}: click to change its name or add details` : it.kind === 'usualshut' ? 'The store is usually closed this day' : calTip(it), onclick: open(it) }, text);
+      const menu = it.kind === 'timeoff' ? (e) => { e.preventDefault(); e.stopPropagation(); popMenu(e.clientX, e.clientY, `${it.who} · ${it.title}`, [...(it.status !== 'approved' ? [['Approve', () => approveTimeOff(it.p, it.t)]] : []), ...(it.status !== 'denied' ? [['Deny', () => denyTimeOff(it.t)]] : []), ['See or change it…', () => calOpen(it)]]); } : null;
+      return h('button', { type: 'button', class: 'db-pill ' + cls, title: (it.kind === 'builtin' ? `${it.b.name}: click to change its name or add details` : it.kind === 'usualshut' ? 'The store is usually closed this day' : calTip(it)) + (it.kind === 'timeoff' ? '\nRight-click to approve or deny' : ''), onclick: open(it), oncontextmenu: menu }, text);
     };
     const row = (key, label, items) => (items.length ? h('div', { class: 'db-row ' + key }, h('span', { class: 'db-lab' }, label), h('div', { class: 'db-items' }, items.map(pill))) : null);
+    const adds = h('div', { class: 'ibs db-adds' },
+      ib('timeoff', 'Add a time off request for this day', () => timeOffDialog(null, null, { from: d, to: d, status: 'requested', why: 'personal' }), { disabled: !plan.staff.some((p) => !p.left) }),
+      ib('appt', 'Add an appointment (not available some hours this day)', () => timeOffDialog(null, null, { from: d, to: d, status: 'requested', why: 'appointment', hours: [540, 660] }), { disabled: !plan.staff.some((p) => !p.left) }),
+      ib('event', 'Add an event for the store this day', () => eventDialog(null, { from: d, to: d })),
+      ib('store', sp ? 'Change this day’s special store hours' : 'Add special store hours (a holiday, closed, open late…)', () => (sp ? specialDialog(sp) : specialDialog(null, { from: d, to: d }))));
     const head = h('div', { class: 'db-row head' }, h('span', { class: 'db-lab' }, 'Day'),
       h('div', { class: 'db-items' },
         h('span', { class: 'db-hours' + (st && st.closed ? ' shut' : sp ? ' special' : '') }, !st ? 'Store hours not set' : st.closed ? 'Store closed' : `Store open ${clockShort(st.open)}–${clockShort(st.close)}${sp ? ' (special)' : ''}`),
         b.head.map((it) => { const k = markOf(it.x); return h('button', { type: 'button', class: 'cal-sign' + (it.x.movedFrom ? ' urgent' : ''), title: calTip(it), onclick: open(it) }, k === 'period' ? h('span', { class: 'cal-eop-key' }, String(parseIso(d).getDate())) : markSvg(k), ` ${it.title}${it.hours ? ' ' + clockShort(it.hours[0]) : ''}`); }),
         look && look.pics ? h('span', { class: 'db-pics' }, look.pics.map((p) => picEl(p, 'cal-dpic'))) : null,
-        look && look.note ? h('span', { class: 'db-note', title: look.note }, '✎ ' + look.note) : null));
+        look && look.note ? h('span', { class: 'db-note', title: look.note }, '✎ ' + look.note) : null), adds);
     return h('div', { class: 'db', style: lookStyle(d), title: 'Double-click for this day’s details; right-click for more',
       ondblclick: (e) => { if (!e.target.closest('button')) dayDialog(d); }, oncontextmenu: (e) => { if (!e.target.closest('button')) { calPick.days.clear(); dayMenu(d, e); } } },
       head, row('top', 'Events', b.top), row('mid', 'Time off', b.mid), row('bot', 'Store', b.bot));
@@ -59,13 +65,14 @@
       else if (offOn(p, d) || (st0.start != null && st0.end != null && availIssue(p, d, { start: st0.start, end: st0.end })) || (p.maxHours > 0 && wh + len > p.maxHours)) groups.cant.push(p);
       else groups.can.push(p);
     });
-    const menuFor = (p) => (e) => { e.preventDefault(); popMenu(e.clientX, e.clientY, `${p.name} · ${dayName(d)}`, [['Add with the usual shift', () => addShift(d, p.id)], ['Add at other times…', () => anotherShiftDialog(d, p.id)], ['Day off request…', () => dayOffRequest(p, d)], ['Not available some hours (appointment)…', () => dayOffRequest(p, d, [540, 660])], ['Time off…', () => timeOffDialog(p)]]); };
+    const menuFor = (p) => (e) => { e.preventDefault(); const asked = timeOffOn(p, d).filter((t) => t.status === 'requested');
+      popMenu(e.clientX, e.clientY, `${p.name} · ${dayName(d)}`, [...asked.flatMap((t) => [[`Approve: ${TIME_OFF_WHY[t.why] || 'time off'}`, () => approveTimeOff(p, t)], [`Deny: ${TIME_OFF_WHY[t.why] || 'time off'}`, () => denyTimeOff(t)]]), ['Add with the usual shift', () => addShift(d, p.id)], ['Add at other times…', () => anotherShiftDialog(d, p.id)], ['Day off request…', () => dayOffRequest(p, d)], ['Not available some hours (appointment)…', () => dayOffRequest(p, d, [540, 660])], ['Time off…', () => timeOffDialog(p)]]); };
     // a person's chip: name, role and hours this week, and why not (in words)
     const chip = (p, kind) => {
       const wh = personWeekHours(p.id, week), st0 = setFor(p, d), allDay = timeOffOn(p, d).filter((t) => !t.hours), away = timeOffOn(p, d);
       const len = st0.start != null && st0.end != null && st0.end > st0.start ? (st0.end - st0.start) / 60 : 0;
       const why = allDay.length ? [...new Set(allDay.map((t) => (TIME_OFF_WHY[t.why] || 'Time off') + (t.status === 'requested' ? ' (asked)' : '')))].join(', ') : offOn(p, d) ? 'OFF day' : '';
-      const range = !why && st0.start != null && st0.end != null && !!availIssue(p, d, { start: st0.start, end: st0.end });
+      const range = !why && st0.start != null && st0.end != null && availIssue(p, d, { start: st0.start, end: st0.end }) ? naShort(p, d, { start: st0.start, end: st0.end }) : '';
       const over = !why && p.maxHours > 0 && wh + len > p.maxHours;
       const mine = shiftsOn(d).filter((s) => s.staffId === p.id);
       const tip = [kind === 'sched' ? `On the schedule ${mine.map((s) => `${clock(s.start)} – ${clock(s.end)}`).join(', ')}` : null, away.length ? timeOffIssue(p, d, null) || '' : null, offOn(p, d) ? availIssue(p, d) : null,
@@ -75,14 +82,30 @@
         : kind === 'asked' ? () => confirmBox(`Add ${p.name}?`, `${p.name} asked for this day off (${why}). Add them with their usual shift anyway?`, 'Add anyway', () => addShift(d, p.id)) : () => addShift(d, p.id);
       return h('button', { type: 'button', class: 'chip pg-' + kind, title: tip, onclick: click, oncontextmenu: kind === 'sched' ? (e) => e.preventDefault() : menuFor(p) },
         `${p.name} `, h('small', null, `(${ROLES[p.role].label}) · ${kind === 'sched' ? mine.map((s) => `${clockShort(s.start)}–${clockShort(s.end)}`).join(', ') : hrs(wh) + ' h'}${away.some((t) => t.hours) && !allDay.length ? ' · off ' + away.filter((t) => t.hours).map((t) => `${clock(t.hours[0], true)}–${clock(t.hours[1], true)}`).join(', ') : ''}`,
-          kind !== 'sched' && why ? h('span', { class: 'na-why' }, ' · ' + why) : kind !== 'sched' && range ? h('span', { class: 'na-range' }, ' · out of range') : null,
+          kind !== 'sched' && why ? h('span', { class: 'na-why' }, ' · ' + why) : kind !== 'sched' && range ? h('span', { class: 'na-range', title: availIssue(p, d, { start: st0.start, end: st0.end }) }, ' · ' + range) : null,
           kind !== 'sched' && over ? h('span', { class: wh >= p.maxHours ? 'na-why' : 'na-range', title: `${hrs(wh)} h this week; their usual shift (${hrs(len)} h) would make ${hrs(wh + len)} h, over their ${p.maxHours} h max` }, ` · O${p.maxHours}`) : null));
     };
     const G = [['sched', 'Scheduled', 'On the schedule today, with their hours'], ['can', 'Can work', 'Free today, their usual shift fits: click to add'], ['asked', 'Asked off', 'Asked for the day off, still to approve'],
       ['off', 'Off', 'Approved time off'], ['cant', 'Can’t work', 'Not available, out of their hours, or over their weekly max']];
     return h('div', { class: 'card people-card' },
-      h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'People today'), h('span', { class: 'muted small' }, 'Click a name to add them with their usual shift; right-click for other times or a day off request. Someone already working can get a second (split) shift: right-click their shift.')),
+      h('div', { class: 'inline' }, h('h2', { style: { margin: 0 } }, 'People today'), h('span', { class: 'muted small' }, 'Click a name to add them with their usual shift; right-click for other times, a day off request, or to approve or deny one.')),
       plan.staff.length ? G.filter(([k]) => groups[k].length).map(([k, label, tip]) => h('div', { class: 'pg pg-row-' + k }, h('span', { class: 'pg-lab', title: tip }, label, h('small', null, String(groups[k].length))), h('div', { class: 'unsched' }, groups[k].map((p) => chip(p, k)))))
         : h('p', { class: 'hint', style: { padding: '10px 0 0' } }, 'No staff yet. Add people on the Staff tab.'),
       h('div', { class: 'legend no-print', style: { marginTop: '8px' } }, 'Tips: drag a shift to move it · drag its left or right edge to change start or finish (15-minute steps) · click for notes · double-click to type exact times · right-click to edit, split, add another shift that day, a day off request, or remove · Ctrl+Z undoes'));
+  }
+
+  // ---------- under the timeline: tabs (People today, Hours by section, Time off), and a jump to the Forecast ----------
+  let schedTab = 'people'; try { schedTab = localStorage.getItem(KEY + '-schedtab') || 'people'; } catch (e) { /* blocked */ }
+  function schedTabs(d) {
+    const off = timeOffToday(d), nOff = plan.staff.filter((p) => !p.left).reduce((n, p) => n + (p.timeOff || []).filter((t) => t.from <= d && d <= t.to && t.status !== 'denied').length, 0);
+    const people = plan.staff.filter((p) => p.active).length;
+    const TABS = [['people', 'People today', String(people)], ['hours', 'Hours by section', hrs(dayHours(d)) + ' h'], ...(off ? [['off', 'Time off', String(nOff)]] : [])];
+    if (!TABS.some(([k]) => k === schedTab)) schedTab = 'people';
+    const body = schedTab === 'hours' ? hoursPanel(d) : schedTab === 'off' ? off : peopleCard(d);
+    const pick = (k) => () => { schedTab = k; try { localStorage.setItem(KEY + '-schedtab', k); } catch (e) { /* blocked */ } render(); };
+    return h('div', { class: 'card sched-tabs' },
+      h('div', { class: 'st-bar', role: 'tablist' }, TABS.map(([k, label, n]) => h('button', { type: 'button', role: 'tab', class: 'st-tab', 'aria-selected': String(schedTab === k), onclick: pick(k) }, label, h('span', { class: 'st-n' }, n))),
+        h('span', { class: 'spacer' }),
+        h('button', { type: 'button', class: 'st-jump', title: 'The Forecast: sales by day, the trend, and the hours they call for', onclick: () => { ui.tab = 'forecast'; persist(); render(); } }, 'Forecast ›')),
+      h('div', { class: 'st-body', role: 'tabpanel' }, body));
   }

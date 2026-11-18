@@ -407,7 +407,10 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Above the timeline**: the day's bands as on the Calendar: Day (store hours, signs, the day's pictures and note), Events, Time off, Store (holidays, special hours, closed). Double-click for the Day details; right-click for more.
 - **The day buttons** (Mon–Sun): a thin line for each band with something in it (events blue, time off orange, the whole store dark), the day's colour as a tint; double-click or right-click as on the Calendar.
 - **Events with a time**: a flag over the hours and a dashed line down the day.
-- **People today**, in groups: Scheduled (with their hours), Can work (click to add), Asked off (adds after asking), Off (approved time off: click to see it), Can't work (OFF day, out of their hours, or over their weekly max: click adds anyway). Groups with nobody are left out.
+- **Under the timeline, in tabs** (the last one picked is kept): People today, Hours by section, Time off (when someone is off: Approve and Deny there, or right-click a request in the Time off band or a name under Asked off); **Forecast ›** jumps to the Forecast (also at the right of the numbers at the top).
+- **Adding to the day**: small icons at the right of the Day line: a time off request, an appointment (some hours), an event, special store hours.
+- **N/A says why** on a shift and on the names: OFF Tue, only 3pm–9pm, works PM, Vacation (asked)…
+- **People today**, in groups (small pills, short rows): Scheduled (with their hours), Can work (click to add), Asked off (adds after asking), Off (approved time off: click to see it), Can't work (OFF day, out of their hours, or over their weekly max: click adds anyway). Groups with nobody are left out.
 
 ## Calendar: a day's details and its own look
 
