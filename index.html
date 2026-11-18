@@ -876,6 +876,22 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .st-tab[aria-selected="true"], .staff-tabs .tab[aria-selected="true"] { box-shadow: inset 0 3px 0 var(--tab-hue); background: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); border-bottom-color: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); }
 .st-tab .st-n, .staff-tabs .tab .st-n { font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 9px; background: color-mix(in srgb, var(--tab-hue) 18%, var(--panel)); color: var(--fg); }
 .st-tab[aria-selected="true"] .st-n, .staff-tabs .tab[aria-selected="true"] .st-n { background: var(--tab-hue); color: #fff; }
+
+/* the week choosers (Schedule's Week out, the Week and Forecast pages) as tabs, the same look and colours as the other
+   tabs: week 1 blue, 2 teal, 3 violet, 4 amber, 5 rose, 6 green, 7 orange */
+.weekout, .weeks { align-items: flex-end; gap: 4px; border-bottom: 2px solid var(--line); }
+.weekout > span { align-self: center; }
+.weekout > .btn, .weeks > .btn { --tab-hue: #3e63dd; position: relative; bottom: -2px; display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px 5px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 9px 9px 0 0; background: none; color: var(--muted); font-weight: 600; box-shadow: inset 0 3px 0 color-mix(in srgb, var(--tab-hue) 35%, transparent); }
+.weekout > .btn:nth-of-type(7n+2), .weeks > .btn:nth-of-type(7n+2) { --tab-hue: #12a594; }
+.weekout > .btn:nth-of-type(7n+3), .weeks > .btn:nth-of-type(7n+3) { --tab-hue: #8e4ec6; }
+.weekout > .btn:nth-of-type(7n+4), .weeks > .btn:nth-of-type(7n+4) { --tab-hue: #e5a00d; }
+.weekout > .btn:nth-of-type(7n+5), .weeks > .btn:nth-of-type(7n+5) { --tab-hue: #e5484d; }
+.weekout > .btn:nth-of-type(7n+6), .weeks > .btn:nth-of-type(7n+6) { --tab-hue: #46a758; }
+.weekout > .btn:nth-of-type(7n+7), .weeks > .btn:nth-of-type(7n+7) { --tab-hue: #f76b15; }
+.weekout > .btn:hover, .weeks > .btn:hover { color: var(--fg); background: color-mix(in srgb, var(--tab-hue) 9%, var(--panel)); }
+.weekout > .btn[aria-pressed="true"], .weeks > .btn[aria-pressed="true"] { color: var(--fg); background: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); border-color: var(--line); border-bottom-color: color-mix(in srgb, var(--tab-hue) 6%, var(--panel)); box-shadow: inset 0 3px 0 var(--tab-hue); }
+.weekout > .btn b { color: var(--tab-hue); }
+.weekout > .btn[aria-pressed="true"] .muted { color: var(--fg); }
 </style>
 </head>
 <body>
