@@ -395,6 +395,12 @@ Every printout opens the same kind of window (05b-print-window.js, `printWindow`
 - **Paper size and orientation** are now picked for the Calendar, person sheets and Print this page too (`setPrintPage` sets the paper just before printing).
 - **The Calendar's choices** show at once in the preview and on the Calendar behind it. Cancel puts back what was there before.
 
+## Calendar: a day's details and its own look
+
+- **Day details** (double-click a day, click its number, or right-click › Day details…): everything on the day in clear sections: Store hours, Holidays, Events, Time off, On the schedule, and This day's look, each with its own add buttons.
+- **A day's look** (not an event): a colour, hatching (diagonal, cross-hatch, lines, dots, light dither), pictures (the Border designer's 386, or your own picture file, made small) by the date or big and faded behind the day, and a note. Each change is kept at once; Ctrl+Z undoes. It prints (Day colours, hatching, pictures and notes in the calendar's print window) and is kept in the schedule file (`plan.days`).
+- **Picking days**: click a day, Shift+click for a range, Ctrl+click to add or take off one; the days picked show in a footer locked to the bottom of the window (so nothing moves under the mouse), with Colour, hatching, pictures… for all of them. Right-click a day (or one of the days picked) for more. Esc clears the picks.
+
 ## Printing: one Layout list everywhere, and the hourly week
 
 - **Layout** is the first choice in every print window, with every printout: week table, visual timeline, **hourly week**, calendar, a person or group, availability list, contact cards, this tab as it is, and print screen. Picking another switches to its window (the week table, timeline, availability list and contact cards share one window and switch in place), so any printout can be reached from any print window, the Calendar's included.

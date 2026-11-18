@@ -18,6 +18,13 @@
         ...(['national', 'local', false, true].includes(x.holiday) ? { holiday: x.holiday } : {}),
         ...(typeof x.mark === 'string' && /^[a-z]{1,20}$/.test(x.mark) ? { mark: x.mark } : {}),
         ...(typeof x.replaces === 'string' && x.replaces ? { replaces: x.replaces.slice(0, 80) } : {}) })) : []; if (!p.events.length) delete p.events; }
+      // the days' own look (20b-day-details.js): colour, hatching, pictures, note
+      if (p.days !== undefined) { const out = {}; if (p.days && typeof p.days === 'object') Object.entries(p.days).forEach(([d, x]) => { if (!okd(d) || !x || typeof x !== 'object') return;
+        const y = {}; if (/^#[0-9a-f]{6}$/i.test(x.color || '')) y.color = x.color; if (['diag', 'diagl', 'cross', 'lines', 'dots', 'dither'].includes(x.hatch)) y.hatch = x.hatch;
+        if (typeof x.note === 'string' && x.note.trim()) y.note = x.note.trim().slice(0, 300);
+        if (Array.isArray(x.pics)) { const ps = x.pics.filter((q) => q && ((typeof q.icon === 'string' && /^[\w-]{1,40}$/.test(q.icon)) || (typeof q.img === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(q.img) && q.img.length < 600000))).slice(0, 6)
+          .map((q) => ({ ...(q.img ? { img: q.img } : { icon: q.icon }), pos: q.pos === 'behind' ? 'behind' : 'corner' })); if (ps.length) y.pics = ps; }
+        if (Object.keys(y).length) out[d] = y; }); if (Object.keys(out).length) p.days = out; else delete p.days; }
       if (p.specialHours !== undefined) { p.specialHours = Array.isArray(p.specialHours) ? p.specialHours.filter((x) => x && okd(x.from)).map((x) => { const open = Number.isFinite(x.open) ? x.open : 600; return { id: x.id || uid(), from: x.from, to: to(x), name: String(x.name || '').slice(0, 80), closed: !!x.closed, open, close: Number.isFinite(x.close) && x.close > open ? x.close : open + 60, note: String(x.note || '').slice(0, 300), ...ics(x) }; }) : []; if (!p.specialHours.length) delete p.specialHours; } }
     const ids = new Set();
     p.staff = (p.staff || []).filter((x) => x && String(x.name || '').trim()).map((x) => {

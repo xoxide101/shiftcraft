@@ -324,28 +324,7 @@
   const calShown = (it) => (it.kind === 'timeoff' ? cal.show[it.status] : cal.show[it.kind]) && cal.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => calText(it).includes(w));
   const calList = () => { cal.view = 'list'; calSave(); calGo(); };
 
-  // ---------- One day: everything on it, and adding to it ----------
-  function dayDialog(d) {
-    const its = calItems(d, d).filter((it) => it.from <= d && d <= it.to).sort(calOrder);
-    const r = regularHours(d), sp = specialOn(d);
-    let m;
-    const add = (fn) => () => { m.close(); fn(); };
-    const line = (it) => h('li', { style: { margin: '4px 0', opacity: it.status === 'denied' ? 0.55 : 1 } }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); m.close(); calOpen(it); } }, h('b', null, calWhat(it))),
-      ` · ${calHours(it)}`, calStatus(it) && it.kind === 'timeoff' ? [' · ', h('span', { class: it.status === 'requested' ? 'warn' : it.status === 'approved' ? 'good' : 'muted' }, calStatus(it))] : '', it.note ? h('span', { class: 'muted' }, ` — ${it.note}`) : null);
-    const sect = (label, list, none) => [h('h3', { class: 'co-h3' }, label), list.length ? h('ul', { style: { margin: 0, paddingLeft: '18px' } }, list.map(line)) : h('p', { class: 'muted small', style: { margin: 0 } }, none)];
-    const inPlan = planDays().includes(d);
-    m = modal({ title: longDate(d), body: [
-      h('p', { style: { margin: '0 0 4px' } }, h('b', null, 'Store hours: '), sp ? [`${specialText(sp)} (${sp.name || 'special hours'})`, h('span', { class: 'muted' }, ` · instead of the usual ${usualText(usualOn(d))}`)] : r ? `${clock(r.open)} – ${clock(r.close)} (usual)` : usualOn(d) ? h('span', { class: 'bad' }, 'Closed (usual)') : 'usual hours not set',
-        inPlan ? h('span', { class: 'muted' }, ` · ${shiftsOn(d).length} on the schedule`) : null),
-      sect('Events', its.filter((it) => it.kind === 'event'), 'No events.'),
-      sect('Time off', its.filter((it) => it.kind === 'timeoff'), 'Nobody has time off.'),
-      h('div', { class: 'inline', style: { marginTop: '14px' } },
-        h('button', { class: 'btn sm', onclick: add(() => eventDialog(null, { from: d, to: d })) }, '+ Event'),
-        h('button', { class: 'btn sm', onclick: add(() => (sp ? specialDialog(sp) : specialDialog(null, { from: d, to: d }))) }, sp ? 'Special hours…' : '+ Special hours'),
-        h('button', { class: 'btn sm', disabled: !plan.staff.some((p) => !p.left), onclick: add(() => timeOffDialog(null, null, { from: d, to: d, status: 'requested', why: 'personal' })) }, '+ Time off request'),
-        inPlan ? h('button', { class: 'btn sm', onclick: add(() => { ui.day = d; ui.tab = 'schedule'; persist(); render(); }) }, 'Open on the Schedule') : null)],
-    actions: [{ label: 'Close', primary: true }] });
-  }
+  // One day: dayDialog (20b-day-details.js)
 
   // ---------- The Calendar tab ----------
   function calendarView(main) {
@@ -426,7 +405,10 @@
       const bottom = evShow.length || bars.length ? h('div', { class: 'cal-bottom' }, evShow.map(chipN),
         bars.map((b) => { const el = h('button', { type: 'button', class: 'cal-hol ' + b.type, title: b.it ? calTip(b.it) : `${b.label} (${b.type === 'national' ? 'national holiday' : 'business or local day'}). Click to change its name or add details`, onclick: (e) => { e.stopPropagation(); if (b.it) calOpen(b.it); else eventDialog(null, { from: d, to: d, title: b.label, holiday: b.type, replaces: b.label }); } }, b.label);
           if (b.it && notesWhere !== 'off') el.prepend(h('span', { class: 'cal-n' }, supNum(numOf(b.it)) + ' ')); return el; })) : null;
-      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (d < today ? ' cal-past' : '') + (st && st.closed ? ' cal-closed' : ''), ondblclick: (e) => { if (e.target === e.currentTarget || e.target.classList.contains('cal-in')) dayDialog(d); } },
+      const look = dayLook(d), bare = (e) => !e.target.closest('button, a, input');
+      return h('td', { class: 'cal-day' + (d.slice(0, 7) !== cal.ym ? ' cal-out' : '') + (d === today ? ' cal-today' : '') + (d < today ? ' cal-past' : '') + (st && st.closed ? ' cal-closed' : '') + (look ? ' cal-look' : ''), 'data-d': d, style: lookStyle(d),
+        onclick: (e) => { if (bare(e)) pickDay(d, e); }, ondblclick: (e) => { if (bare(e)) dayDialog(d); }, oncontextmenu: (e) => { if (bare(e) || e.target.closest('.cal-num')) dayMenu(d, e); } },
+        dayPicsEl(d),
         // the day's box fills the cell (the holiday bar and events sit at its bottom); room is kept for them
         h('div', { class: 'cal-in', style: { paddingBottom: (evShow.length * 20 + bars.length * 19 + 5) + 'px' } },
         h('div', { class: 'cal-head' },
@@ -443,6 +425,7 @@
           n ? h('span', { class: 'cal-cnt' + (st && st.closed ? ' shut' : ''), title: st && st.closed ? `${n} on the schedule, but the store is closed: Check schedule points them out (not printed)` : `${n} on the schedule` }, `${n} sched.`) : null),
         // the week's time off bars: this day's own starts here; a lane another day's bar runs through is kept empty
         spans[w].length ? h('div', { class: 'cal-lanes' }, spans[w].map((l) => { const seg = l.find((x) => x.s <= d && d <= x.e); return seg && seg.s === d ? spanBar(seg) : h('div', { class: 'cal-lane' }); })) : null,
+        look && look.note ? h('div', { class: 'cal-dnote', title: look.note }, look.note) : null, // under the time off bars (they line up across the week)
         topShow.map(chipN),
         more.length ? h('button', { type: 'button', class: 'cal-more', onclick: () => dayDialog(d) }, `+${more.length} more`) : null,
         // printed: the ones that don't fit as numbers only
@@ -464,10 +447,10 @@
         gone.forEach((td) => td.classList.add('cal-gone')); const td = h('td', { class: 'cal-legcell', colSpan: k }, leg); if (atEnd) row.push(td); else row.unshift(td); legIn = true; };
       if (after >= 3 && clear(lw, (x) => x.e > mLast)) put(lw, after, true); else if (before >= 3 && clear(0, (x) => x.s < mFirst)) put(0, before, false);
     }
-    main.append(h('div', { class: 'card cal-card' + calpClass() + (legIn ? ' cp-leg-in' : '') }, h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
+    main.append(h('div', { class: 'card cal-card' + calpClass() + (legIn ? ' cp-leg-in' : '') }, h('div', { class: 'cal-selbar no-print', id: 'cal-selbar', hidden: true }), h('div', { class: 'table-wrap' }, h('table', { class: 'cal' },
       h('thead', null, h('tr', null, WEEKDAYS.map((w) => h('th', null, w.slice(0, 3))))), h('tbody', null, cells.map((row) => h('tr', null, row))))),
       legendEl(),
-      h('p', { class: 'hint no-print', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +) to see everything on it and add to it. Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
+      h('p', { class: 'hint no-print', style: { margin: '8px 0 0' } }, 'Click a day’s number (or +), or double-click the day, to see everything on it in sections and add to it. Click a day to pick it, Shift+click for a range, Ctrl+click to add or take off one; right-click for more (colour, hatching, pictures). Click an entry to change it. Under each date: the store’s hours (bold when special hours take the place of the usual ones). ? marks a time off request still to approve; a dashed line is a request, a red day is closed.')));
     // printed: the details for the weeks shown (store hours, time off, events, holidays, as on the availability list),
     // each entry with the number it has on the month; under the month or on a page of their own
     if (notesWhere !== 'off') main.append(h('div', { class: 'cal-pnotes al-sheet' + (notesWhere === 'separate' ? ' sep' : '') }, h('style', null, AL_CSS),
@@ -476,6 +459,7 @@
     // printed: the decorations for these weeks, over every page
     { const ov = decoOverlay(start, addDays(start, weeks * 7 - 1), calp.paper ? [...paperOf(calp), 10 / 25.4] : null); if (ov) main.append(ov); }
     main.append(usualHoursCard());
+    setTimeout(paintPicks, 0);
   }
   // the Calendar's print button: where the numbered notes go, then print
   // ---------- Printing the Calendar: a window to pick what goes on the paper ----------
@@ -483,7 +467,7 @@
   // month, on a page of their own, or none; which tables; repeating events on one line each. Kept in this browser.
   const CALP_KEY = 'shiftcraft-cal-print';
   // closed: a no sign over the date on a closed day; past: the days gone by crossed off with an X
-  const calp = { grid: { hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', paper: 'letter', orient: 'landscape', format: 'pdf', dpi: 300, tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
+  const calp = { grid: { look: true, hours: true, timeoff: true, events: true, signs: true, holidays: true, legend: true, closed: true, past: false }, out: 'show', pastAt: 'day', paper: 'letter', orient: 'landscape', format: 'pdf', dpi: 300, tables: { hours: true, timeoff: true, events: true, holidays: true }, condense: true };
   try { const c = JSON.parse(localStorage.getItem(CALP_KEY) || '{}'); ['grid', 'tables'].forEach((g) => { if (c[g]) Object.keys(calp[g]).forEach((k) => { if (typeof c[g][k] === 'boolean') calp[g][k] = c[g][k]; }); }); if (c.condense === false) calp.condense = false; if (['show', 'dim', 'blank'].includes(c.out)) calp.out = c.out; if (['day', 'date', 'dim'].includes(c.pastAt)) calp.pastAt = c.pastAt; ['paper', 'orient', 'format'].forEach((k) => { if (typeof c[k] === 'string') calp[k] = c[k]; }); if (+c.dpi) calp.dpi = +c.dpi; } catch (e) { /* blocked */ }
   const calpSave = () => { try { localStorage.setItem(CALP_KEY, JSON.stringify(calp)); } catch (e) { /* blocked */ } };
   const CALP_ON = ['closed', 'past']; // shown when ticked (the others: left off when not)
@@ -505,7 +489,7 @@
     const MARGIN = 10 / 25.4;
     pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`, use: 'calendar', kind: 'calendar', reopen: () => calPrintDialog(), keep: () => { kept = true; calpSave(); },
       opts: [...paperChoices(calp, changed),
-        field('On the month', tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
+        field('On the month', tick(calp.grid, 'look', 'Day colours, hatching, pictures and notes'), tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
         field('Month heading', calSeg('Month heading', [['left', 'Large left'], ['center', 'Large centre'], ['right', 'Large right']], calp.title || 'left', (v) => { calp.title = v; changed(); })),
         field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),
         field('Days before the 1st and after the last day (blank: the legend can go there)', calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], calp.out, (v) => { calp.out = v; changed(); })),

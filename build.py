@@ -48,7 +48,7 @@ def border():
         "themeVals(design.theme || BASE.theme), JSON.parse(JSON.stringify(design)), over || {}, { showPts: false }); return drawSvg(W, H, false); };\n"
         "// how far in from the paper edge the border reaches (inches): the printout starts inside it\n"
         "const inset = (design, over) => { render(design, 816, 1056, over); return fitted(() => { const r = reach(); return (S.margin * IN + SHIFT + r.inn) / IN; }); };\n"
-        "return { render, inset };\n};\n")
+        "return { render, inset, icons: ICONS, cat: CAT };\n};\n")
     tags = '<script src="border_icons.js"></script>\n<script src="border_icons2.js"></script>'
     assert lab.count(tags) == 1
     hosted = lab.replace(tags, '<script>window.LAB_ICONS = parent.LAB_ICONS; window.BORDER_HOST = parent.BORDER_HOST;</script>')
