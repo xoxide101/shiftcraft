@@ -755,3 +755,11 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .st-body > .card > .inline:first-child h2 { display: none; }
 .summary { position: relative; }
 .sum-jump { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+
+/* the Schedule's Training and Forecast tabs */
+.tr-tab td, .tr-tab th, .fc-tab td, .fc-tab th { vertical-align: top; }
+.tr-tab td.on { background: color-mix(in srgb, var(--good) 12%, transparent); }
+.tr-tab .cur, .fc-tab .cur { box-shadow: inset 0 0 0 2px var(--accent); }
+.fc-tab .tot { font-weight: 700; }
+.fc-tab td.good { color: var(--good); } .fc-tab td.warn { color: var(--warn); } .fc-tab td.bad { color: var(--bad); }
+.tr-wrap { overflow-x: auto; }

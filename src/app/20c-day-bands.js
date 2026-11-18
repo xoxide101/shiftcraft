@@ -99,13 +99,50 @@
   function schedTabs(d) {
     const off = timeOffToday(d), nOff = plan.staff.filter((p) => !p.left).reduce((n, p) => n + (p.timeOff || []).filter((t) => t.from <= d && d <= t.to && t.status !== 'denied').length, 0);
     const people = plan.staff.filter((p) => p.active).length;
-    const TABS = [['people', 'People today', String(people)], ['hours', 'Hours by section', hrs(dayHours(d)) + ' h'], ...(off ? [['off', 'Time off', String(nOff)]] : [])];
+    const trainees = traineesOf(d);
+    const TABS = [['people', 'People today', String(people)], ['hours', 'Hours by section', hrs(dayHours(d)) + ' h'], ...(off ? [['off', 'Time off', String(nOff)]] : []),
+      ['training', 'Training', String(trainees.length)], ['forecast', 'Forecast', money(forecastOf(d))]];
     if (!TABS.some(([k]) => k === schedTab)) schedTab = 'people';
-    const body = schedTab === 'hours' ? hoursPanel(d) : schedTab === 'off' ? off : peopleCard(d);
+    const body = schedTab === 'hours' ? hoursPanel(d) : schedTab === 'off' ? off : schedTab === 'training' ? trainingPanel(d) : schedTab === 'forecast' ? forecastPanel(d) : peopleCard(d);
     const pick = (k) => () => { schedTab = k; try { localStorage.setItem(KEY + '-schedtab', k); } catch (e) { /* blocked */ } render(); };
     return h('div', { class: 'card sched-tabs' },
       h('div', { class: 'st-bar', role: 'tablist' }, TABS.map(([k, label, n]) => h('button', { type: 'button', role: 'tab', class: 'st-tab', 'aria-selected': String(schedTab === k), onclick: pick(k) }, label, h('span', { class: 'st-n' }, n))),
         h('span', { class: 'spacer' }),
         h('button', { type: 'button', class: 'st-jump', title: 'The Forecast: sales by day, the trend, and the hours they call for', onclick: () => { ui.tab = 'forecast'; persist(); render(); } }, 'Forecast ›')),
       h('div', { class: 'st-body', role: 'tabpanel' }, body));
+  }
+
+  // the week's trainees: the Training group (new hires), and anyone with a training task this week
+  const traineesOf = (d) => { const days = weekDays(weekOf(d));
+    return sortStaff(plan.staff.filter((p) => !p.left && (ROLES[p.role].group === 'trn' || (p.tasks || []).some((t) => days.includes(t.date))))); };
+  // Training: who trains this week, their shifts day by day (who else is on with them), hours, and their tasks
+  function trainingPanel(d) {
+    const days = weekDays(weekOf(d)), list = traineesOf(d), go = (x) => () => { ui.day = x; persist(); render(); };
+    if (!list.length) return h('p', { class: 'hint' }, 'Nobody is in training this week. New hires (the Training group) and anyone with a training task this week show here.');
+    const lead = (x, s) => sortStaff(shiftsOn(x).filter((o) => o.staffId !== s.staffId && o.start < s.end && o.end > s.start).map((o) => staffById(o.staffId)).filter((q) => q && ROLES[q.role].group !== 'trn')).slice(0, 2).map((q) => q.name.split(' ')[0]);
+    return h('div', { class: 'tr-wrap' }, h('table', { class: 't compact tr-tab' },
+      h('thead', null, h('tr', null, h('th', null, 'Trainee'), days.map((x) => h('th', { class: x === d ? 'cur' : '' }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); go(x)(); } }, `${dayName(x, 'short')} ${parseIso(x).getDate()}`))), h('th', { class: 'num' }, 'Week'), h('th', null, 'Training tasks this week'))),
+      h('tbody', null, list.map((p) => { const ts = (p.tasks || []).filter((t) => days.includes(t.date)).sort((a, b) => a.date.localeCompare(b.date));
+        return h('tr', null, h('td', null, h('b', null, p.name), ' ', h('span', { class: 'muted small' }, ROLES[p.role].short)),
+          days.map((x) => { const ss = shiftsOn(x).filter((s) => s.staffId === p.id), off = timeOffOn(p, x).some((t) => !t.hours);
+            return h('td', { class: (x === d ? 'cur' : '') + (ss.length ? ' on' : ''), title: ss.length ? ss.map((s) => `${clock(s.start)} – ${clock(s.end)}${lead(x, s).length ? ' · with ' + lead(x, s).join(', ') : ''}`).join('\n') : off ? 'Time off' : 'Not on the schedule' },
+              ss.length ? ss.map((s) => h('div', null, `${clockShort(s.start)}–${clockShort(s.end)}`, lead(x, s).length ? h('div', { class: 'muted small' }, 'with ' + lead(x, s).join(', ')) : null)) : off ? h('span', { class: 'muted small' }, 'off') : h('span', { class: 'muted' }, '—')); }),
+          h('td', { class: 'num' }, hrs(personWeekHours(p.id, weekOf(d)))),
+          h('td', null, ts.length ? ts.map((t) => h('div', { class: 'small' }, `${t.done ? '☑' : '☐'} ${dayName(t.date, 'short')}: ${t.text}`)) : h('span', { class: 'muted small' }, 'none'), ' ',
+            h('button', { class: 'btn sm ghost', type: 'button', onclick: () => tasksDialog(p) }, 'Tasks…'))); }))));
+  }
+  // Forecast: this week's days: forecast, target hours, scheduled hours, the difference; the day being worked on marked
+  function forecastPanel(d) {
+    const days = weekDays(weekOf(d)), go = (x) => (e) => { e.preventDefault(); ui.day = x; persist(); render(); };
+    const sum = (fn) => days.reduce((a, x) => a + (fn(x) || 0), 0), anyT = days.some((x) => targetHours(x) != null);
+    const row = (label, fn, fmt, tot, cls) => h('tr', null, h('th', null, label), days.map((x) => { const v = fn(x); return h('td', { class: 'num' + (x === d ? ' cur' : '') + (cls ? ' ' + cls(v) : '') }, v == null ? '—' : fmt(v)); }), h('td', { class: 'num tot' + (cls ? ' ' + cls(tot) : '') }, tot == null ? '—' : fmt(tot)));
+    return h('div', null, h('table', { class: 't compact fc-tab' },
+      h('thead', null, h('tr', null, h('th', null, ''), days.map((x) => h('th', { class: 'num' + (x === d ? ' cur' : '') }, h('a', { href: '#', onclick: go(x) }, `${dayName(x, 'short')} ${parseIso(x).getDate()}`))), h('th', { class: 'num' }, 'Week'))),
+      h('tbody', null,
+        row('Forecast sales', forecastOf, money, sum(forecastOf)),
+        row('Target hours', targetHours, hrs, anyT ? sum(targetHours) : null),
+        row('Scheduled hours', dayHours, hrs, sum(dayHours)),
+        row('Difference', varianceHours, signed, anyT ? sum(varianceHours) : null, (v) => varClass(v == null ? null : v)))),
+      h('p', { class: 'muted small', style: { margin: '6px 0 0' } }, `Target hours = forecast sales ÷ $${plan.splh} per labor hour. Difference = scheduled minus target (negative: fewer hours than the target). `,
+        h('a', { href: '#', onclick: (e) => { e.preventDefault(); ui.tab = 'forecast'; persist(); render(); } }, 'Change the forecast on the Forecast tab ›')));
   }
