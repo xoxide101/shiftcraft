@@ -402,10 +402,16 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
 - **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
 
+## Every file has a name of its own
+
+Every file saved or exported (printouts as PDF or pictures, schedules, teams, iCal, the Border designer's) gets the moment it was made before its extension, to the second: `… v2026.11.18.14.05.33.pdf`. Pages saved together share one stamp. (Saving again to the file you opened, with Save, writes that same file.)
+
 ## Availability: one table, seven days
 
 - **One place**: Staff › **1 · Availability**: each person, Monday to Sunday, one box a day: **Any time**, **Hours** (one stretch, or **+ Another stretch** for a split day, e.g. 11am–12pm and 1:30pm–9pm; hours they can't work come out), **OFF**, **a note**, or **Not given**; tick **Call first** for yellow. Click a day to set it (also from the Weekday shift and Weekend shift tabs); Same Mon to Fri / Same for Sat and Sun / Same every day copy it across; right-click for quick choices. What is set is exactly what prints on the availability list and what the schedule checks.
 - **Older files** are turned into the seven days the first time a person's availability is looked at, as the list showed them (the day-by-day entries first, then the off days, Some days lines and weekday / weekend hours); those older settings go. **AM / MID / PM** were only tags to help find people: they never set availability and are no longer on the screen.
+- **The order of the stretches** (on screen and printed) is set with ▲ ▼ in the day's window. Days with hours show dark in the middle with the day's colour on the top and bottom edges (easier to read); Any, OFF and Call first are as before.
+- **The availability list printout**: under On the page, the colour key, **Contact QR codes** (each person's first and last name and phone number as a small code with the name under it, across the page: scan to add to a phone; in print, PDF and pictures at any resolution) and each details table (Store hours, Time off, Events, Holidays) on or off.
 - **Call first** days: a yellow **Call first** mark on that person's shift, a reminder when they are added, and "· call first" by their name under People today. They can still be scheduled.
 - The usual shift (what they get when their name is clicked) is on the Weekday shift and Weekend shift tabs.
 

@@ -126,7 +126,11 @@
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
       if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
         const ds = (key, opts, label) => { const x = h('select', { class: 'input', 'aria-label': label, onchange: () => { availDet[key] = x.value; saveAvailDet(); update(); } }, opts.map(([v, l]) => h('option', { value: v, selected: availDet[key] === v }, l))); return h('label', { class: 'field' }, h('span', null, label), x); };
-        checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'));
+        checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'),
+          h('div', { class: 'field' }, h('span', null, 'On the page'), ...[['key', 'The colour key'], ['qr', 'Contact QR codes (name and phone: scan to add to a phone)']].map(([k, l]) =>
+            h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet[k] !== false && (k !== 'qr' || availDet.qr), onchange: (e) => { availDet[k] = e.target.checked; saveAvailDet(); update(); } }), ' ' + l)),
+            ...[['hours', 'Store hours'], ['timeoff', 'Time off'], ['events', 'Events'], ['holidays', 'Holidays']].map(([k, l]) =>
+              h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet.tables[k] !== false, onchange: (e) => { availDet.tables[k] = e.target.checked; saveAvailDet(); update(); } }), ` Details: ${l}`))));
         return; }
       // (nulls left out: replaceChildren would write them as the word “null”)
       box.replaceChildren(...[

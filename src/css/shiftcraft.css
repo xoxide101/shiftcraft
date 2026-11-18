@@ -789,3 +789,7 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 /* Call first: a reminder, not a block */
 .shift .w.cf { background: #ffe58a; color: #3a2a00; white-space: nowrap; }
 .chip .na-cf { color: #b7791f; font-weight: 600; }
+
+/* Availability days with hours: a dark middle so the times read, the day's colour on the top and bottom edges */
+.avcell.tm { background: #14181f; color: #fff; border: 0; border-top: 4px solid var(--good); border-bottom: 4px solid var(--good); font-weight: 600; }
+.avcell.tm.hl { border-top-color: #ffd400; border-bottom-color: #ffd400; }

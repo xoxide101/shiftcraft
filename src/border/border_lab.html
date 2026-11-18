@@ -913,7 +913,7 @@ function draw() {
 // ---------------- saving: SVG (vector), PDF and PNG at a resolution, every paper size ----------------
 let outDpi = 300; try { outDpi = +localStorage.getItem('border-lab-dpi') || 300; } catch (e) { /* blocked */ }
 const outName = () => `${HOST && design ? design.name : 'border ' + THEMES[S.theme].name} ${(PAPER_NAMES[S.paper] || S.paper).split(' ')[0]} ${S.orient}`.replace(/[\\/:*?"<>|]+/g, ' ');
-function download(blob, name) { const a = el('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+function download(blob, name) { const n = new Date(), q = (x) => String(x).padStart(2, '0'); name = name.replace(/(\.[a-z0-9]{1,5})$/i, (ext) => ` v${n.getFullYear()}.${q(n.getMonth() + 1)}.${q(n.getDate())}.${q(n.getHours())}.${q(n.getMinutes())}.${q(n.getSeconds())}${ext}`); const a = el('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 const saveNote = (t) => { const n = $('#saveNote'); if (n) n.textContent = t; };
 function saveSvg() { const [W, H] = size(); download(new Blob([drawSvg(W, H, false)], { type: 'image/svg+xml' }), outName() + '.svg'); saveNote('Saved as SVG: sharp at any size.'); }
 // the page as a picture at dpi (smaller if the browser cannot make one that big: the dpi it got is returned)
