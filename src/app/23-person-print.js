@@ -25,7 +25,7 @@
       h('p', { class: 'hint' }, 'Each person gets their own page.')],
     draw: (pv) => { const list = sheets(); if (!list.length) { pv.replaceChildren(h('p', { class: 'hint' }, 'Nobody to print for those weeks.')); return 'Nobody'; } const [w, hgt] = paperOf(o), n = pvDom(pv, list, { pw: w, ph: hgt }); return `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
     actions: [{ label: 'Cancel' },
-      { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
+      { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(sheets(), o, w, hgt); return; } setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
       { label: 'Save', primary: true, onClick: () => { const list = sheets(); if (!list.length) { toast('Nobody to save for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o), one = who.value.startsWith('p:') ? staffById(who.value.slice(2)) : null;
         savePrintout({ name: fileStem(one ? one.name : 'schedules', ...weeksOf().length === 1 ? [fileDate(weekDays(weeksOf()[0])[0])] : []), pw: w, ph: hgt, o, svgs: (k) => domPageSvgs(list, { pw: w, ph: hgt }, k) }); } }] });
   }

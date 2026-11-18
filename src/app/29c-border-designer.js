@@ -12,8 +12,11 @@
   const myBorder = () => borders.designs.find((d) => d.id === borders.current) || null;
   let bEngine = null;
   const bEng = () => bEngine || (bEngine = typeof window.makeBorderEngine === 'function' ? window.makeBorderEngine() : null);
-  const borderOnPrint = () => !!(deco.border && deco.style === 'design' && myBorder());
-  function borderUseOnPrint(on) { deco.border = true; deco.style = on && myBorder() ? 'design' : 'frame'; decoSave(); }
+  // your border is used on printouts automatically once you have one, unless you picked the thin frame (or Off)
+  try { deco.chosen = !!JSON.parse(localStorage.getItem(DECO_KEY) || '{}').chosen; } catch (e) { deco.chosen = false; }
+  const useMine = () => !!(deco.border && myBorder() && (deco.style === 'design' || !deco.chosen));
+  const borderOnPrint = useMine;
+  function borderUseOnPrint(on) { deco.border = true; deco.style = on && myBorder() ? 'design' : 'frame'; deco.chosen = !on; decoSave(); }
   // how far in from the paper's edge your border reaches (inches); the printout starts inside it
   const bInsets = new Map();
   function myBorderInset(over) {
@@ -45,16 +48,24 @@
   }
   // a small picture of your border (the print windows)
   const bThumbs = new Map();
-  function myBorderThumb() { const d = myBorder(); if (!d) return ''; const k = JSON.stringify(d.s); if (!bThumbs.has(k)) { if (bThumbs.size > 8) bThumbs.clear(); bThumbs.set(k, myBorderSvg(1056, 816)); } return bThumbs.get(k); }
+  function myBorderThumb() { const d = myBorder(); if (!d) return ''; const k = JSON.stringify(d.s); if (!bThumbs.has(k)) { if (bThumbs.size > 8) bThumbs.clear(); bThumbs.set(k, myBorderSvg(528, 408)); } return bThumbs.get(k); }
 
   // the Border choice in every print window
+  // (your current border is picked automatically; any other kept design can be picked here, or Thin frame or Off)
   function borderField(changed, customize) {
-    const d = myBorder(), now = !deco.border ? 'off' : deco.style === 'design' && d ? 'design' : 'frame';
-    const prev = h('span', { class: 'pd-bprev', title: d ? `Your border: ${d.name}` : '' }); if (d) prev.innerHTML = myBorderThumb();
-    const s = h('select', { class: 'input', 'aria-label': 'Border', style: { width: 'auto' }, onchange: () => { deco.border = s.value !== 'off'; if (s.value !== 'off') deco.style = s.value; decoSave(); if (ui.tab === 'calendar') render(); changed(); } },
-      [['off', 'Off'], ['frame', 'Thin frame'], ['design', d ? `My border: ${d.name}` : 'My border (make one first)']].map(([v, l]) => h('option', { value: v, selected: now === v, disabled: v === 'design' && !d }, l)));
-    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, d ? prev : null,
-      h('button', { class: 'btn sm', type: 'button', title: 'Open the Border designer, then come back to this window', onclick: customize }, 'Customize border…')));
+    const d = myBorder(), now = !deco.border ? 'off' : useMine() ? 'd:' + d.id : 'frame';
+    const prev = h('span', { class: 'pd-bprev' });
+    const showPrev = () => { const x = useMine() ? myBorder() : null; prev.innerHTML = x ? myBorderThumb() : ''; prev.title = x ? `Your border: ${x.name}` : ''; prev.hidden = !x; };
+    const s = h('select', { class: 'input', 'aria-label': 'Border', style: { width: 'auto' }, onchange: () => {
+      const v = s.value; deco.border = v !== 'off';
+      if (v === 'frame') { deco.style = 'frame'; deco.chosen = true; }
+      if (v.startsWith('d:')) { deco.style = 'design'; deco.chosen = false; borders.current = v.slice(2); bordersSave(); bInsets.clear(); }
+      decoSave(); showPrev(); if (ui.tab === 'calendar') render(); changed(); } },
+      [['off', 'Off'], ['frame', 'Thin frame'], ...borders.designs.map((x) => ['d:' + x.id, 'My border: ' + x.name])].map(([v, l]) => h('option', { value: v, selected: now === v }, l)));
+    showPrev();
+    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, prev,
+      h('button', { class: 'btn sm', type: 'button', title: d ? 'Change your border in the Border designer, then come back to this window' : 'Make your own border in the Border designer, then come back to this window', onclick: customize }, d ? 'Customize border…' : 'Make a border…')),
+      d ? null : h('p', { class: 'hint' }, 'Once you make a border, printouts use it automatically.'));
   }
 
   // the screen: the designer in a frame filling the window under the ribbon
@@ -67,7 +78,7 @@
   }
   window.BORDER_HOST = {
     get: () => JSON.parse(JSON.stringify(borders)),
-    put: (b) => { borders = JSON.parse(JSON.stringify(b)); bordersSave(); },
+    put: (b) => { const first = !borders.designs.length; borders = JSON.parse(JSON.stringify(b)); bordersSave(); bInsets.clear(); if (first && borders.designs.length) { deco.border = true; deco.chosen = false; deco.style = 'design'; decoSave(); } },
     opener: () => borderUse,
     back: () => !!borderBack,
     goBack: () => { const f = borderBack; borderBack = null; borderUse = null; ui.tab = borderPrev === 'border' ? 'schedule' : borderPrev; persist(); render(); if (f) setTimeout(f, 60); },
@@ -82,3 +93,23 @@
     const fit = () => { if (!f.isConnected) { removeEventListener('resize', fit); return; } f.style.height = Math.max(520, innerHeight - f.getBoundingClientRect().top - 14) + 'px'; };
     requestAnimationFrame(fit); addEventListener('resize', fit);
   }
+
+  // web-page printouts (a person's schedule, the calendar, a tab as it is): the border laid over each page, and a
+  // margin wide enough for it (the preview, saving, and Print… all use these)
+  const domBorderM = (m) => (deco.border ? Math.max(m, useMine() ? myBorderInset() + 0.06 : 0.45) : m);
+  function domBorderLayer(pw, ph) {
+    if (!deco.border) return null;
+    const IN = 96, W = Math.round(pw * IN), H = Math.round(ph * IN), t = iso(new Date());
+    const el = h('div', { class: 'pd-blayer', style: { position: 'absolute', left: '0', top: '0', width: W + 'px', height: H + 'px', pointerEvents: 'none' } });
+    if (useMine()) el.innerHTML = myBorderSvg(W, H).replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, `<svg$1 width="${W}" height="${H}"`);
+    else { const col = decoTheme(t, t).col; el.append(h('div', { style: { position: 'absolute', inset: '0.2in', border: `1.2px solid ${col}`, borderRadius: '0.08in' } }), h('div', { style: { position: 'absolute', inset: '0.24in', border: `0.6px solid ${col}`, borderRadius: '0.05in' } })); }
+    return el;
+  }
+  // Print… for a web-page printout with a border: the same pages as the preview, printed as 300 DPI pictures
+  async function printDomPictures(sections, o, pw, ph, m) {
+    if (blockedHere()) return;
+    toast('Getting the pages ready…');
+    try { const cs = await Promise.all(domPageSvgs(sections, { pw, ph, m }, 300 / 96).map((s) => svgToCanvas(s, Math.round(pw * 300), Math.round(ph * 300)))); printSurfaces(cs, o); }
+    catch (e) { toast('Could not get the pages ready: ' + e.message); }
+  }
+  const noBorderCopy = (el) => { if (deco.border) el.querySelectorAll('.deco-overlay .deco-mine, .deco-overlay .deco-frame').forEach((x) => x.remove()); };

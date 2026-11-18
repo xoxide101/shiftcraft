@@ -117,8 +117,8 @@
   // 0.43 in) never sit on what is printed, or your own border (Border designer) however deep it is. Pages with narrow
   // margins (the week in tiles, contact cards) use it. The corner pictures go with Decorations On; the border has its
   // own choice (Off, Thin frame, My border) in every print window.
-  const decoCorners = () => (deco.on && !(deco.border && deco.style === 'design' && myBorder()) ? deco.corners : 0); // your own border has its own corners
-  const decoMargin = (m) => Math.max(m, decoCorners() ? 0.45 : 0, deco.border ? (deco.style === 'design' && myBorder() ? myBorderInset() + 0.06 : 0.45) : 0);
+  const decoCorners = () => (deco.on && !(useMine()) ? deco.corners : 0); // your own border has its own corners
+  const decoMargin = (m) => Math.max(m, decoCorners() ? 0.45 : 0, deco.border ? (useMine() ? myBorderInset() + 0.06 : 0.45) : 0);
   function decorateSurface(c, a, b, dpi) {
     if ((!decoCorners() && !deco.border) || !c) return c;
     const g = c.getContext('2d'); if (!g) return c;
@@ -129,7 +129,7 @@
       if (typeof g.toSVG === 'function') { g.decoPath(d, x, y, s, t.col, lw); return; }
       g.save(); g.translate(x, y); g.scale(s, s); g.lineWidth = lw / s; g.strokeStyle = t.col; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(new Path2D(d)); g.restore();
     };
-    if (deco.border && deco.style === 'design' && myBorder()) drawMyBorder(g, W, H, inch);
+    if (useMine()) drawMyBorder(g, W, H, inch);
     else if (deco.border) {
       const m = inch * 0.2, r = inch * 0.08;
       g.save(); g.strokeStyle = t.col; g.lineWidth = lw * 0.8; g.beginPath(); g.roundRect(m, m, W - 2 * m, H - 2 * m, r); g.stroke();
@@ -151,7 +151,7 @@
   function decoOverlay(a, b, paper) {
     if (!decoCorners() && !deco.border) return null;
     const t = decoTheme(a, b), pos = [{ top: '0', right: '0' }, { bottom: '0', left: '0' }, { top: '0', left: '0' }, { bottom: '0', right: '0' }];
-    const mine = deco.border && deco.style === 'design' && myBorder() ? myBorderOverlay(paper) : null;
+    const mine = useMine() ? myBorderOverlay(paper) : null;
     return h('div', { class: 'deco-overlay print-only' + (mine ? ' mine' : ''), 'aria-hidden': 'true' },
       mine || (deco.border ? h('div', { class: 'deco-frame', style: { borderColor: t.col } }) : null),
       pos.slice(0, decoCorners()).map((p, i) => h('div', { class: 'deco-corner', style: p }, decoSvg(t.art[i], t.col, 34))));

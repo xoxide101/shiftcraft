@@ -515,7 +515,7 @@
       draw: (pv) => { const [w, hgt] = paperOf(calp), n = pvDom(pv, sections(), { pw: w, ph: hgt, m: MARGIN }); return `${monthLabel(cal.ym)} · ${PAPERS[calp.paper][2]} ${calp.orient} · ${n} page${n > 1 ? 's' : ''}${notesWhere === 'separate' ? ' · details on a page of their own' : ''}`; },
       onClose: () => { if (kept) return; Object.keys(calp).forEach((k) => delete calp[k]); Object.assign(calp, before); calpSave(); setNotesWhere(whereBefore); render(); },
       actions: [{ label: 'Cancel' },
-        { label: 'Print…', onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp); setPrintPage(w, hgt, MARGIN); setTimeout(() => window.print(), 80); } },
+        { label: 'Print…', onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp); if (deco.border) { printDomPictures(sections(), calp, w, hgt, MARGIN); return; } setPrintPage(w, hgt, MARGIN); setTimeout(() => window.print(), 80); } },
         { label: 'Save', primary: true, onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp), sec = sections(); savePrintout({ name: fileStem('calendar', monthLabel(cal.ym)), pw: w, ph: hgt, o: calp, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt, m: MARGIN }, k) }); } }] });
   }
   // the usual hours as a card on the Calendar

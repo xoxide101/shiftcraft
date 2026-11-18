@@ -559,7 +559,7 @@ table.cal td.cal-day { padding: 0; }
 /* the Border designer: the designer page in a frame of its own (its own styles), filling the window */
 .border-frame { display: block; width: 100%; border: 0; border-radius: 10px; background: #e7eaf0; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
 .pd-border { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.pd-border .pd-bprev { display: inline-flex; width: 52px; height: 40px; border: 1px solid var(--line, #ccd); border-radius: 4px; background: #fff; overflow: hidden; }
+.pd-border .pd-bprev { display: inline-flex; width: 104px; height: 80px; border: 1px solid var(--line, #ccd); border-radius: 4px; background: #fff; overflow: hidden; }
 .pd-border .pd-bprev svg { width: 100%; height: 100%; }
 </style>
 </head>
@@ -2122,20 +2122,27 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // wider than the paper (a wide table): shrunk to the paper's width, as the browser does when it prints
   function fitWide(meas, cw) { const kid = meas.firstChild, sw = Math.max(meas.scrollWidth, ...[...meas.querySelectorAll('.table-wrap, .tl-wrap, table')].map((e) => e.scrollWidth + (e.getBoundingClientRect().left - meas.getBoundingClientRect().left))); if (sw <= cw + 2) return 1; const z = cw / sw; kid.style.zoom = z; return z; }
+  // the month (with its legend) stays on one page: a little too tall (a border's wider margin) and it is made smaller
+  function fitTall(meas, ch, z) {
+    const card = meas.querySelector('.cal-card'); if (!card) return z;
+    const bottom = card.getBoundingClientRect().bottom - meas.getBoundingClientRect().top;
+    if (bottom <= ch || bottom > ch * 1.45) return z;
+    const z2 = z * (ch / bottom) * 0.99; meas.firstChild.style.zoom = z2; return z2;
+  }
   // sections: elements, each starting on a new page (a person each, the notes on their own page); paper in inches
   function pvDom(pv, sections, { pw, ph, m = 0.4 }) {
-    pvPrintCss();
+    pvPrintCss(); m = domBorderM(m);
     const IN = 96, cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, w = pvWidth(pv), k = w / (pw * IN), pages = [];
     sections.filter(Boolean).forEach((node) => {
       const meas = h('div', { class: 'pd-print pd-measure', style: { width: cw + 'px' } }, node.cloneNode(true)); document.body.append(meas);
-      const z = fitWide(meas, cw); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
+      const z = fitTall(meas, ch, fitWide(meas, cw)); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
     });
     const MAX = 12;
     pv.replaceChildren(...pages.slice(0, MAX).flatMap((p, i) => {
-      const kid = p.node.cloneNode(true); if (p.z !== 1) kid.style.zoom = p.z;
+      const kid = p.node.cloneNode(true); if (p.z !== 1) kid.style.zoom = p.z; noBorderCopy(kid);
       const content = h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -p.off + 'px' } }, kid);
       const sheet = h('div', { class: 'pd-sheet', style: { width: pw * IN + 'px', height: ph * IN + 'px', transform: `scale(${k})` } },
-        h('div', { class: 'pd-clip', style: { left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: p.len + 'px' } }, content));
+        h('div', { class: 'pd-clip', style: { left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: p.len + 'px' } }, content), domBorderLayer(pw, ph));
       return [h('div', { class: 'pd-page', style: { width: pw * IN * k + 'px', height: ph * IN * k + 'px' } }, sheet), pages.length > 1 ? h('div', { class: 'pd-cap' }, `Page ${i + 1} of ${pages.length}`) : null].filter(Boolean);
     }), ...(pages.length > MAX ? [h('div', { class: 'pd-cap' }, `… and ${pages.length - MAX} more pages`)] : []));
     return pages.length;
@@ -2184,17 +2191,17 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // a web-page printout's pages (as in the preview) as SVG pictures, each W × H at k (DPI / 96)
   function domPageSvgs(sections, { pw, ph, m = 0.4 }, k) {
-    pvPrintCss();
+    pvPrintCss(); m = domBorderM(m);
     const IN = 96, W = Math.round(pw * IN), H = Math.round(ph * IN), cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, out = [];
     const host = h('div', { style: { position: 'fixed', left: '-40000px', top: '0' } }); document.body.append(host);
     try {
       sections.filter(Boolean).forEach((node) => {
         const meas = h('div', { class: 'pd-print', style: { width: cw + 'px' } }, node.cloneNode(true)); host.append(meas);
-        const z = fitWide(meas, cw), cuts = pageCuts(meas, ch); meas.remove();
+        const z = fitTall(meas, ch, fitWide(meas, cw)), cuts = pageCuts(meas, ch); meas.remove();
         for (const [off, len] of cuts) {
           const sheet = h('div', { class: 'pd-print', style: { position: 'relative', width: W + 'px', height: H + 'px', background: '#fff', overflow: 'hidden' } },
             h('div', { style: { position: 'absolute', left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: len + 'px', overflow: 'hidden' } },
-              h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -off + 'px' } }, (() => { const kid = node.cloneNode(true); if (z !== 1) kid.style.zoom = z; return kid; })())));
+              h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -off + 'px' } }, (() => { const kid = node.cloneNode(true); if (z !== 1) kid.style.zoom = z; noBorderCopy(kid); return kid; })())), domBorderLayer(pw, ph));
           out.push(pageSvg(sheet, W, H, k));
         }
       });
@@ -2232,7 +2239,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },
-        { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },
+        { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(content(), o, w, hgt); return; } setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },
         { label: 'Save', primary: true, onClick: () => { keep(); const [w, hgt] = paperOf(o), sec = content(); savePrintout({ name: fileStem(tabName.toLowerCase(), fileDate(ui.day)), pw: w, ph: hgt, o, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt }, k) }); } }] });
   }
   // ===================================================================
@@ -4328,7 +4335,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       draw: (pv) => { const [w, hgt] = paperOf(calp), n = pvDom(pv, sections(), { pw: w, ph: hgt, m: MARGIN }); return `${monthLabel(cal.ym)} · ${PAPERS[calp.paper][2]} ${calp.orient} · ${n} page${n > 1 ? 's' : ''}${notesWhere === 'separate' ? ' · details on a page of their own' : ''}`; },
       onClose: () => { if (kept) return; Object.keys(calp).forEach((k) => delete calp[k]); Object.assign(calp, before); calpSave(); setNotesWhere(whereBefore); render(); },
       actions: [{ label: 'Cancel' },
-        { label: 'Print…', onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp); setPrintPage(w, hgt, MARGIN); setTimeout(() => window.print(), 80); } },
+        { label: 'Print…', onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp); if (deco.border) { printDomPictures(sections(), calp, w, hgt, MARGIN); return; } setPrintPage(w, hgt, MARGIN); setTimeout(() => window.print(), 80); } },
         { label: 'Save', primary: true, onClick: () => { kept = true; calpSave(); const [w, hgt] = paperOf(calp), sec = sections(); savePrintout({ name: fileStem('calendar', monthLabel(cal.ym)), pw: w, ph: hgt, o: calp, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt, m: MARGIN }, k) }); } }] });
   }
   // the usual hours as a card on the Calendar
@@ -4818,7 +4825,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       h('p', { class: 'hint' }, 'Each person gets their own page.')],
     draw: (pv) => { const list = sheets(); if (!list.length) { pv.replaceChildren(h('p', { class: 'hint' }, 'Nobody to print for those weeks.')); return 'Nobody'; } const [w, hgt] = paperOf(o), n = pvDom(pv, list, { pw: w, ph: hgt }); return `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
     actions: [{ label: 'Cancel' },
-      { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
+      { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(sheets(), o, w, hgt); return; } setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
       { label: 'Save', primary: true, onClick: () => { const list = sheets(); if (!list.length) { toast('Nobody to save for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o), one = who.value.startsWith('p:') ? staffById(who.value.slice(2)) : null;
         savePrintout({ name: fileStem(one ? one.name : 'schedules', ...weeksOf().length === 1 ? [fileDate(weekDays(weeksOf()[0])[0])] : []), pw: w, ph: hgt, o, svgs: (k) => domPageSvgs(list, { pw: w, ph: hgt }, k) }); } }] });
   }
@@ -5444,8 +5451,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // 0.43 in) never sit on what is printed, or your own border (Border designer) however deep it is. Pages with narrow
   // margins (the week in tiles, contact cards) use it. The corner pictures go with Decorations On; the border has its
   // own choice (Off, Thin frame, My border) in every print window.
-  const decoCorners = () => (deco.on && !(deco.border && deco.style === 'design' && myBorder()) ? deco.corners : 0); // your own border has its own corners
-  const decoMargin = (m) => Math.max(m, decoCorners() ? 0.45 : 0, deco.border ? (deco.style === 'design' && myBorder() ? myBorderInset() + 0.06 : 0.45) : 0);
+  const decoCorners = () => (deco.on && !(useMine()) ? deco.corners : 0); // your own border has its own corners
+  const decoMargin = (m) => Math.max(m, decoCorners() ? 0.45 : 0, deco.border ? (useMine() ? myBorderInset() + 0.06 : 0.45) : 0);
   function decorateSurface(c, a, b, dpi) {
     if ((!decoCorners() && !deco.border) || !c) return c;
     const g = c.getContext('2d'); if (!g) return c;
@@ -5456,7 +5463,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (typeof g.toSVG === 'function') { g.decoPath(d, x, y, s, t.col, lw); return; }
       g.save(); g.translate(x, y); g.scale(s, s); g.lineWidth = lw / s; g.strokeStyle = t.col; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(new Path2D(d)); g.restore();
     };
-    if (deco.border && deco.style === 'design' && myBorder()) drawMyBorder(g, W, H, inch);
+    if (useMine()) drawMyBorder(g, W, H, inch);
     else if (deco.border) {
       const m = inch * 0.2, r = inch * 0.08;
       g.save(); g.strokeStyle = t.col; g.lineWidth = lw * 0.8; g.beginPath(); g.roundRect(m, m, W - 2 * m, H - 2 * m, r); g.stroke();
@@ -5478,7 +5485,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function decoOverlay(a, b, paper) {
     if (!decoCorners() && !deco.border) return null;
     const t = decoTheme(a, b), pos = [{ top: '0', right: '0' }, { bottom: '0', left: '0' }, { top: '0', left: '0' }, { bottom: '0', right: '0' }];
-    const mine = deco.border && deco.style === 'design' && myBorder() ? myBorderOverlay(paper) : null;
+    const mine = useMine() ? myBorderOverlay(paper) : null;
     return h('div', { class: 'deco-overlay print-only' + (mine ? ' mine' : ''), 'aria-hidden': 'true' },
       mine || (deco.border ? h('div', { class: 'deco-frame', style: { borderColor: t.col } }) : null),
       pos.slice(0, decoCorners()).map((p, i) => h('div', { class: 'deco-corner', style: p }, decoSvg(t.art[i], t.col, 34))));
@@ -5609,8 +5616,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const myBorder = () => borders.designs.find((d) => d.id === borders.current) || null;
   let bEngine = null;
   const bEng = () => bEngine || (bEngine = typeof window.makeBorderEngine === 'function' ? window.makeBorderEngine() : null);
-  const borderOnPrint = () => !!(deco.border && deco.style === 'design' && myBorder());
-  function borderUseOnPrint(on) { deco.border = true; deco.style = on && myBorder() ? 'design' : 'frame'; decoSave(); }
+  // your border is used on printouts automatically once you have one, unless you picked the thin frame (or Off)
+  try { deco.chosen = !!JSON.parse(localStorage.getItem(DECO_KEY) || '{}').chosen; } catch (e) { deco.chosen = false; }
+  const useMine = () => !!(deco.border && myBorder() && (deco.style === 'design' || !deco.chosen));
+  const borderOnPrint = useMine;
+  function borderUseOnPrint(on) { deco.border = true; deco.style = on && myBorder() ? 'design' : 'frame'; deco.chosen = !on; decoSave(); }
   // how far in from the paper's edge your border reaches (inches); the printout starts inside it
   const bInsets = new Map();
   function myBorderInset(over) {
@@ -5642,16 +5652,24 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // a small picture of your border (the print windows)
   const bThumbs = new Map();
-  function myBorderThumb() { const d = myBorder(); if (!d) return ''; const k = JSON.stringify(d.s); if (!bThumbs.has(k)) { if (bThumbs.size > 8) bThumbs.clear(); bThumbs.set(k, myBorderSvg(1056, 816)); } return bThumbs.get(k); }
+  function myBorderThumb() { const d = myBorder(); if (!d) return ''; const k = JSON.stringify(d.s); if (!bThumbs.has(k)) { if (bThumbs.size > 8) bThumbs.clear(); bThumbs.set(k, myBorderSvg(528, 408)); } return bThumbs.get(k); }
 
   // the Border choice in every print window
+  // (your current border is picked automatically; any other kept design can be picked here, or Thin frame or Off)
   function borderField(changed, customize) {
-    const d = myBorder(), now = !deco.border ? 'off' : deco.style === 'design' && d ? 'design' : 'frame';
-    const prev = h('span', { class: 'pd-bprev', title: d ? `Your border: ${d.name}` : '' }); if (d) prev.innerHTML = myBorderThumb();
-    const s = h('select', { class: 'input', 'aria-label': 'Border', style: { width: 'auto' }, onchange: () => { deco.border = s.value !== 'off'; if (s.value !== 'off') deco.style = s.value; decoSave(); if (ui.tab === 'calendar') render(); changed(); } },
-      [['off', 'Off'], ['frame', 'Thin frame'], ['design', d ? `My border: ${d.name}` : 'My border (make one first)']].map(([v, l]) => h('option', { value: v, selected: now === v, disabled: v === 'design' && !d }, l)));
-    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, d ? prev : null,
-      h('button', { class: 'btn sm', type: 'button', title: 'Open the Border designer, then come back to this window', onclick: customize }, 'Customize border…')));
+    const d = myBorder(), now = !deco.border ? 'off' : useMine() ? 'd:' + d.id : 'frame';
+    const prev = h('span', { class: 'pd-bprev' });
+    const showPrev = () => { const x = useMine() ? myBorder() : null; prev.innerHTML = x ? myBorderThumb() : ''; prev.title = x ? `Your border: ${x.name}` : ''; prev.hidden = !x; };
+    const s = h('select', { class: 'input', 'aria-label': 'Border', style: { width: 'auto' }, onchange: () => {
+      const v = s.value; deco.border = v !== 'off';
+      if (v === 'frame') { deco.style = 'frame'; deco.chosen = true; }
+      if (v.startsWith('d:')) { deco.style = 'design'; deco.chosen = false; borders.current = v.slice(2); bordersSave(); bInsets.clear(); }
+      decoSave(); showPrev(); if (ui.tab === 'calendar') render(); changed(); } },
+      [['off', 'Off'], ['frame', 'Thin frame'], ...borders.designs.map((x) => ['d:' + x.id, 'My border: ' + x.name])].map(([v, l]) => h('option', { value: v, selected: now === v }, l)));
+    showPrev();
+    return h('div', { class: 'field' }, h('span', null, 'Border'), h('div', { class: 'pd-border' }, s, prev,
+      h('button', { class: 'btn sm', type: 'button', title: d ? 'Change your border in the Border designer, then come back to this window' : 'Make your own border in the Border designer, then come back to this window', onclick: customize }, d ? 'Customize border…' : 'Make a border…')),
+      d ? null : h('p', { class: 'hint' }, 'Once you make a border, printouts use it automatically.'));
   }
 
   // the screen: the designer in a frame filling the window under the ribbon
@@ -5664,7 +5682,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   window.BORDER_HOST = {
     get: () => JSON.parse(JSON.stringify(borders)),
-    put: (b) => { borders = JSON.parse(JSON.stringify(b)); bordersSave(); },
+    put: (b) => { const first = !borders.designs.length; borders = JSON.parse(JSON.stringify(b)); bordersSave(); bInsets.clear(); if (first && borders.designs.length) { deco.border = true; deco.chosen = false; deco.style = 'design'; decoSave(); } },
     opener: () => borderUse,
     back: () => !!borderBack,
     goBack: () => { const f = borderBack; borderBack = null; borderUse = null; ui.tab = borderPrev === 'border' ? 'schedule' : borderPrev; persist(); render(); if (f) setTimeout(f, 60); },
@@ -5679,6 +5697,26 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const fit = () => { if (!f.isConnected) { removeEventListener('resize', fit); return; } f.style.height = Math.max(520, innerHeight - f.getBoundingClientRect().top - 14) + 'px'; };
     requestAnimationFrame(fit); addEventListener('resize', fit);
   }
+
+  // web-page printouts (a person's schedule, the calendar, a tab as it is): the border laid over each page, and a
+  // margin wide enough for it (the preview, saving, and Print… all use these)
+  const domBorderM = (m) => (deco.border ? Math.max(m, useMine() ? myBorderInset() + 0.06 : 0.45) : m);
+  function domBorderLayer(pw, ph) {
+    if (!deco.border) return null;
+    const IN = 96, W = Math.round(pw * IN), H = Math.round(ph * IN), t = iso(new Date());
+    const el = h('div', { class: 'pd-blayer', style: { position: 'absolute', left: '0', top: '0', width: W + 'px', height: H + 'px', pointerEvents: 'none' } });
+    if (useMine()) el.innerHTML = myBorderSvg(W, H).replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, `<svg$1 width="${W}" height="${H}"`);
+    else { const col = decoTheme(t, t).col; el.append(h('div', { style: { position: 'absolute', inset: '0.2in', border: `1.2px solid ${col}`, borderRadius: '0.08in' } }), h('div', { style: { position: 'absolute', inset: '0.24in', border: `0.6px solid ${col}`, borderRadius: '0.05in' } })); }
+    return el;
+  }
+  // Print… for a web-page printout with a border: the same pages as the preview, printed as 300 DPI pictures
+  async function printDomPictures(sections, o, pw, ph, m) {
+    if (blockedHere()) return;
+    toast('Getting the pages ready…');
+    try { const cs = await Promise.all(domPageSvgs(sections, { pw, ph, m }, 300 / 96).map((s) => svgToCanvas(s, Math.round(pw * 300), Math.round(ph * 300)))); printSurfaces(cs, o); }
+    catch (e) { toast('Could not get the pages ready: ' + e.message); }
+  }
+  const noBorderCopy = (el) => { if (deco.border) el.querySelectorAll('.deco-overlay .deco-mine, .deco-overlay .deco-frame').forEach((x) => x.remove()); };
   // ===================================================================
   // Schedule files for any span of days (a day, a week, weeks, a month)
   // ===================================================================

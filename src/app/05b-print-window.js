@@ -66,20 +66,27 @@
   }
   // wider than the paper (a wide table): shrunk to the paper's width, as the browser does when it prints
   function fitWide(meas, cw) { const kid = meas.firstChild, sw = Math.max(meas.scrollWidth, ...[...meas.querySelectorAll('.table-wrap, .tl-wrap, table')].map((e) => e.scrollWidth + (e.getBoundingClientRect().left - meas.getBoundingClientRect().left))); if (sw <= cw + 2) return 1; const z = cw / sw; kid.style.zoom = z; return z; }
+  // the month (with its legend) stays on one page: a little too tall (a border's wider margin) and it is made smaller
+  function fitTall(meas, ch, z) {
+    const card = meas.querySelector('.cal-card'); if (!card) return z;
+    const bottom = card.getBoundingClientRect().bottom - meas.getBoundingClientRect().top;
+    if (bottom <= ch || bottom > ch * 1.45) return z;
+    const z2 = z * (ch / bottom) * 0.99; meas.firstChild.style.zoom = z2; return z2;
+  }
   // sections: elements, each starting on a new page (a person each, the notes on their own page); paper in inches
   function pvDom(pv, sections, { pw, ph, m = 0.4 }) {
-    pvPrintCss();
+    pvPrintCss(); m = domBorderM(m);
     const IN = 96, cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, w = pvWidth(pv), k = w / (pw * IN), pages = [];
     sections.filter(Boolean).forEach((node) => {
       const meas = h('div', { class: 'pd-print pd-measure', style: { width: cw + 'px' } }, node.cloneNode(true)); document.body.append(meas);
-      const z = fitWide(meas, cw); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
+      const z = fitTall(meas, ch, fitWide(meas, cw)); pageCuts(meas, ch).forEach(([off, len]) => pages.push({ node, off, len, z })); meas.remove();
     });
     const MAX = 12;
     pv.replaceChildren(...pages.slice(0, MAX).flatMap((p, i) => {
-      const kid = p.node.cloneNode(true); if (p.z !== 1) kid.style.zoom = p.z;
+      const kid = p.node.cloneNode(true); if (p.z !== 1) kid.style.zoom = p.z; noBorderCopy(kid);
       const content = h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -p.off + 'px' } }, kid);
       const sheet = h('div', { class: 'pd-sheet', style: { width: pw * IN + 'px', height: ph * IN + 'px', transform: `scale(${k})` } },
-        h('div', { class: 'pd-clip', style: { left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: p.len + 'px' } }, content));
+        h('div', { class: 'pd-clip', style: { left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: p.len + 'px' } }, content), domBorderLayer(pw, ph));
       return [h('div', { class: 'pd-page', style: { width: pw * IN * k + 'px', height: ph * IN * k + 'px' } }, sheet), pages.length > 1 ? h('div', { class: 'pd-cap' }, `Page ${i + 1} of ${pages.length}`) : null].filter(Boolean);
     }), ...(pages.length > MAX ? [h('div', { class: 'pd-cap' }, `… and ${pages.length - MAX} more pages`)] : []));
     return pages.length;
@@ -128,17 +135,17 @@
   }
   // a web-page printout's pages (as in the preview) as SVG pictures, each W × H at k (DPI / 96)
   function domPageSvgs(sections, { pw, ph, m = 0.4 }, k) {
-    pvPrintCss();
+    pvPrintCss(); m = domBorderM(m);
     const IN = 96, W = Math.round(pw * IN), H = Math.round(ph * IN), cw = (pw - 2 * m) * IN, ch = (ph - 2 * m) * IN, out = [];
     const host = h('div', { style: { position: 'fixed', left: '-40000px', top: '0' } }); document.body.append(host);
     try {
       sections.filter(Boolean).forEach((node) => {
         const meas = h('div', { class: 'pd-print', style: { width: cw + 'px' } }, node.cloneNode(true)); host.append(meas);
-        const z = fitWide(meas, cw), cuts = pageCuts(meas, ch); meas.remove();
+        const z = fitTall(meas, ch, fitWide(meas, cw)), cuts = pageCuts(meas, ch); meas.remove();
         for (const [off, len] of cuts) {
           const sheet = h('div', { class: 'pd-print', style: { position: 'relative', width: W + 'px', height: H + 'px', background: '#fff', overflow: 'hidden' } },
             h('div', { style: { position: 'absolute', left: m * IN + 'px', top: m * IN + 'px', width: cw + 'px', height: len + 'px', overflow: 'hidden' } },
-              h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -off + 'px' } }, (() => { const kid = node.cloneNode(true); if (z !== 1) kid.style.zoom = z; return kid; })())));
+              h('div', { class: 'pd-print', style: { width: cw + 'px', marginTop: -off + 'px' } }, (() => { const kid = node.cloneNode(true); if (z !== 1) kid.style.zoom = z; noBorderCopy(kid); return kid; })())), domBorderLayer(pw, ph));
           out.push(pageSvg(sheet, W, H, k));
         }
       });
@@ -176,6 +183,6 @@
       h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },
-        { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },
+        { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(content(), o, w, hgt); return; } setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },
         { label: 'Save', primary: true, onClick: () => { keep(); const [w, hgt] = paperOf(o), sec = content(); savePrintout({ name: fileStem(tabName.toLowerCase(), fileDate(ui.day)), pw: w, ph: hgt, o, svgs: (k) => domPageSvgs(sec, { pw: w, ph: hgt }, k) }); } }] });
   }
