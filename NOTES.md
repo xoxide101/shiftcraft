@@ -402,6 +402,12 @@ Every day is built the same way, top to bottom: the **header** (the date, signs 
 - **Fixed rows** (the default): each band keeps the same rows across the week, so strips line up. A band with more rows than fit gets a flipper (‹ 1/2 ›) at the week's end; printed, every row shows.
 - **Fit each day**: each day shows only its own entries, as pills (+n more opens the day).
 
+## Company & Location in tabs; store hours; copying forecasts
+
+- **Company & Location** is in tabs (the last one picked is kept): **Company & location** (names, address, phone, email, website, contact details kept, notes), **Store hours** (the usual hours Monday to Sunday, special hours coming up, + Special hours…, + Special hours for a week…), **Positions**. The Calendar's **Store hours…** opens the Store hours tab.
+- **Special hours** for a day, a week or a range: + Special hours… and + Special hours for a week… on the Calendar and the Store hours tab; in the window, Quick: one day, its week (Mon–Sun), the next week, two weeks; or right-click days picked on the Calendar.
+- **Forecast › Copy a week…**: a week's past sales (or its forecast) become the forecast for the weeks ticked, day by day, Monday to Monday, up or down by a percent (quick: last week, 4 weeks ago, same week last year).
+
 ## The Schedule: the same bands, and the people in groups
 
 - **Above the timeline**: the day's bands as on the Calendar: Day (store hours, signs, the day's pictures and note), Events, Time off, Store (holidays, special hours, closed). Double-click for the Day details; right-click for more.

@@ -103,7 +103,7 @@
         h('div', { class: 'inline' }, h('button', { class: 'btn sm ghost', title: `Closed every ${day}`, onclick: () => setUsual((x) => { x[i] = { closed: true }; }) }, 'Closed'), h('button', { class: 'btn sm ghost', title: 'Clear: not set', onclick: () => setUsual((x) => { x[i] = null; }) }, 'Clear')), same);
     };
     return h('div', { class: 'usual-hours' }, WEEKDAYS.map(row),
-      h('p', { class: 'hint', style: { margin: '6px 0 0' } }, 'The same hours as on Company & Location (change them in either place). Special store hours on the Calendar, like Thanksgiving, Christmas or New Year’s Day, take their place on those days.'));
+      h('p', { class: 'hint', style: { margin: '6px 0 0' } }, 'Special store hours (here or on the Calendar), like Thanksgiving, Christmas or New Year’s Day, take their place on those days.'));
   }
   const specialText = (x) => (x.closed ? 'Closed all day' : `Open ${clock(x.open)} – ${clock(x.close)}`);
   const specialShort = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
@@ -531,7 +531,7 @@
   }
   // the usual hours as a card on the Calendar
   // the usual hours, in the store's details: Company & Location
-  const storeHoursGo = () => { ui.tab = 'company'; persist(); render(); setTimeout(() => $('#co-hours')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80); };
+  const storeHoursGo = () => { coTab = 'hours'; ui.tab = 'company'; persist(); render(); setTimeout(() => $('#co-hours')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80); };
   function usualHoursCard() {
     return h('div', { class: 'card no-print', id: 'cal-usual' }, h('h2', { style: { margin: '0 0 2px', fontSize: '16px' } }, 'Usual store hours (Monday – Sunday)'),
       h('p', { class: 'muted small', style: { margin: '0 0 6px' } }, usualSummary() || 'Not set yet.'), usualHoursEditor());

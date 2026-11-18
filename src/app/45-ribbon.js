@@ -72,8 +72,8 @@
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
         { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [
-          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
-          ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
+          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website', run: () => { coTab = 'details'; ui.tab = 'company'; persist(); render(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
+          ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { coTab = 'positions'; ui.tab = 'company'; persist(); render(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
         ] },
         { id: 'border', label: 'Border designer', hue: '#9b3fb5', onSelect: () => openBorderDesigner(), groups: [
           ['Border', [{ label: 'Designer', icon: I.star, big: true, title: 'Design your own page border: lines, shapes, pictures at the corners and along the sides', run: () => openBorderDesigner() },

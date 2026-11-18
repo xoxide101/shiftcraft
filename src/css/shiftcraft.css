@@ -776,3 +776,8 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 
 /* the Forecast's Copy a week window: the weeks to copy onto */
 .cf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 12px; max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Positions, compact rows */
+.co-pos td { padding-top: 2px; padding-bottom: 2px; }
+.co-pos .input { padding-top: 3px; padding-bottom: 3px; }
+.co-pos .btn.sm { padding: 1px 6px; }

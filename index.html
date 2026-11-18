@@ -783,6 +783,11 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 
 /* the Forecast's Copy a week window: the weeks to copy onto */
 .cf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 12px; max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Positions, compact rows */
+.co-pos td { padding-top: 2px; padding-bottom: 2px; }
+.co-pos .input { padding-top: 3px; padding-bottom: 3px; }
+.co-pos .btn.sm { padding: 1px 6px; }
 </style>
 </head>
 <body>
@@ -3842,6 +3847,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
 
   // ---------- Company & Location ----------
+  // the page in tabs: the store's details, its hours, its positions (the last one picked is kept)
+  let coTab = 'details'; try { coTab = localStorage.getItem(KEY + '-cotab') || 'details'; } catch (e) { /* blocked */ }
   function companyView(main) {
     const err = h('p', { class: 'error bad', hidden: true });
     const savePlace = (k, v) => {
@@ -3862,25 +3869,25 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     };
     const notes = h('textarea', { class: 'input', rows: 3, placeholder: 'e.g. Delivery Tuesdays 7am · Parking behind the building' }, plan.placeNotes || '');
     notes.addEventListener('change', () => change(() => { plan.placeNotes = notes.value; }));
-    main.append(h('div', { class: 'card' },
-      h('h2', { style: { margin: '0 0 4px' } }, 'Company & location'),
+    const details = h('div', null,
       h('p', { class: 'hint', style: { margin: '0 0 12px' } }, 'Used on every plan, printout and file name on this computer, and saved inside Location files. Changes save as you go.'),
       h('div', { class: 'co-grid' },
         field('company', 'Company name', 'e.g. Sunny Bowl Cafe'), field('location', 'Location name', 'e.g. Main & 5th'), field('storeNo', 'Store number', 'e.g. 0042'),
         field('address', 'Address', 'e.g. 1234 Main St, Denver CO 80202', true),
         field('phone', 'Phone', 'e.g. (303) 555-0142'), field('email', 'Email', 'e.g. manager@example.com'), field('website', 'Website', 'e.g. www.example.com')),
       err,
-      h('h3', { class: 'co-h3', id: 'co-hours' }, 'Opening hours (Monday – Sunday)'),
+      h('h3', { class: 'co-h3' }, 'Contact details we keep'),
+      h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),
+      h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes));
+    const hoursTab = h('div', null,
+      h('h3', { class: 'co-h3', id: 'co-hours', style: { marginTop: 0 } }, 'Opening hours (Monday – Sunday)'),
       usualHoursEditor(),
       h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
       (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
         return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
           : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
-      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: () => { const m = mondayOf(ui.day); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
-      h('h3', { class: 'co-h3' }, 'Contact details we keep'),
-      h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),
-      h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
+      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: () => { const m = mondayOf(ui.day); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')));
 
     // positions at this location
     const list = plan.positions || (plan.positions = defaultPositions());
@@ -3901,14 +3908,21 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const addPos = () => { const v = newPos.value.replace(/\s+/g, ' ').trim(); if (!v) { newPos.focus(); return; } if (list.some((x) => x.name.toLowerCase() === v.toLowerCase())) { toast(`${v} is already on the list.`); return; } change(() => { list.push({ id: uid(), name: v, active: true }); }); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }); };
     newPos.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPos(); });
     const inUse = list.filter((x) => x.active).length;
-    main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Positions · ${inUse} in use`), h('span', { class: 'muted small' }, list.length !== inUse ? `${list.length - inUse} not in use` : ''), h('span', { class: 'spacer' }),
+    const posTab = h('div', null,
+      h('div', { class: 'daynav' }, h('span', { class: 'muted small' }, list.length !== inUse ? `${list.length - inUse} not in use` : ''), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: () => confirmBox('Go back to the standard list?', 'The list goes back to the 14 standard positions. You can undo this.', 'Use the standard list', () => change(() => { plan.positions = defaultPositions(); })) }, 'Standard list')),
       h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'The stations and jobs at this location. Rename any of them, put them in the order you use, untick In use for ones this location doesn’t have, or add your own. The list is saved with the location.'),
-      h('div', { class: 'table-wrap' }, h('table', { class: 't' },
+      h('div', { class: 'table-wrap' }, h('table', { class: 't compact co-pos' },
         h('thead', null, h('tr', null, h('th', { class: 'num' }, '#'), h('th', null, 'Position'), h('th', { class: 'c' }, 'In use'), h('th', null, ''))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 4, class: 'muted' }, 'No positions yet. Add them below, or use the standard list.'))),
-        h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position'))))))));
+        h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position')))))));
+    const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date())).length;
+    const TABS = [['details', 'Company & location', plan.location || plan.company || ''], ['hours', 'Store hours', up ? `${up} special` : ''], ['positions', 'Positions', `${inUse} in use`]];
+    if (!TABS.some(([k]) => k === coTab)) coTab = 'details';
+    const pick = (k) => () => { coTab = k; try { localStorage.setItem(KEY + '-cotab', k); } catch (e) { /* blocked */ } render(); };
+    main.append(h('div', { class: 'card sched-tabs' },
+      h('div', { class: 'st-bar', role: 'tablist' }, TABS.map(([k, label, n]) => h('button', { type: 'button', role: 'tab', class: 'st-tab', 'aria-selected': String(coTab === k), onclick: pick(k) }, label, n ? h('span', { class: 'st-n' }, n) : null))),
+      h('div', { class: 'st-body', role: 'tabpanel' }, coTab === 'hours' ? hoursTab : coTab === 'positions' ? posTab : details)));
   }
 
   // ---------- School ----------
@@ -4234,7 +4248,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
         h('div', { class: 'inline' }, h('button', { class: 'btn sm ghost', title: `Closed every ${day}`, onclick: () => setUsual((x) => { x[i] = { closed: true }; }) }, 'Closed'), h('button', { class: 'btn sm ghost', title: 'Clear: not set', onclick: () => setUsual((x) => { x[i] = null; }) }, 'Clear')), same);
     };
     return h('div', { class: 'usual-hours' }, WEEKDAYS.map(row),
-      h('p', { class: 'hint', style: { margin: '6px 0 0' } }, 'The same hours as on Company & Location (change them in either place). Special store hours on the Calendar, like Thanksgiving, Christmas or New Year’s Day, take their place on those days.'));
+      h('p', { class: 'hint', style: { margin: '6px 0 0' } }, 'Special store hours (here or on the Calendar), like Thanksgiving, Christmas or New Year’s Day, take their place on those days.'));
   }
   const specialText = (x) => (x.closed ? 'Closed all day' : `Open ${clock(x.open)} – ${clock(x.close)}`);
   const specialShort = (x) => (x.closed ? 'Closed' : `${clockShort(x.open)}–${clockShort(x.close)}`);
@@ -4662,7 +4676,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   }
   // the usual hours as a card on the Calendar
   // the usual hours, in the store's details: Company & Location
-  const storeHoursGo = () => { ui.tab = 'company'; persist(); render(); setTimeout(() => $('#co-hours')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80); };
+  const storeHoursGo = () => { coTab = 'hours'; ui.tab = 'company'; persist(); render(); setTimeout(() => $('#co-hours')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80); };
   function usualHoursCard() {
     return h('div', { class: 'card no-print', id: 'cal-usual' }, h('h2', { style: { margin: '0 0 2px', fontSize: '16px' } }, 'Usual store hours (Monday – Sunday)'),
       h('p', { class: 'muted small', style: { margin: '0 0 6px' } }, usualSummary() || 'Not set yet.'), usualHoursEditor());
@@ -8540,8 +8554,8 @@ function hourlyWeekDialog() { HW.dialog(); }
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
         { id: 'company', label: 'Company & Location', hue: '#c2711d', onSelect: view('company'), groups: [
-          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website, opening hours', run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
-          ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { view('company')(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
+          ['Location', [{ label: 'Details', icon: I.store, big: true, title: 'Company, location, address, phone, email, website', run: () => { coTab = 'details'; ui.tab = 'company'; persist(); render(); setTimeout(() => { const x = document.querySelector('#co-company'); x && x.focus(); }, 50); } }, C('Save location', 'Save everything', I.save, { big: true, title: 'Save the whole location: team, schedule, positions and settings' }), C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file (everything, a team or weeks)' })]],
+          ['Positions', [{ label: 'Add a position', icon: I.checklist, big: true, run: () => { coTab = 'positions'; ui.tab = 'company'; persist(); render(); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }, 50); } }]],
         ] },
         { id: 'border', label: 'Border designer', hue: '#9b3fb5', onSelect: () => openBorderDesigner(), groups: [
           ['Border', [{ label: 'Designer', icon: I.star, big: true, title: 'Design your own page border: lines, shapes, pictures at the corners and along the sides', run: () => openBorderDesigner() },

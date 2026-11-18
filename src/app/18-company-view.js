@@ -1,4 +1,6 @@
   // ---------- Company & Location ----------
+  // the page in tabs: the store's details, its hours, its positions (the last one picked is kept)
+  let coTab = 'details'; try { coTab = localStorage.getItem(KEY + '-cotab') || 'details'; } catch (e) { /* blocked */ }
   function companyView(main) {
     const err = h('p', { class: 'error bad', hidden: true });
     const savePlace = (k, v) => {
@@ -19,25 +21,25 @@
     };
     const notes = h('textarea', { class: 'input', rows: 3, placeholder: 'e.g. Delivery Tuesdays 7am · Parking behind the building' }, plan.placeNotes || '');
     notes.addEventListener('change', () => change(() => { plan.placeNotes = notes.value; }));
-    main.append(h('div', { class: 'card' },
-      h('h2', { style: { margin: '0 0 4px' } }, 'Company & location'),
+    const details = h('div', null,
       h('p', { class: 'hint', style: { margin: '0 0 12px' } }, 'Used on every plan, printout and file name on this computer, and saved inside Location files. Changes save as you go.'),
       h('div', { class: 'co-grid' },
         field('company', 'Company name', 'e.g. Sunny Bowl Cafe'), field('location', 'Location name', 'e.g. Main & 5th'), field('storeNo', 'Store number', 'e.g. 0042'),
         field('address', 'Address', 'e.g. 1234 Main St, Denver CO 80202', true),
         field('phone', 'Phone', 'e.g. (303) 555-0142'), field('email', 'Email', 'e.g. manager@example.com'), field('website', 'Website', 'e.g. www.example.com')),
       err,
-      h('h3', { class: 'co-h3', id: 'co-hours' }, 'Opening hours (Monday – Sunday)'),
+      h('h3', { class: 'co-h3' }, 'Contact details we keep'),
+      h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),
+      h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes));
+    const hoursTab = h('div', null,
+      h('h3', { class: 'co-h3', id: 'co-hours', style: { marginTop: 0 } }, 'Opening hours (Monday – Sunday)'),
       usualHoursEditor(),
       h('h3', { class: 'co-h3' }, 'Special hours (holidays and other days)'),
       (() => { const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date()));
         return up.length ? up.map((x) => h('div', { class: 'co-hours' }, h('b', null, x.name || 'Special hours'), h('span', { class: x.closed ? 'bad' : '' }, `${datesOnly(x)} · ${specialText(x)}`), ibs(ib('edit', 'Change or delete these special hours', () => specialDialog(x)))))
           : h('p', { class: 'muted small', style: { margin: '2px 0' } }, 'None coming up. Holidays and other days with their own opening hours (or closed) go here.'); })(),
-      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: () => { const m = mondayOf(ui.day); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')),
-      h('h3', { class: 'co-h3' }, 'Contact details we keep'),
-      h('p', { class: 'muted small', style: { margin: '0 0 4px' } }, 'Phone and email are always kept. Turn the home address off if this location does not use it: it leaves Staff › Contact & training, the contact cards and the QR codes.'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: addrInUse(), onchange: (e) => change(() => { plan.contactUse = { ...(plan.contactUse || {}), address: e.target.checked }; }) }), ' Home address in use'),
-      h('label', { class: 'field', style: { marginTop: '10px' } }, h('span', null, 'Notes about this location'), notes)));
+      h('div', { class: 'inline', style: { marginTop: '6px' } }, h('button', { class: 'btn sm', onclick: () => specialDialog(null) }, '+ Special hours…'), h('button', { class: 'btn sm', onclick: () => { const m = mondayOf(ui.day); specialDialog(null, { from: m, to: addDays(m, 6) }); } }, '+ Special hours for a week…'), h('button', { class: 'btn sm', onclick: calGo }, 'Open the Calendar')));
 
     // positions at this location
     const list = plan.positions || (plan.positions = defaultPositions());
@@ -58,13 +60,20 @@
     const addPos = () => { const v = newPos.value.replace(/\s+/g, ' ').trim(); if (!v) { newPos.focus(); return; } if (list.some((x) => x.name.toLowerCase() === v.toLowerCase())) { toast(`${v} is already on the list.`); return; } change(() => { list.push({ id: uid(), name: v, active: true }); }); setTimeout(() => { const x = document.querySelector('#co-newpos'); x && x.focus(); }); };
     newPos.addEventListener('keydown', (e) => { if (e.key === 'Enter') addPos(); });
     const inUse = list.filter((x) => x.active).length;
-    main.append(h('div', { class: 'card' },
-      h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Positions · ${inUse} in use`), h('span', { class: 'muted small' }, list.length !== inUse ? `${list.length - inUse} not in use` : ''), h('span', { class: 'spacer' }),
+    const posTab = h('div', null,
+      h('div', { class: 'daynav' }, h('span', { class: 'muted small' }, list.length !== inUse ? `${list.length - inUse} not in use` : ''), h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', onclick: () => confirmBox('Go back to the standard list?', 'The list goes back to the 14 standard positions. You can undo this.', 'Use the standard list', () => change(() => { plan.positions = defaultPositions(); })) }, 'Standard list')),
       h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'The stations and jobs at this location. Rename any of them, put them in the order you use, untick In use for ones this location doesn’t have, or add your own. The list is saved with the location.'),
-      h('div', { class: 'table-wrap' }, h('table', { class: 't' },
+      h('div', { class: 'table-wrap' }, h('table', { class: 't compact co-pos' },
         h('thead', null, h('tr', null, h('th', { class: 'num' }, '#'), h('th', null, 'Position'), h('th', { class: 'c' }, 'In use'), h('th', null, ''))),
         h('tbody', null, rows.length ? rows : h('tr', null, h('td', { colspan: 4, class: 'muted' }, 'No positions yet. Add them below, or use the standard list.'))),
-        h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position'))))))));
+        h('tfoot', null, h('tr', null, h('td', null, ''), h('td', null, newPos), h('td', { colspan: 2 }, h('button', { class: 'btn primary', onclick: addPos }, '+ Add position')))))));
+    const up = (plan.specialHours || []).filter((x) => x.to >= iso(new Date())).length;
+    const TABS = [['details', 'Company & location', plan.location || plan.company || ''], ['hours', 'Store hours', up ? `${up} special` : ''], ['positions', 'Positions', `${inUse} in use`]];
+    if (!TABS.some(([k]) => k === coTab)) coTab = 'details';
+    const pick = (k) => () => { coTab = k; try { localStorage.setItem(KEY + '-cotab', k); } catch (e) { /* blocked */ } render(); };
+    main.append(h('div', { class: 'card sched-tabs' },
+      h('div', { class: 'st-bar', role: 'tablist' }, TABS.map(([k, label, n]) => h('button', { type: 'button', role: 'tab', class: 'st-tab', 'aria-selected': String(coTab === k), onclick: pick(k) }, label, n ? h('span', { class: 'st-n' }, n) : null))),
+      h('div', { class: 'st-body', role: 'tabpanel' }, coTab === 'hours' ? hoursTab : coTab === 'positions' ? posTab : details)));
   }
 
