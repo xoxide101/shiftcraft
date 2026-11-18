@@ -795,7 +795,8 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .avcell.tm.hl { border-top-color: #ffd400; border-bottom-color: #ffd400; }
 
 /* wide areas: no scrollbar; the ‹ › at the edges (01b-edge-scroll.js) */
-.es-host { position: relative; }
+.es-host { position: relative; min-width: 0; max-width: 100%; }
+.main > * { min-width: 0; }
 .es-wrap { scrollbar-width: none; -ms-overflow-style: none; }
 .es-wrap::-webkit-scrollbar { display: none; }
 .es-btn { position: absolute; top: 0; bottom: 0; z-index: 6; width: 24px; padding: 0; border: 0; cursor: pointer; color: var(--fg); display: block; }
@@ -807,3 +808,16 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .es-btn:focus-visible { outline: 2px solid var(--accent); }
 @media print { .es-btn { display: none !important; } }
 .pd-print .es-btn { display: none !important; }
+
+/* the title bar's second line: the store and the week at the right of the ribbon's tabs (always there, shortened if need be) */
+.crb-tabs .crb-extra { min-width: 0; flex: 0 1 auto; }
+.crb-tabs .crb-extra .ctb-info { display: flex !important; min-width: 0; gap: 6px; }
+.crb-tabs .crb-extra .ctb-chip { background: var(--panel); color: var(--fg); border: 1px solid var(--line); font-size: 12px; line-height: 1.5; padding: 1px 10px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.crb-tabs .crb-extra button.ctb-chip:hover { border-color: var(--accent); }
+/* the search box: Alt+Q only when there is room for it */
+@media (max-width: 1350px) { .ctb .ctb-kbd { display: none; } }
+/* the ribbon's buttons: the ‹ › edges, not a scrollbar */
+.es-host:has(> .crb-body) .es-btn { border-radius: 0; }
+.crb-tabs .crb-extra .ctb-chip:last-child { flex: none; max-width: none; }
+.crb-tabs .crb-extra .ctb-chip:first-child { flex: 0 1 auto; min-width: 60px; }
+@media (max-width: 1350px) { .ctb .ctb-title { display: none; } }

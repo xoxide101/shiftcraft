@@ -3,7 +3,7 @@
   // only when there is more that way. Click scrolls most of a screen; hold keeps going. Shift+wheel and touchpads still
   // scroll. Every .table-wrap, .tl-wrap and .tr-wrap gets them, wherever it is (the screens, windows, print windows).
   // ===================================================================
-  const ES_SEL = '.table-wrap, .tl-wrap, .tr-wrap';
+  const ES_SEL = '.table-wrap, .tl-wrap, .tr-wrap, .crb-body';
   function edgeScroll(w) {
     if (w.dataset.es || w.closest('.pd-print, .pd-pv, #print-area')) return;
     w.dataset.es = '1';

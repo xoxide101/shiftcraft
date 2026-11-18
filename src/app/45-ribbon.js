@@ -111,6 +111,9 @@
       rightEls: [window.CraftAccount && CraftAccount.button ? CraftAccount.button() : null, document.getElementById('theme-btn')].filter(Boolean),
       onHelp: help ? help.run : null,
     });
+    // the top line keeps what you act on (menu, quick buttons, search, Log in, theme, help); what you are working on (the
+    // store, the week) is always on the second line, at the right of the ribbon's tabs
+    { const info = document.querySelector('.ctb-info'), extra = document.querySelector('.crb-extra'); if (info && extra) extra.prepend(info); }
     const ic = document.createElement('link'); ic.rel = 'icon';
     ic.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
     document.head.append(ic);
