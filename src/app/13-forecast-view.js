@@ -30,6 +30,7 @@
         h('div', { class: 'inline', style: { marginTop: '12px' } },
           h('label', { class: 'inline' }, h('span', null, 'Sales per labor hour target $'), splh),
           h('span', { class: 'spacer' }),
+          h('button', { class: 'btn sm primary', title: 'Copy a week’s past sales or forecast onto other weeks (past to future, week by week)', onclick: () => copyForecastDialog(w) }, 'Copy a week…'),
           h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { const t = trend(d); if (t != null) plan.forecast[d] = Math.round(t); })) }, 'Fill week from trend'),
           h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { delete plan.forecast[d]; })) }, 'Clear my forecasts'))),
       historyCard()));
@@ -86,3 +87,58 @@
     return null;
   }
 
+  // ---------- Copy a week's sales or forecast onto other weeks (past to future, week by week) ----------
+  // from: any week (its past sales, or its forecast); to: one or more weeks, Monday to Monday; a % up or down, rounded
+  // to the dollar. A forecast already there is replaced (Ctrl+Z undoes).
+  function copyForecastDialog(atWeek) {
+    const today = iso(new Date()), planEnd = addDays(plan.startDate, plan.weeks * 7 - 1);
+    const hist = Object.keys(plan.history || {}).filter((d) => plan.history[d] != null).sort();
+    const first = mondayOf(hist[0] && hist[0] < plan.startDate ? hist[0] : addDays(plan.startDate, -28));
+    const last = mondayOf(addDays(planEnd, 8 * 7));
+    const weeks = []; for (let m = first; m <= last; m = addDays(m, 7)) weeks.push(m);
+    const days7 = (m) => Array.from({ length: 7 }, (_, i) => addDays(m, i));
+    const has = (v) => v != null && v !== '';
+    const salesOf = (m) => days7(m).reduce((t, d) => t + (has(plan.history[d]) ? +plan.history[d] : 0), 0), nSales = (m) => days7(m).filter((d) => has(plan.history[d])).length;
+    const fcOf = (m) => days7(m).reduce((t, d) => t + (has(plan.forecast[d]) ? +plan.forecast[d] : 0), 0), nFc = (m) => days7(m).filter((d) => has(plan.forecast[d])).length;
+    const label = (m) => `${shortDate(m)} – ${shortDate(addDays(m, 6))}${m.slice(0, 4) !== today.slice(0, 4) ? ', ' + m.slice(0, 4) : ''}${m >= plan.startDate && m <= planEnd ? ` (plan week ${weekOf(m) + 1})` : ''}`;
+    const viewed = weekDays(atWeek)[0];
+    // from: the last week with sales before the week being looked at
+    const lastSales = [...weeks].reverse().find((m) => m < viewed && nSales(m)) || weeks[0];
+    let what = nSales(lastSales) ? 'sales' : 'forecast';
+    const fromSel = h('select', { class: 'input', 'aria-label': 'Copy from week' }, weeks.map((m) => h('option', { value: m, selected: m === lastSales }, `${label(m)} · sales ${nSales(m) ? money(salesOf(m)) : '—'} · forecast ${nFc(m) ? money(fcOf(m)) : '—'}`)));
+    const quick = (txt, k) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { const m = addDays(viewed, -7 * k); if (weeks.includes(m)) { fromSel.value = m; sync(); } else toast('That week is not in the list (no sales that far back).'); } }, txt);
+    const whatSeg = calSeg('Copy', [['sales', 'Its past sales'], ['forecast', 'Its forecast']], what, (v) => { what = v; sync(); });
+    const pct = h('input', { class: 'input', type: 'number', step: 1, value: 0, style: { width: '80px' }, 'aria-label': 'Up or down by percent' });
+    const boxes = weeks.map((m) => ({ m, el: h('input', { type: 'checkbox', checked: m === viewed }) }));
+    const grid = h('div', { class: 'cf-grid' });
+    const info = h('p', { class: 'hint', style: { margin: '6px 0 0' } });
+    const sync = () => {
+      const src = fromSel.value, n = what === 'sales' ? nSales(src) : nFc(src);
+      grid.replaceChildren(...boxes.filter((b) => b.m > src).map((b) => h('label', { class: 'check small' + (b.m < today ? ' muted' : '') }, b.el, ` ${label(b.m)}${nFc(b.m) ? ' •' : ''}`)));
+      const k = 1 + (+pct.value || 0) / 100, total = days7(src).reduce((t, d) => t + (what === 'sales' ? +(plan.history[d] || 0) : +(plan.forecast[d] || 0)), 0);
+      info.textContent = n ? `${n} day${n === 1 ? '' : 's'} to copy, ${money(total * k)} a week${+pct.value ? ` (${+pct.value > 0 ? '+' : ''}${+pct.value}%)` : ''}. Weeks marked • have forecasts already: they are replaced. You can undo this.`
+        : `That week has no ${what === 'sales' ? 'past sales' : 'forecast'} to copy: pick another week, or the other kind.`;
+    };
+    fromSel.onchange = sync; pct.oninput = sync;
+    sync();
+    modal({ title: 'Copy a week’s sales or forecast', wide: true, body: [
+      h('p', { class: 'hint', style: { marginTop: 0 } }, 'Day by day, Monday to Monday: a week’s past sales (or its forecast) become the forecast for the weeks you tick. Up or down by a percent if you like (e.g. 5 for 5% more).'),
+      h('label', { class: 'field' }, h('span', null, 'From the week'), fromSel),
+      h('div', { class: 'inline', style: { gap: '6px', margin: '-4px 0 8px' } }, h('span', { class: 'muted small' }, 'Quick:'), quick('Last week', 1), quick('4 weeks ago', 4), quick('Same week last year', 52)),
+      h('div', { class: 'field' }, h('span', null, 'Copy'), whatSeg),
+      h('label', { class: 'field' }, h('span', null, 'Up or down by %'), pct),
+      h('div', { class: 'field' }, h('span', null, 'Onto the weeks'), grid),
+      h('div', { class: 'inline', style: { gap: '6px' } },
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { boxes.forEach((b) => { b.el.checked = b.m > fromSel.value && b.m >= plan.startDate && b.m <= planEnd; }); } }, 'The plan’s weeks'),
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { boxes.forEach((b) => { b.el.checked = b.m > fromSel.value && b.m >= mondayOf(today); }); } }, 'Every week from this one on'),
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => boxes.forEach((b) => { b.el.checked = false; }) }, 'None')),
+      info],
+    actions: [{ label: 'Cancel' }, { label: 'Copy', primary: true, onClick: () => {
+      const src = fromSel.value, targets = boxes.filter((b) => b.el.checked && b.m > src).map((b) => b.m), k = 1 + (+pct.value || 0) / 100;
+      const vals = days7(src).map((d) => (what === 'sales' ? plan.history[d] : plan.forecast[d]));
+      if (!targets.length) { toast('Tick the weeks to copy onto.'); return false; }
+      if (!vals.some(has)) { toast('That week has nothing to copy.'); return false; }
+      change(() => targets.forEach((m) => days7(m).forEach((d, i) => { const v = vals[i]; if (has(v)) plan.forecast[d] = Math.max(0, Math.round(+v * k)); })));
+      toast(`Copied onto ${targets.length} week${targets.length === 1 ? '' : 's'}. You can undo this.`);
+    } }] });
+  }

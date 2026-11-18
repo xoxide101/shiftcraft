@@ -773,3 +773,6 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 
 /* the store hours heading, when jumped to from the Calendar, clear of the bars at the top */
 #co-hours { scroll-margin-top: 200px; }
+
+/* the Forecast's Copy a week window: the weeks to copy onto */
+.cf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 12px; max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
