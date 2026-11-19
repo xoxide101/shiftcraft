@@ -56,43 +56,68 @@
     const paint = () => { const x = list.find((y) => y.id === sel.value), cur = curLoc();
       if (!x) { go.disabled = true; go.textContent = 'Select a location first'; return; }
       const can = ['admin', 'manager', 'scheduler'].includes(x.myRole);
-      go.disabled = plan.example || !can; go.textContent = plan.example ? 'The example schedule is not saved' : !can ? `${LROLE[x.myRole]} at ${x.name}: you cannot save here` : `☁ Save: this browser → ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`;
+      go.disabled = plan.example || !can; go.textContent = plan.example ? 'The example schedule is not saved' : !can ? `${LROLE[x.myRole]} at ${x.name}: you cannot save here` : `☁ Computer → Server: ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`;
       go.title = cur && cur.id === x.id ? 'Your location: saves everything there now' : 'Saves this browser’s schedule to that location; from now on it saves there'; };
     CA().api('GET', 'locations').then((r) => { list = r.locations; const cur = curLoc();
       sel.innerHTML = ''; sel.append(h('option', { value: '' }, list.length ? 'Select a location…' : 'You do not work at a location yet (your account copy instead)'));
       const by = {}; for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
       for (const [co, ls] of Object.entries(by)) sel.append(h('optgroup', { label: co }, ...ls.map((x) => h('option', { value: x.id, selected: !!(cur && cur.id === x.id) }, `📍 ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''} · ${LROLE[x.myRole] || x.myRole}${x.lastSaved ? '' : ' · nothing saved yet'}`))));
-      if (!list.length) { go.disabled = plan.example; go.textContent = '☁ Save: this browser → your account (private copy)'; go.onclick = () => { closeSave(); saveToServer(); }; return; }
+      if (!list.length) { go.disabled = plan.example; go.textContent = '☁ Computer → Server: your account (private copy)'; go.onclick = () => { closeSave(); saveToServer(); }; return; }
       paint(); }).catch(() => { sel.innerHTML = '<option value="">The server could not be reached</option>'; });
     sel.onchange = paint;
     go.onclick = async () => { const x = list.find((y) => y.id === sel.value); if (!x) return; closeSave(); await saveToLocation(x); };
-    return h('div', { class: 'stack', style: { gap: '6px' } }, h('span', { class: 'muted small' }, 'Save to which location'), sel, go);
+    return h('div', { class: 'save-loc' }, h('label', { class: 'muted small' }, 'Save to which location'), sel, go);
   }
-  let closeSave = () => {};
+  let closeSave = () => {}, saveTab = 'server';
+  try { saveTab = localStorage.getItem(KEY + '-savetab') || 'server'; } catch (e) { /* blocked */ }
+  // ---- Save: on the left, where (the server, this computer, this browser, backups); on the right, what you can do there,
+  // each a big row saying exactly what happens. Ctrl+S, the Save button and File › Save… open it.
   function saveDialog() {
-    const A = CA(), l = curLoc(), st = accState(), icon = (k) => { const s = h('span', { class: 'save-ic' }); s.innerHTML = SAVE_ICON[k]; return s; };
-    const card = (k, title, sub, kids) => h('div', { class: 'save-card' }, h('div', { class: 'save-head' }, k === 'cloud' && companyLogo() ? h('img', { src: companyLogo(), alt: '', style: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', background: '#fff' } }) : icon(k), h('div', null, h('b', null, title), h('div', { class: 'muted small' }, sub))), h('div', { class: 'save-btns' }, ...kids));
-    const btn = (label, desc, run, o = {}) => h('button', { type: 'button', class: 'btn' + (o.primary ? ' primary' : ''), title: desc, disabled: !!o.disabled, onclick: () => { close(); run(); } }, label);
-    let close = () => {};
-    const cloudLine = !A ? 'Log in to save on the server: the same schedule at work and at home, shared with the people at your location.'
-      : plan.example ? 'This is the example schedule: open or make your own first.'
-      : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}${!locSaves() ? ' You can look here, not save (' + LROLE[l.role] + ').' : ''}`
-      : `Your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`;
-    const body = h('div', { class: 'save-grid' },
-      card('cloud', 'The server' + (A ? serverWhere() : ''), cloudLine, !A ? [btn('Log in…', 'Log in with your Craft account', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true })] : [
-        locPickRow(),
-        btn('Load: server → this browser', 'What is open here is replaced by the server’s copy (Undo brings it back)', loadFromServer),
-        btn('📍 Open a location… (its schedule opens here)', 'Opens another location’s schedule from the server, in place of this browser’s', chooseLocation),
-        btn('⇄ Bring in from another location or account…', 'Replace or merge what is open here with a schedule you can open', bringIn)]),
-      card('file', 'This computer (a file)', 'A .json file you keep, copy or email. Everything: the team, every week, time off, calendar, forecast, settings, store profile and designs.', [
-        btn('Save: this browser → file (everything)', 'Saves a file with everything', () => saveFile('location'), { primary: !A || plan.example }),
-        btn('Save as… (choose the folder and name)', 'Saves everything, asking where', () => saveFile('location', { as: true })),
-        btn('Save a part only…', 'This week, the month, the team or one day', () => saveAsDialog({ what: 'schedule' })),
-        btn('📂 Load: file → this browser', 'Opens a saved file', () => openFile())]),
-      card('browser', 'This browser', 'Every change is kept here by itself, as you work (even with nobody logged in). It stays on this computer and in this browser only.', [
-        h('span', { class: 'muted small' }, plan.example ? 'Example data: not kept.' : `Kept now: ${plan.staff.length} people, ${Object.keys(plan.shifts).length} days with shifts.`)]));
-    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close; closeSave = close;
-    setTimeout(() => { const p = document.querySelector('.save-grid .btn.primary:not([disabled])'); if (p) p.focus(); }, 0);
+    const A = CA(), l = curLoc(), st = accState();
+    const icon = (k, px = 26) => { const sp = h('span', { class: 'save-ic' }); sp.innerHTML = SAVE_ICON[k].replace(/width="44" height="44"/, `width="${px}" height="${px}"`); return sp; };
+    // one action: a big row (title, what it does), and what happens on a click
+    const act = (title, desc, run, o = {}) => h('button', { type: 'button', class: 'save-act' + (o.primary ? ' primary' : ''), disabled: !!o.disabled, onclick: () => { closeSave(); run(); } }, h('span', { class: 'save-act-ic' }, o.ic || ''), h('span', null, h('b', null, title), h('small', null, desc)));
+    const right = h('div', { class: 'save-pane' }), nav = h('div', { class: 'save-nav', role: 'tablist' });
+    const PLACES = [['server', 'cloud', 'Server (cloud)', A ? (l ? l.name : 'your account') : 'log in first'], ['file', 'file', 'File', 'a .json file you keep'], ['browser', 'browser', 'Computer', 'what is open here'], ['backups', 'cloud', 'Backups', 'copies kept for you']];
+    const head = (k, title, sub) => h('div', { class: 'save-pane-head' }, k === 'server' && companyLogo() ? h('img', { src: companyLogo(), alt: '', class: 'save-logo' }) : icon(k === 'backups' ? 'cloud' : k, 44), h('div', null, h('h3', null, title), h('div', { class: 'muted' }, sub)));
+    const panes = {
+      server: () => !A ? [head('server', 'Server (cloud)', 'Log in to use the server: the same schedule at work and at home, shared with the people at your location.'), act('Log in…', 'With your Craft user ID and password', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true, ic: '👤' })]
+        : [head('server', 'Server (cloud)' + serverWhere(), plan.example ? 'This is the example schedule: open or make your own first.' : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}` : `Choose a location below, or it saves to your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`),
+          h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Computer → Server (save)'), locPickRow()),
+          h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Server → Computer (open)'),
+            act('Server → Computer: open the server’s copy', `What is open on this computer is replaced by the copy on the server${serverWhere()} (yours is kept as a backup).`, loadFromServer, { ic: '⬇' }),
+            act('Server → Computer: open another location…', 'Another location you work at: its schedule opens on this computer, from the server.', chooseLocation, { ic: '📍' }),
+            act('Server → Computer: bring in from another location or account…', 'Another location’s schedule (or a copy in your account) into what is open: replace it, or merge the two.', bringIn, { ic: '⇄' }))],
+      file: () => [head('file', 'File', 'A .json file you keep, copy or email. “Everything” holds the team, every week, time off, calendar, forecast, settings, store profile and designs.'),
+        h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Computer → File (save)'),
+          act('Computer → File: everything', 'A file with all of it, in your usual folder.', () => saveFile('location'), { primary: !A || plan.example, ic: '💾' }),
+          act('Computer → File as…: everything', 'Choose the folder and the file’s name.', () => saveFile('location', { as: true }), { ic: '💾' }),
+          act('Computer → File: a part only…', 'This week, the month, the team or one day.', () => saveAsDialog({ what: 'schedule' }), { ic: '✂' })),
+        h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'File → Computer (open)'),
+          act('File → Computer: open a file…', 'A saved file comes in (an everything file replaces what is open; Undo brings it back).', () => openFile(), { ic: '📂' }))],
+      browser: () => [head('browser', 'Computer', 'What is open here. Every change is kept on this computer by itself as you work, also with nobody logged in (in this browser only).'),
+        h('div', { class: 'save-facts' }, ...COUNT_NAMES.map(([k, n]) => h('div', null, h('b', null, String(planCounts(plan)[k])), h('span', null, n)))),
+        h('p', { class: 'muted' }, plan.example ? 'This is the example schedule: it is not kept.' : 'To have it elsewhere too: Computer → Server (shared) or Computer → File.')],
+      backups: () => { const box = h('div', { class: 'save-group' }, h('p', { class: 'muted' }, 'Looking…'));
+        listBackups().then((list) => { box.innerHTML = ''; if (!list.length) { box.append(h('p', { class: 'muted' }, 'No backups yet. One is kept whenever a copy is replaced by a different one.')); return; }
+          list.forEach((x) => { const n = x.note || {}, k = n.kept || planCounts(x.plan), d = n.difference;
+            box.append(h('div', { class: 'save-bk' }, h('div', null, h('b', null, new Date(n.at || x.savedAt).toLocaleString()), h('div', { class: 'muted small' }, `${n.why || 'backup'} · ${x.where} · ${k.people} people, ${k.days} day${k.days === 1 ? '' : 's'} with shifts, ${k.events} event${k.events === 1 ? '' : 's'}${d ? ' · the other had ' + Object.entries(d).filter(([, v]) => v).map(([kk, v]) => `${v > 0 ? '+' : ''}${v} ${(COUNT_NAMES.find((c) => c[0] === kk) || [kk, kk])[1].toLowerCase()}`).join(', ') : ''}`)),
+              h('div', { class: 'save-bk-b' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { closeSave(); extrasBack(x.extras); takePlan(x.plan, x.savedAt, accState().base || '', 'Opened the backup from ' + new Date(n.at || x.savedAt).toLocaleString()); setAcc({ dirty: true }); } }, '→ Computer'),
+                h('button', { type: 'button', class: 'btn sm', onclick: () => downloadBlob(`${placeName()} - backup ${String(n.at || x.savedAt).slice(0, 16).replace(/[:T]/g, '-')}.json`, new Blob([JSON.stringify({ ...x.plan, app: 'ShiftCraft', kind: 'location', version: 4 }, null, 2)], { type: 'application/json' })) }, '→ File')))); }); }).catch((e) => { box.innerHTML = ''; box.append(h('p', { class: 'muted' }, e.message)); });
+        return [head('backups', 'Backups', 'Kept for you whenever one copy replaced a different one (on the server when logged in, on this computer when not). Open one, or download it as a file.'), box]; },
+    };
+    const show = (k) => { saveTab = k; try { localStorage.setItem(KEY + '-savetab', k); } catch (e) { /* blocked */ } nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === k))); right.innerHTML = ''; right.append(...panes[k]()); setTimeout(() => { const p = right.querySelector('.save-act.primary:not([disabled]), .btn.primary:not([disabled])'); if (p) p.focus(); }, 0); };
+    PLACES.forEach(([k, ic, t, sub]) => nav.append(h('button', { type: 'button', role: 'tab', 'data-k': k, onclick: () => show(k) }, icon(ic), h('span', null, h('b', null, t), h('small', null, sub)))));
+    const m = modal({ title: 'Save and open: Computer · Server · File', wide: true, body: h('div', { class: 'save-wrap' }, nav, right), actions: [{ label: 'Close' }] }); closeSave = m.close; m.el.classList.add('save-dialog');
+    show(PLACES.some((p) => p[0] === saveTab) ? saveTab : 'server');
+  }
+  // the backups: this location's (or your account's) on the server, and this browser's own
+  async function listBackups() {
+    const out = [], A = CA(), l = curLoc();
+    if (A) { try { if (l) { const o = await A.api('GET', `locations/${l.id}/data/shiftcraft`); for (const [k, v] of Object.entries(o)) if (/^backup /.test(k) && v.value && v.value.plan) out.push({ ...v.value, where: '☁ ' + l.name + (v.by ? ' (by ' + v.by + ')' : '') }); }
+      else { const o = await A.all('shiftcraft'); for (const [k, v] of Object.entries(o || {})) if (/^backup /.test(k) && v.value && v.value.plan) out.push({ ...v.value, where: '☁ your account' }); } } catch (e) { /* not now */ } }
+    try { for (const x of JSON.parse(localStorage.getItem(KEY + '-backups') || '[]')) out.push({ ...x, where: '🖥 this browser' }); } catch (e) { /* none */ }
+    return out.sort((a, b) => String((b.note || {}).at || b.savedAt).localeCompare(String((a.note || {}).at || a.savedAt)));
   }
   function saveAsDialog(preset = {}) {
     const c = { what: preset.what || 'all', range: preset.range || 'week' };

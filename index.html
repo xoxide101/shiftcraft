@@ -906,6 +906,26 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .save-ic { flex: none; line-height: 0; }
 .save-btns { display: flex; flex-direction: column; gap: 6px; } .save-btns .btn { text-align: left; justify-content: flex-start; white-space: normal; height: auto; min-height: 32px; line-height: 1.3; }
 .ctb-info .co-logo { height: 20px; max-width: 60px; object-fit: contain; border-radius: 3px; background: #fff; padding: 1px; align-self: center; }
+
+/* the Save and open window: places on the left, big plain actions on the right */
+.dialog.save-dialog { width: min(1040px, 96vw); max-width: none; }
+.save-wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; min-height: 440px; }
+.save-nav { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--line, #d0d5dd); padding-right: 14px; }
+.save-nav button { display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: none; color: inherit; cursor: pointer; font: inherit; }
+.save-nav button:hover { background: rgba(127,127,127,.12); }
+.save-nav button[aria-selected=true] { background: rgba(59,130,246,.16); border-color: rgba(59,130,246,.55); }
+.save-nav b, .save-act b { display: block; } .save-nav small, .save-act small { display: block; opacity: .75; font-size: 12px; line-height: 1.35; }
+.save-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.save-pane-head { display: flex; gap: 14px; align-items: center; } .save-pane-head h3 { margin: 0 0 2px; font-size: 18px; } .save-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #fff; }
+.save-group { display: flex; flex-direction: column; gap: 8px; } .save-group-t { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; font-weight: 600; }
+.save-act { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line, #d0d5dd); background: rgba(127,127,127,.06); color: inherit; font: inherit; cursor: pointer; }
+.save-act:hover:not([disabled]) { border-color: rgba(59,130,246,.7); background: rgba(59,130,246,.10); } .save-act[disabled] { opacity: .5; cursor: default; }
+.save-act.primary { border-color: rgba(59,130,246,.85); background: rgba(59,130,246,.18); } .save-act-ic { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.save-loc { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 12px 14px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-loc .btn { justify-content: center; font-size: 15px; padding: 10px; height: auto; white-space: normal; }
+.save-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; } .save-facts > div { border: 1px solid var(--line, #d0d5dd); border-radius: 10px; padding: 10px; } .save-facts b { display: block; font-size: 22px; }
+.save-bk { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-bk-b { display: flex; gap: 6px; flex: none; }
+.cmp-table { width: 100%; border-collapse: collapse; } .cmp-table td, .cmp-table th { padding: 6px 8px; border-bottom: 1px solid var(--line, #d0d5dd); text-align: left; }
+@media (max-width: 720px) { .save-wrap { grid-template-columns: 1fr; } .save-nav { flex-direction: row; overflow-x: auto; border-right: 0; padding: 0 0 8px; border-bottom: 1px solid var(--line, #d0d5dd); } .save-nav small { display: none; } }
 </style>
 </head>
 <body>
@@ -2327,8 +2347,8 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       const r = l ? await A.api('GET', locPath(l)).catch((e) => { if (e.status === 404) return null; throw e; }) : await A.get('shiftcraft', accKey());
       const v = l ? r && r.value : r; if (!v || !v.plan) { toast(`The server has nothing saved${serverWhere()} yet: use ☁ Save first.`); return; }
       const what = `${v.plan.staff.length} people, ${Object.keys(v.plan.shifts || {}).length} days with shifts, saved ${new Date(l ? r.changed : v.savedAt).toLocaleString()}${l && r.by ? ' by ' + r.by : ''}`;
-      modal({ title: `☁ Load: server → this browser${serverWhere()}`, body: h('p', null, `What is open here is replaced by the server’s copy (${what}). Undo brings this browser’s back.`),
-        actions: [{ label: 'Cancel' }, { label: '☁ Open the server’s copy here', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
+      modal({ title: `☁ Server → Computer${serverWhere()} (open)`, body: h('p', null, `What is open here is replaced by the server’s copy (${what}). Undo brings this browser’s back.`),
+        actions: [{ label: 'Cancel' }, { label: '☁ Server → Computer: open it', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
     } catch (e) { toast(e.message); }
   }
   // ⇄ Bring in from another location (one you can open) or a copy in your own account: replaces or merges into what is
@@ -2352,11 +2372,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const sel = h('select', { class: 'input' }, ...src.map((s, i) => h('option', { value: i }, s.label)));
     const go = async (how) => { try { const v = await src[+sel.value].get(); if (!v || !v.plan) return toast('That one has nothing saved.'); const np = how === 'merge' ? mergeInto(plan, v.plan) : v.plan;
       if (l) { np.location = locLabel(l); np.company = l.company || np.company; }
-      snapshot(); normalize(np); plan = np; delete plan.example; persist(); render(); toast(`${how === 'merge' ? 'Merged' : 'Brought in'}: ${src[+sel.value].label.replace(/^\S+ /, '')} → this browser${l ? ', then to ' + l.name + ' on the server' : ''}. (Undo brings back what was here.)`); } catch (e) { toast(e.message); } };
+      snapshot(); normalize(np); plan = np; delete plan.example; persist(); render(); toast(`${how === 'merge' ? 'Merged' : 'Brought in'}: ${src[+sel.value].label.replace(/^\S+ /, '')} → Computer${l ? ', then Computer → Server (' + l.name + ')' : ''}. (Undo brings back what was here.)`); } catch (e) { toast(e.message); } };
     modal({ title: '⇄ Bring in from another location or account', body: h('div', null,
         h('p', null, `Take a schedule you can open into what is open here${l ? ` (${l.name}, which then saves it to the server for ${l.name})` : ''}.`), h('label', { class: 'field' }, h('span', null, 'From'), sel),
         h('p', { class: 'muted' }, 'Replace: theirs instead of what is here. Merge: people matched by name, their shifts, events, time off and the rest added without doubles. Undo works for both.')),
-      actions: [{ label: 'Cancel' }, { label: 'Merge it into this browser’s', onClick: () => go('merge') }, { label: 'Open it here instead (this browser’s is replaced)', primary: true, onClick: () => go('replace') }] });
+      actions: [{ label: 'Cancel' }, { label: 'Merge it into this computer’s', onClick: () => go('merge') }, { label: 'Server → Computer (replace what is open)', primary: true, onClick: () => go('replace') }] });
   }
   // Save: this browser → a chosen location. It becomes your location (later saves go there). A location that already has
   // a different schedule asks first: replace it with this browser's, merge this browser's into it, or cancel.
@@ -2376,7 +2396,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     modal({ title: `${mine.name} already has a schedule`, body: h('div', null,
         h('p', null, `On the server, ${mine.name} has ${theirs.staff.length} people and ${Object.keys(theirs.shifts || {}).length} days with shifts, saved ${new Date(r.changed).toLocaleString()}${r.by ? ' by ' + r.by : ''}. This browser has ${plan.staff.length} people and ${Object.keys(plan.shifts).length} days with shifts.`),
         h('p', { class: 'muted' }, 'Replace: the server gets this browser’s. Merge: people matched by name, shifts, events, time off and the rest put together without doubles. Either way it is in the location’s latest changes (AccountCraft), and Undo works here.')),
-      actions: [{ label: 'Cancel' }, { label: 'Merge this browser’s into it', onClick: () => put(mergeInto(theirs, plan), 'Merged into') }, { label: 'Replace it with this browser’s', primary: true, onClick: () => put(plan, 'Saved to') }] });
+      actions: [{ label: 'Cancel' }, { label: 'Merge this computer’s into it', onClick: () => put(mergeInto(theirs, plan), 'Merged into') }, { label: '☁ Computer → Server (replace it)', primary: true, onClick: () => put(plan, 'Saved to') }] });
   }
   // File › Save to the server, and the title bar's ☁: now, not in a few seconds
   async function saveToServer() {
@@ -2387,10 +2407,47 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     clearTimeout(accT); setAcc({ dirty: true }); await accountSend();
     if (!accErr && !accState().dirty) toast(`Saved to the server${curLoc() ? ' for ' + curLoc().name : ' (your account)'}, ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}: everything (team, schedules, time off, calendar, settings).`);
   }
+  // ---- what a copy holds (to compare two copies), its fingerprint, and a backup of a copy about to be replaced
+  function planCounts(p) {
+    p = p || {}; const sh = p.shifts || {};
+    return { people: (p.staff || []).length, days: Object.values(sh).filter((l) => (l || []).length).length, shifts: Object.values(sh).reduce((n, l) => n + (l || []).length, 0),
+      events: (p.events || []).length, timeOff: (p.staff || []).reduce((n, s) => n + ((s && s.timeOff) || []).length, 0), forecast: Object.keys(p.forecast || {}).length, dayLooks: Object.keys(p.days || {}).length };
+  }
+  const COUNT_NAMES = [['people', 'People'], ['days', 'Days with shifts'], ['shifts', 'Shifts'], ['events', 'Calendar events'], ['timeOff', 'Time off'], ['forecast', 'Forecast days'], ['dayLooks', 'Day looks']];
+  function planHash(p) { let x = 2166136261; const t = JSON.stringify([p.staff, p.shifts, p.events, p.days, p.forecast, p.history, p.special, p.positions]); for (let i = 0; i < t.length; i++) { x ^= t.charCodeAt(i); x = Math.imul(x, 16777619); } return (x >>> 0).toString(16); }
+  const samePlan = (a, b) => { try { const x = JSON.parse(JSON.stringify(a)); normalize(x); return planHash(x) === planHash(b); } catch (e) { return false; } };
+  const backupStamp = () => { const d = new Date(), p2 = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}.${p2(d.getMinutes())}.${p2(d.getSeconds())}`; };
+  // a copy about to be replaced by a different one is kept first: on the server (the location, or your account) when
+  // logged in, else in this browser (the last 5). Its note says when, why, and what each side held, with the difference.
+  async function keepBackup(p, why, other, extras) {
+    if (!p || p.example || !(p.staff || []).length) return;
+    const a = planCounts(p), b = other ? planCounts(other) : null, note = { why, at: new Date().toISOString(), hash: planHash(p), kept: a, other: b, difference: b ? Object.fromEntries(Object.keys(a).map((k) => [k, b[k] - a[k]])) : null };
+    const value = { savedAt: new Date().toISOString(), plan: p, extras: extras || extrasNow(), note }, key = `backup ${backupStamp()} ${why}`.slice(0, 100);
+    const A = CA(), l = curLoc();
+    try {
+      if (A && l && locSaves()) { await A.api('PUT', `locations/${l.id}/data/shiftcraft/${encodeURIComponent(key)}`, { value }); return; }
+      if (A && !l) { await A.put('shiftcraft', key, value); return; }
+    } catch (e) { /* the server: no; this browser instead */ }
+    try { const list = JSON.parse(localStorage.getItem(KEY + '-backups') || '[]'); list.unshift({ key, ...value }); while (list.length > 5) list.pop(); localStorage.setItem(KEY + '-backups', JSON.stringify(list)); } catch (e) { /* full */ }
+  }
+  let sessionAsked = false, asking = false;   // asking: the question is open; other checks wait for the answer
+  // on connecting: the server and this browser hold different schedules. Which one? (the other is kept as a backup)
+  function connectAsk(l, r) {
+    const theirs = r.value.plan, a = planCounts(theirs), b = planCounts(plan);
+    const row = ([k, n]) => h('tr', null, h('td', null, n), h('td', null, String(a[k])), h('td', null, String(b[k])), h('td', { class: a[k] === b[k] ? 'muted' : '' }, a[k] === b[k] ? 'same' : (b[k] - a[k] > 0 ? '+' : '') + (b[k] - a[k])));
+    const tbl = h('table', { class: 'cmp-table' }, h('tr', null, h('th', null, ''), h('th', null, `☁ Server${l ? ' · ' + l.name : ''}`), h('th', null, '🖥 This computer'), h('th', null, 'Difference')), ...COUNT_NAMES.map(row));
+    asking = true; const st0 = document.getElementById('sc-start'); if (st0) st0.hidden = true;
+    modal({ title: 'The server and this computer have different schedules', wide: true, onClose: () => { asking = false; }, body: h('div', null,
+        h('p', null, `On the server: saved ${new Date(r.changed || r.value.savedAt).toLocaleString()}${r.by ? ' by ' + r.by : ''}. On this computer: ${accState().synced ? 'last in step ' + new Date(accState().synced).toLocaleString() : 'never saved to the server'}.`), tbl,
+        h('p', { class: 'muted' }, 'Whichever you do, the other copy is kept as a backup (with the date, time and these numbers), so nothing is lost.')),
+      actions: [{ label: 'Merge both', onClick: () => { const np = mergeInto(theirs, plan); snapshot(); normalize(np); plan = np; persist(); accountSend(true).then(() => { render(); toast('Merged: both are now on the server and here.'); }); } },
+        { label: '☁ Computer → Server (keep this computer’s)', onClick: () => { accountSend(true).then(() => toast('Saved this browser’s to the server (the server’s is kept as a backup).')); } },
+        { label: '☁ Server → Computer (keep the server’s)', primary: true, onClick: () => { extrasBack(r.value.extras); takePlan(theirs, r.value.savedAt, r.changed || '', 'Opened the server’s copy (this browser’s is kept as a backup)'); } }] });
+  }
   let accAgain = false, accT = 0, accBusy = false, accLast = '', accQuiet = false, accSeen = 0, viewTold = false;
   function accountSoon(txt) {
     if (txt === accLast) return; accLast = txt;
-    if (accQuiet || !CA() || plan.example) return;
+    if (accQuiet || !CA() || plan.example || asking) return;
     if (!locSaves()) { if (!viewTold) { viewTold = true; toast(`${LROLE[curLoc().role]} at ${curLoc().name}: changes stay in this browser and are not saved for the location.`); } return; }
     setAcc({ dirty: true }); clearTimeout(accT); accT = setTimeout(accountSend, 4000);
   }
@@ -2401,6 +2458,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     try {
       if (!l) { await A.put('shiftcraft', accKey(), { savedAt, plan, extras }); setAcc({ synced: savedAt, dirty: false }); return; }
       if (!locSaves()) return;
+      if (force) { try { const was = await A.api('GET', locPath(l)); if (was && was.value && was.value.plan && !samePlan(was.value.plan, plan)) await keepBackup(was.value.plan, 'server copy replaced', plan, was.value.extras); } catch (e) { /* nothing there */ } }
       const r = await A.api('PUT', locPath(l), { value: { savedAt, plan, extras }, base: accState().base || '', force: !!force });
       setAcc({ base: r.changed, synced: savedAt, dirty: false });
     } catch (e) {
@@ -2413,18 +2471,20 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   // someone else saved the location since this browser opened it
   function locConflict(info) {
     const l = curLoc(); if (!l || document.querySelector('.loc-conflict')) return;
+    const st0 = document.getElementById('sc-start'); if (st0) st0.hidden = true;
     modal({ title: `${info.by || 'Someone'} saved ${l.name} since you opened it`, body: h('div', { class: 'loc-conflict' },
         h('p', null, `${info.by || 'Someone'} saved ${l.name} at ${info.changed ? new Date(info.changed).toLocaleString() : 'just now'}, and this browser has changes of its own. Which one do you want to keep?`),
         h('p', { class: 'muted' }, 'Saving a file first keeps yours, then theirs opens: nothing is lost. Undo also brings yours back.')),
-      actions: [{ label: '☁ Save mine over theirs', onClick: () => accountSend(true) },
-        { label: '💾 Save mine to a file, then open theirs', onClick: () => { downloadBlob(`${placeName()} - my copy.json`, new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })); locTake(true); } },
-        { label: '☁ Open theirs here (mine is replaced)', primary: true, onClick: () => locTake(true) }] });
+      actions: [{ label: '☁ Computer → Server (mine over theirs)', onClick: () => accountSend(true) },
+        { label: '💾 Computer → File (mine), then Server → Computer (theirs)', onClick: () => { downloadBlob(`${placeName()} - my copy.json`, new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })); locTake(true); } },
+        { label: '☁ Server → Computer (theirs; mine is kept as a backup)', primary: true, onClick: () => locTake(true) }] });
   }
   async function locTake(quietly) {
     const A = CA(), l = curLoc(); if (!A || !l) return;
     try { const r = await A.api('GET', locPath(l)); extrasBack(r.value.extras); takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`, quietly); } catch (e) { toast(e.message); }
   }
   function takePlan(np, savedAt, base, note, quiet) {
+    if (!samePlan(np, plan)) keepBackup(JSON.parse(JSON.stringify(plan)), 'browser copy replaced', np);
     snapshot(); normalize(np); const l = curLoc(); if (l) { np.location = locLabel(l); np.company = l.company || np.company; }
     accQuiet = true; plan = np; delete plan.example; persist(); accQuiet = false; accLast = JSON.stringify(plan); setAcc({ synced: savedAt, base: base || '', dirty: false }); render();
     if (!quiet || note) toast(note + ' (Undo brings back this browser’s)');
@@ -2434,13 +2494,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   function companyLogo() { try { const o = JSON.parse(localStorage.getItem(LOGO_KEY) || 'null'), l = curLoc(); return o && l && o.company === l.companyId ? o.logo || '' : ''; } catch (e) { return ''; } }
   async function refreshLogo() { const A = CA(), l = curLoc(); if (!A || !l || !l.companyId) return; try { const c = (await A.api('GET', 'companies')).companies.find((x) => x.id === l.companyId); const was = companyLogo(), now = (c && c.logo) || ''; localStorage.setItem(LOGO_KEY, JSON.stringify({ company: l.companyId, logo: now })); if (was !== now) render(); } catch (e) { /* later */ } }
   async function accountCheck() {
-    const A = CA(); if (!A) return; if (accBusy) { accAgain = true; return; } accBusy = true; accSeen = Date.now();
+    const A = CA(); if (!A || asking) return; if (accBusy) { accAgain = true; return; } accBusy = true; accSeen = Date.now();
     try {
       const st = accState(), l = curLoc();
       if (l) {
         refreshLogo();
         let r = null; try { r = await A.api('GET', locPath(l)); } catch (e) { if (e.status === 403) { setAcc({ loc: null }); toast(`You no longer work at ${l.name}: back to this browser’s plan.`); render(); return; } if (e.status !== 404) throw e; }
         if (!r) return locEmpty(l);
+        if (samePlan(r.value.plan, plan)) { sessionAsked = true; setAcc({ base: r.changed, synced: r.value.savedAt }); if (st.dirty && locSaves()) await accountSend(); return; }
+        if (!sessionAsked && !plan.example && (plan.staff || []).length && locSaves()) { sessionAsked = true; return connectAsk(l, r); }
+        sessionAsked = true;
         if (r.changed === st.base) { if (st.dirty && locSaves()) await accountSend(); return; }
         try { const same = JSON.parse(JSON.stringify(r.value.plan)); normalize(same); if (JSON.stringify(same.staff) === JSON.stringify(plan.staff) && JSON.stringify(same.shifts) === JSON.stringify(plan.shifts)) { setAcc({ base: r.changed, synced: r.value.savedAt }); if (st.dirty && locSaves()) await accountSend(); return; } } catch (e) { /* compare below */ }
         if (!st.dirty || plan.example || !locSaves()) { extrasBack(r.value.extras); return takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`); }
@@ -2448,6 +2511,9 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       }
       const r = await A.get('shiftcraft', accKey());
       if (!r || !r.plan) { if (!plan.example) await accountSend(); return; }
+      if (samePlan(r.plan, plan)) { sessionAsked = true; setAcc({ synced: r.savedAt }); if (st.dirty) await accountSend(); return; }
+      if (!sessionAsked && !plan.example && (plan.staff || []).length) { sessionAsked = true; return connectAsk(null, { value: r, changed: r.savedAt }); }
+      sessionAsked = true;
       if (r.savedAt === st.synced) { if (st.dirty) await accountSend(); return; }
       const take = () => (extrasBack(r.extras), takePlan(r.plan, r.savedAt, '', `Opened your account’s copy, saved ${new Date(r.savedAt).toLocaleString()}`));
       if (!st.dirty || plan.example) return take();
@@ -2463,10 +2529,10 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     if (here && accState().auto) { setAcc({ auto: false }); plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); return accountSend(true).then(() => { render(); toast(`Saved this schedule as ${l.company ? l.company + ' › ' : ''}${l.name}: everyone working there sees it now.`); }); }
     modal({ title: `${l.name}: nothing on the server yet`, body: h('div', null,
         h('p', null, here ? `This browser has a schedule (${placeName()}: ${plan.staff.length} people, ${Object.keys(plan.shifts || {}).length} days with shifts). The server has nothing for ${l.name} yet.` : `The server has nothing for ${l.name} yet, and this browser has no schedule of its own.`),
-        h('p', { class: 'muted' }, here ? `☁ Save it there: everyone at ${l.name} then sees this schedule. Empty: ${l.name} starts with a new, empty schedule (this browser’s is replaced; Undo brings it back).` : `Empty: ${l.name} starts with a new, empty schedule. (To use a file instead: Save › Load: file → this browser, then Save › to this location.)`)),
+        h('p', { class: 'muted' }, here ? `☁ Computer → Server: everyone at ${l.name} then sees this schedule. Empty: ${l.name} starts with a new, empty schedule (this browser’s is replaced; Undo brings it back).` : `Empty: ${l.name} starts with a new, empty schedule. (To use a file instead: Save › Load: file → this browser, then Save › to this location.)`)),
       actions: [{ label: 'Don’t use a location now', onClick: () => { setAcc({ loc: null }); render(); } },
         ...(here ? [{ label: `Start ${l.name} empty`, onClick: () => locNew(l) }] : []),
-        { label: here ? `☁ Save this browser’s schedule to ${l.name}` : `Start ${l.name} empty`, primary: true, onClick: () => (here ? (() => { plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); accountSend(true).then(() => { render(); toast(`${l.name} now has this schedule: everyone working there sees it.`); }); })() : locNew(l)) }] });
+        { label: here ? `☁ Computer → Server: save it to ${l.name}` : `Start ${l.name} empty`, primary: true, onClick: () => (here ? (() => { plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); accountSend(true).then(() => { render(); toast(`${l.name} now has this schedule: everyone working there sees it.`); }); })() : locNew(l)) }] });
   }
   function locNew(l) {
     snapshot(); const np = { app: 'ShiftCraft', version: 2, company: l.company || '', location: locLabel(l), splh: 85, startDate: mondayOf(iso(new Date())), weeks: 4, staff: [], shifts: {}, forecast: {}, history: {} };
@@ -2481,13 +2547,13 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
     const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
     modal({ title: 'Open a location', wide: true, body: h('div', null,
-      h('p', { class: 'muted' }, 'Its schedule opens here, from the server. (To save this browser’s schedule to a location instead: Save › The server.)'),
+      h('p', { class: 'muted' }, 'Server → Computer: its schedule opens on this computer. (To save this computer’s schedule to a location instead: Save › Computer → Server.)'),
       list.length ? Object.entries(by).map(([co, ls]) => h('div', null, h('h3', { style: 'margin:10px 0 4px' }, co),
         ...ls.map((x) => h('button', { class: 'btn' + (cur && cur.id === x.id ? ' primary' : ''), style: 'display:flex;width:100%;justify-content:space-between;margin:4px 0', onclick: () => pick(x) },
           h('span', null, `📍 ${x.name}${x.number ? ' #' + x.number : ''}`), h('span', { class: 'muted' }, `${LROLE[x.myRole] || x.myRole}${x.lastSaved ? ' · saved ' + new Date(x.lastSaved).toLocaleDateString() : ' · nothing saved yet'}`)))))
         : h('p', null, 'You do not work at a location yet: the admin or a location manager adds you (AccountCraft › Companies).'),
       h('p', { class: 'muted', style: 'margin-top:12px' }, cur ? `Open now: ${cur.name}. ` : '', 'A location’s schedule is shared by everyone who works there.')),
-      actions: [{ label: 'Work without a location (this browser only)', onClick: () => pick(null) }, { label: 'Manage locations…', onClick: () => window.open(A.server().replace(/account\.php$/, ''), '_blank') }] });
+      actions: [{ label: 'Work without a location (this computer only)', onClick: () => pick(null) }, { label: 'Manage locations…', onClick: () => window.open(A.server().replace(/account\.php$/, ''), '_blank') }] });
   }
   // logged in, no location chosen yet, and you work at some: ask once (per login)
   const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -6920,43 +6986,68 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     const paint = () => { const x = list.find((y) => y.id === sel.value), cur = curLoc();
       if (!x) { go.disabled = true; go.textContent = 'Select a location first'; return; }
       const can = ['admin', 'manager', 'scheduler'].includes(x.myRole);
-      go.disabled = plan.example || !can; go.textContent = plan.example ? 'The example schedule is not saved' : !can ? `${LROLE[x.myRole]} at ${x.name}: you cannot save here` : `☁ Save: this browser → ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`;
+      go.disabled = plan.example || !can; go.textContent = plan.example ? 'The example schedule is not saved' : !can ? `${LROLE[x.myRole]} at ${x.name}: you cannot save here` : `☁ Computer → Server: ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`;
       go.title = cur && cur.id === x.id ? 'Your location: saves everything there now' : 'Saves this browser’s schedule to that location; from now on it saves there'; };
     CA().api('GET', 'locations').then((r) => { list = r.locations; const cur = curLoc();
       sel.innerHTML = ''; sel.append(h('option', { value: '' }, list.length ? 'Select a location…' : 'You do not work at a location yet (your account copy instead)'));
       const by = {}; for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
       for (const [co, ls] of Object.entries(by)) sel.append(h('optgroup', { label: co }, ...ls.map((x) => h('option', { value: x.id, selected: !!(cur && cur.id === x.id) }, `📍 ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''} · ${LROLE[x.myRole] || x.myRole}${x.lastSaved ? '' : ' · nothing saved yet'}`))));
-      if (!list.length) { go.disabled = plan.example; go.textContent = '☁ Save: this browser → your account (private copy)'; go.onclick = () => { closeSave(); saveToServer(); }; return; }
+      if (!list.length) { go.disabled = plan.example; go.textContent = '☁ Computer → Server: your account (private copy)'; go.onclick = () => { closeSave(); saveToServer(); }; return; }
       paint(); }).catch(() => { sel.innerHTML = '<option value="">The server could not be reached</option>'; });
     sel.onchange = paint;
     go.onclick = async () => { const x = list.find((y) => y.id === sel.value); if (!x) return; closeSave(); await saveToLocation(x); };
-    return h('div', { class: 'stack', style: { gap: '6px' } }, h('span', { class: 'muted small' }, 'Save to which location'), sel, go);
+    return h('div', { class: 'save-loc' }, h('label', { class: 'muted small' }, 'Save to which location'), sel, go);
   }
-  let closeSave = () => {};
+  let closeSave = () => {}, saveTab = 'server';
+  try { saveTab = localStorage.getItem(KEY + '-savetab') || 'server'; } catch (e) { /* blocked */ }
+  // ---- Save: on the left, where (the server, this computer, this browser, backups); on the right, what you can do there,
+  // each a big row saying exactly what happens. Ctrl+S, the Save button and File › Save… open it.
   function saveDialog() {
-    const A = CA(), l = curLoc(), st = accState(), icon = (k) => { const s = h('span', { class: 'save-ic' }); s.innerHTML = SAVE_ICON[k]; return s; };
-    const card = (k, title, sub, kids) => h('div', { class: 'save-card' }, h('div', { class: 'save-head' }, k === 'cloud' && companyLogo() ? h('img', { src: companyLogo(), alt: '', style: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', background: '#fff' } }) : icon(k), h('div', null, h('b', null, title), h('div', { class: 'muted small' }, sub))), h('div', { class: 'save-btns' }, ...kids));
-    const btn = (label, desc, run, o = {}) => h('button', { type: 'button', class: 'btn' + (o.primary ? ' primary' : ''), title: desc, disabled: !!o.disabled, onclick: () => { close(); run(); } }, label);
-    let close = () => {};
-    const cloudLine = !A ? 'Log in to save on the server: the same schedule at work and at home, shared with the people at your location.'
-      : plan.example ? 'This is the example schedule: open or make your own first.'
-      : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}${!locSaves() ? ' You can look here, not save (' + LROLE[l.role] + ').' : ''}`
-      : `Your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`;
-    const body = h('div', { class: 'save-grid' },
-      card('cloud', 'The server' + (A ? serverWhere() : ''), cloudLine, !A ? [btn('Log in…', 'Log in with your Craft account', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true })] : [
-        locPickRow(),
-        btn('Load: server → this browser', 'What is open here is replaced by the server’s copy (Undo brings it back)', loadFromServer),
-        btn('📍 Open a location… (its schedule opens here)', 'Opens another location’s schedule from the server, in place of this browser’s', chooseLocation),
-        btn('⇄ Bring in from another location or account…', 'Replace or merge what is open here with a schedule you can open', bringIn)]),
-      card('file', 'This computer (a file)', 'A .json file you keep, copy or email. Everything: the team, every week, time off, calendar, forecast, settings, store profile and designs.', [
-        btn('Save: this browser → file (everything)', 'Saves a file with everything', () => saveFile('location'), { primary: !A || plan.example }),
-        btn('Save as… (choose the folder and name)', 'Saves everything, asking where', () => saveFile('location', { as: true })),
-        btn('Save a part only…', 'This week, the month, the team or one day', () => saveAsDialog({ what: 'schedule' })),
-        btn('📂 Load: file → this browser', 'Opens a saved file', () => openFile())]),
-      card('browser', 'This browser', 'Every change is kept here by itself, as you work (even with nobody logged in). It stays on this computer and in this browser only.', [
-        h('span', { class: 'muted small' }, plan.example ? 'Example data: not kept.' : `Kept now: ${plan.staff.length} people, ${Object.keys(plan.shifts).length} days with shifts.`)]));
-    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close; closeSave = close;
-    setTimeout(() => { const p = document.querySelector('.save-grid .btn.primary:not([disabled])'); if (p) p.focus(); }, 0);
+    const A = CA(), l = curLoc(), st = accState();
+    const icon = (k, px = 26) => { const sp = h('span', { class: 'save-ic' }); sp.innerHTML = SAVE_ICON[k].replace(/width="44" height="44"/, `width="${px}" height="${px}"`); return sp; };
+    // one action: a big row (title, what it does), and what happens on a click
+    const act = (title, desc, run, o = {}) => h('button', { type: 'button', class: 'save-act' + (o.primary ? ' primary' : ''), disabled: !!o.disabled, onclick: () => { closeSave(); run(); } }, h('span', { class: 'save-act-ic' }, o.ic || ''), h('span', null, h('b', null, title), h('small', null, desc)));
+    const right = h('div', { class: 'save-pane' }), nav = h('div', { class: 'save-nav', role: 'tablist' });
+    const PLACES = [['server', 'cloud', 'Server (cloud)', A ? (l ? l.name : 'your account') : 'log in first'], ['file', 'file', 'File', 'a .json file you keep'], ['browser', 'browser', 'Computer', 'what is open here'], ['backups', 'cloud', 'Backups', 'copies kept for you']];
+    const head = (k, title, sub) => h('div', { class: 'save-pane-head' }, k === 'server' && companyLogo() ? h('img', { src: companyLogo(), alt: '', class: 'save-logo' }) : icon(k === 'backups' ? 'cloud' : k, 44), h('div', null, h('h3', null, title), h('div', { class: 'muted' }, sub)));
+    const panes = {
+      server: () => !A ? [head('server', 'Server (cloud)', 'Log in to use the server: the same schedule at work and at home, shared with the people at your location.'), act('Log in…', 'With your Craft user ID and password', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true, ic: '👤' })]
+        : [head('server', 'Server (cloud)' + serverWhere(), plan.example ? 'This is the example schedule: open or make your own first.' : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}` : `Choose a location below, or it saves to your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`),
+          h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Computer → Server (save)'), locPickRow()),
+          h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Server → Computer (open)'),
+            act('Server → Computer: open the server’s copy', `What is open on this computer is replaced by the copy on the server${serverWhere()} (yours is kept as a backup).`, loadFromServer, { ic: '⬇' }),
+            act('Server → Computer: open another location…', 'Another location you work at: its schedule opens on this computer, from the server.', chooseLocation, { ic: '📍' }),
+            act('Server → Computer: bring in from another location or account…', 'Another location’s schedule (or a copy in your account) into what is open: replace it, or merge the two.', bringIn, { ic: '⇄' }))],
+      file: () => [head('file', 'File', 'A .json file you keep, copy or email. “Everything” holds the team, every week, time off, calendar, forecast, settings, store profile and designs.'),
+        h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'Computer → File (save)'),
+          act('Computer → File: everything', 'A file with all of it, in your usual folder.', () => saveFile('location'), { primary: !A || plan.example, ic: '💾' }),
+          act('Computer → File as…: everything', 'Choose the folder and the file’s name.', () => saveFile('location', { as: true }), { ic: '💾' }),
+          act('Computer → File: a part only…', 'This week, the month, the team or one day.', () => saveAsDialog({ what: 'schedule' }), { ic: '✂' })),
+        h('div', { class: 'save-group' }, h('div', { class: 'save-group-t' }, 'File → Computer (open)'),
+          act('File → Computer: open a file…', 'A saved file comes in (an everything file replaces what is open; Undo brings it back).', () => openFile(), { ic: '📂' }))],
+      browser: () => [head('browser', 'Computer', 'What is open here. Every change is kept on this computer by itself as you work, also with nobody logged in (in this browser only).'),
+        h('div', { class: 'save-facts' }, ...COUNT_NAMES.map(([k, n]) => h('div', null, h('b', null, String(planCounts(plan)[k])), h('span', null, n)))),
+        h('p', { class: 'muted' }, plan.example ? 'This is the example schedule: it is not kept.' : 'To have it elsewhere too: Computer → Server (shared) or Computer → File.')],
+      backups: () => { const box = h('div', { class: 'save-group' }, h('p', { class: 'muted' }, 'Looking…'));
+        listBackups().then((list) => { box.innerHTML = ''; if (!list.length) { box.append(h('p', { class: 'muted' }, 'No backups yet. One is kept whenever a copy is replaced by a different one.')); return; }
+          list.forEach((x) => { const n = x.note || {}, k = n.kept || planCounts(x.plan), d = n.difference;
+            box.append(h('div', { class: 'save-bk' }, h('div', null, h('b', null, new Date(n.at || x.savedAt).toLocaleString()), h('div', { class: 'muted small' }, `${n.why || 'backup'} · ${x.where} · ${k.people} people, ${k.days} day${k.days === 1 ? '' : 's'} with shifts, ${k.events} event${k.events === 1 ? '' : 's'}${d ? ' · the other had ' + Object.entries(d).filter(([, v]) => v).map(([kk, v]) => `${v > 0 ? '+' : ''}${v} ${(COUNT_NAMES.find((c) => c[0] === kk) || [kk, kk])[1].toLowerCase()}`).join(', ') : ''}`)),
+              h('div', { class: 'save-bk-b' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { closeSave(); extrasBack(x.extras); takePlan(x.plan, x.savedAt, accState().base || '', 'Opened the backup from ' + new Date(n.at || x.savedAt).toLocaleString()); setAcc({ dirty: true }); } }, '→ Computer'),
+                h('button', { type: 'button', class: 'btn sm', onclick: () => downloadBlob(`${placeName()} - backup ${String(n.at || x.savedAt).slice(0, 16).replace(/[:T]/g, '-')}.json`, new Blob([JSON.stringify({ ...x.plan, app: 'ShiftCraft', kind: 'location', version: 4 }, null, 2)], { type: 'application/json' })) }, '→ File')))); }); }).catch((e) => { box.innerHTML = ''; box.append(h('p', { class: 'muted' }, e.message)); });
+        return [head('backups', 'Backups', 'Kept for you whenever one copy replaced a different one (on the server when logged in, on this computer when not). Open one, or download it as a file.'), box]; },
+    };
+    const show = (k) => { saveTab = k; try { localStorage.setItem(KEY + '-savetab', k); } catch (e) { /* blocked */ } nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === k))); right.innerHTML = ''; right.append(...panes[k]()); setTimeout(() => { const p = right.querySelector('.save-act.primary:not([disabled]), .btn.primary:not([disabled])'); if (p) p.focus(); }, 0); };
+    PLACES.forEach(([k, ic, t, sub]) => nav.append(h('button', { type: 'button', role: 'tab', 'data-k': k, onclick: () => show(k) }, icon(ic), h('span', null, h('b', null, t), h('small', null, sub)))));
+    const m = modal({ title: 'Save and open: Computer · Server · File', wide: true, body: h('div', { class: 'save-wrap' }, nav, right), actions: [{ label: 'Close' }] }); closeSave = m.close; m.el.classList.add('save-dialog');
+    show(PLACES.some((p) => p[0] === saveTab) ? saveTab : 'server');
+  }
+  // the backups: this location's (or your account's) on the server, and this browser's own
+  async function listBackups() {
+    const out = [], A = CA(), l = curLoc();
+    if (A) { try { if (l) { const o = await A.api('GET', `locations/${l.id}/data/shiftcraft`); for (const [k, v] of Object.entries(o)) if (/^backup /.test(k) && v.value && v.value.plan) out.push({ ...v.value, where: '☁ ' + l.name + (v.by ? ' (by ' + v.by + ')' : '') }); }
+      else { const o = await A.all('shiftcraft'); for (const [k, v] of Object.entries(o || {})) if (/^backup /.test(k) && v.value && v.value.plan) out.push({ ...v.value, where: '☁ your account' }); } } catch (e) { /* not now */ } }
+    try { for (const x of JSON.parse(localStorage.getItem(KEY + '-backups') || '[]')) out.push({ ...x, where: '🖥 this browser' }); } catch (e) { /* none */ }
+    return out.sort((a, b) => String((b.note || {}).at || b.savedAt).localeCompare(String((a.note || {}).at || a.savedAt)));
   }
   function saveAsDialog(preset = {}) {
     const c = { what: preset.what || 'all', range: preset.range || 'week' };
@@ -8336,20 +8427,20 @@ function hourlyWeekDialog() { HW.dialog(); }
   const MENUS = [
     ['File', [
       { label: 'New plan…', run: newPlan },
-      { label: 'Save… (this computer, the server)', key: 'Ctrl+S', run: () => saveDialog() },
+      { label: 'Save and open… (Computer, Server, File)', key: 'Ctrl+S', run: () => saveDialog() },
       '-',
-      { label: () => `☁ Save: this browser → server${serverWhere()}`, run: () => saveToServer() },
-      { label: () => `☁ Load: server → this browser${serverWhere()}`, run: () => loadFromServer() },
+      { label: () => `☁ Computer → Server${serverWhere()} (save)`, run: () => saveToServer() },
+      { label: () => `☁ Server → Computer${serverWhere()} (open)`, run: () => loadFromServer() },
       { label: '📍 Open a location… (its schedule opens here)', run: () => chooseLocation() },
       { label: '⇄ Bring in from another location or account…', run: () => bringIn() },
       '-',
-      { label: '💾 Save: this browser → file (everything)', run: () => saveFile('location') },
-      { label: '💾 Save: this browser → file as… (everything)', run: () => saveFile('location', { as: true }) },
-      { label: '📂 Load: file → this browser', key: 'Ctrl+O', run: () => openFile() },
-      { label: 'Save a part only → file: this week’s schedule', run: () => saveWeek(false) },
-      { label: 'Save a part only → file: the month’s schedules', run: () => saveMonth(false) },
-      { label: 'Save a part only → file: the team…', run: saveStaff },
-      { label: 'Save a part only → file: one day', run: () => saveFile('day', { as: true }) },
+      { label: '💾 Computer → File (save everything)', run: () => saveFile('location') },
+      { label: '💾 Computer → File as… (save everything)', run: () => saveFile('location', { as: true }) },
+      { label: '📂 File → Computer (open a file)', key: 'Ctrl+O', run: () => openFile() },
+      { label: '💾 Computer → File: a part only: this week’s schedule', run: () => saveWeek(false) },
+      { label: '💾 Computer → File: a part only: the month’s schedules', run: () => saveMonth(false) },
+      { label: '💾 Computer → File: a part only: the team…', run: saveStaff },
+      { label: '💾 Computer → File: a part only: one day', run: () => saveFile('day', { as: true }) },
       { label: 'Save… (choose what to save)', key: 'Ctrl+Shift+S', run: () => saveAsDialog() },
       { label: 'Save emailable file (.html)…', run: saveEmailable },
       { label: 'Email or share…', run: emailDialog },
@@ -9074,7 +9165,7 @@ function hourlyWeekDialog() { HW.dialog(); }
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true }), C('Undo', 'Undo', I.undo, { big: true })]],
         ] },
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
-          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save a part only → file: this week', 'Week → file', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
+          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('💾 Computer → File: a part only: this week', 'Week → File', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
         ] },
         { id: 'calendar', label: 'Calendar', hue: '#3c8d3c', onSelect: view('calendar'), groups: [
@@ -9089,7 +9180,7 @@ function hourlyWeekDialog() { HW.dialog(); }
           ['Hand-off', [C('Print…', 'Print this list', I.print, { big: true }), C('Save as text or CSV', 'Text or CSV', I.textFile, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
         ] },
         { id: 'staff', label: 'Staff', hue: '#d1408a', onSelect: view('staff'), groups: [
-          ['Team', [C('Save a part only → file: the team', 'Team → file', I.save, { big: true }), C('📂 Load: file', 'Load a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
+          ['Team', [C('💾 Computer → File: a part only: the team', 'Team → File', I.save, { big: true }), C('📂 File → Computer', 'Open a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
           ['Time off', [C('Time off request', 'Time off request…', I.calendar, { big: true }), { col: [C('Not available some hours', 'Appointment…', I.clock), C('Time off list', 'Time off list', I.list)] }]],
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
@@ -9105,7 +9196,7 @@ function hourlyWeekDialog() { HW.dialog(); }
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save the hourly week', 'Hourly week', I.timeline, { big: true }), C('Print the calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
-          ['Save and open', [C('☁ Save: this browser', 'Browser → server', I.save, { big: true, title: 'Save: this browser → server (your location): everything, now' }), C('☁ Load: server', 'Server → browser', I.folder, { big: true, title: 'Load: server → this browser (what is open here is replaced; Undo brings it back)' }), C('⇄ Bring in', 'Bring in…', I.folder, { big: true, title: 'Bring in from another location or account: replace or merge into what is open here' }), C('📂 Load: file', 'File → browser', I.folder, { big: true, title: 'Load: file → this browser. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save a part only → file: the month', 'Month → file', I.save), C('💾 Save: this browser → file (everything)', 'Everything → file', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
+          ['Save and open', [C('☁ Computer → Server', 'Computer → Server', I.save, { big: true, title: 'Computer → Server: saves everything to your location now' }), C('☁ Server → Computer', 'Server → Computer', I.folder, { big: true, title: 'Server → Computer: opens the server’s copy here (what is open is kept as a backup)' }), C('⇄ Bring in', 'Bring in…', I.folder, { big: true, title: 'Bring in from another location or account: replace or merge into what is open here' }), C('📂 File → Computer', 'File → Computer', I.folder, { big: true, title: 'File → Computer: opens a saved file. An everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('💾 Computer → File: a part only: the month', 'Month → File', I.save), C('💾 Computer → File (save everything)', 'Everything → file', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
         ] },
       ],
     });
@@ -9117,9 +9208,9 @@ function hourlyWeekDialog() { HW.dialog(); }
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
         { icon: 'wand', title: 'Start (wizard)', run: showStart },
-        { icon: 'save', title: 'Save: on this computer (a file) or the server (your location): choose', key: 'Ctrl+S', run: () => saveDialog() },
-        { icon: 'cloud', title: 'Save: this browser → server (your location): everything, now', run: () => saveToServer() },
-        { icon: 'open', title: 'Load: file → this browser (a file saved with Save everything brings back the team, schedules, time off and settings)', key: 'Ctrl+O', run: () => openFile() },
+        { icon: 'save', title: 'Save and open: Computer → Server, Computer → File, and back (choose)', key: 'Ctrl+S', run: () => saveDialog() },
+        { icon: 'cloud', title: 'Computer → Server: saves everything to your location now', run: () => saveToServer() },
+        { icon: 'open', title: 'File → Computer: opens a saved file (an everything file brings back the team, schedules, time off and settings)', key: 'Ctrl+O', run: () => openFile() },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },

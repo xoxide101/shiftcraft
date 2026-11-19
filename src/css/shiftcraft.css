@@ -899,3 +899,23 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .save-ic { flex: none; line-height: 0; }
 .save-btns { display: flex; flex-direction: column; gap: 6px; } .save-btns .btn { text-align: left; justify-content: flex-start; white-space: normal; height: auto; min-height: 32px; line-height: 1.3; }
 .ctb-info .co-logo { height: 20px; max-width: 60px; object-fit: contain; border-radius: 3px; background: #fff; padding: 1px; align-self: center; }
+
+/* the Save and open window: places on the left, big plain actions on the right */
+.dialog.save-dialog { width: min(1040px, 96vw); max-width: none; }
+.save-wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; min-height: 440px; }
+.save-nav { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--line, #d0d5dd); padding-right: 14px; }
+.save-nav button { display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: none; color: inherit; cursor: pointer; font: inherit; }
+.save-nav button:hover { background: rgba(127,127,127,.12); }
+.save-nav button[aria-selected=true] { background: rgba(59,130,246,.16); border-color: rgba(59,130,246,.55); }
+.save-nav b, .save-act b { display: block; } .save-nav small, .save-act small { display: block; opacity: .75; font-size: 12px; line-height: 1.35; }
+.save-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.save-pane-head { display: flex; gap: 14px; align-items: center; } .save-pane-head h3 { margin: 0 0 2px; font-size: 18px; } .save-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #fff; }
+.save-group { display: flex; flex-direction: column; gap: 8px; } .save-group-t { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .7; font-weight: 600; }
+.save-act { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line, #d0d5dd); background: rgba(127,127,127,.06); color: inherit; font: inherit; cursor: pointer; }
+.save-act:hover:not([disabled]) { border-color: rgba(59,130,246,.7); background: rgba(59,130,246,.10); } .save-act[disabled] { opacity: .5; cursor: default; }
+.save-act.primary { border-color: rgba(59,130,246,.85); background: rgba(59,130,246,.18); } .save-act-ic { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.save-loc { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 12px 14px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-loc .btn { justify-content: center; font-size: 15px; padding: 10px; height: auto; white-space: normal; }
+.save-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; } .save-facts > div { border: 1px solid var(--line, #d0d5dd); border-radius: 10px; padding: 10px; } .save-facts b { display: block; font-size: 22px; }
+.save-bk { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-bk-b { display: flex; gap: 6px; flex: none; }
+.cmp-table { width: 100%; border-collapse: collapse; } .cmp-table td, .cmp-table th { padding: 6px 8px; border-bottom: 1px solid var(--line, #d0d5dd); text-align: left; }
+@media (max-width: 720px) { .save-wrap { grid-template-columns: 1fr; } .save-nav { flex-direction: row; overflow-x: auto; border-right: 0; padding: 0 0 8px; border-bottom: 1px solid var(--line, #d0d5dd); } .save-nav small { display: none; } }
