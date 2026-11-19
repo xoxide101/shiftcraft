@@ -17,6 +17,33 @@
   const locSaves = () => { const l = curLoc(); return !l || ['admin', 'manager', 'scheduler'].includes(l.role); };
   const locPath = (l) => `locations/${l.id}/data/shiftcraft/plan`;
   const locLabel = (l) => (l.number && !String(l.name).includes(l.number) ? `${l.name} ${l.number}` : l.name);
+  // the location's own things kept beside the plan in this browser: the store profile, border designs, decorations, page
+  // notes, contact cards and availability-list choices. They go to the server with the plan, and come back with it.
+  const EXTRA_KEYS = () => [KEY + '-place', KEY + '-borders', KEY + '-deco', KEY + '-print-notes', KEY + '-cards', KEY + '-avail-details'];
+  const extrasNow = () => { const o = {}; try { for (const k of EXTRA_KEYS()) { const v = localStorage.getItem(k); if (v != null) o[k] = v; } } catch (e) { /* blocked */ } return o; };
+  const extrasBack = (o) => { if (!o || typeof o !== 'object') return; try { for (const k of EXTRA_KEYS()) if (typeof o[k] === 'string') localStorage.setItem(k, o[k]); } catch (e) { /* blocked */ } };
+  // what the title bar says about the server copy
+  let accSending = false, accErr = '';
+  function serverState() {
+    const A = CA(), l = curLoc(), st = accState();
+    if (!A) return null;
+    if (plan.example) return { text: '☁ example: not saved', title: 'The example schedule is not saved to the server' };
+    if (l && !locSaves()) return { text: '☁ ' + LROLE[l.role], title: `You look at ${l.name}; your changes stay in this browser` };
+    if (accSending) return { text: '☁ saving…', title: 'Saving to the server' };
+    if (accErr) return { text: '☁ not saved', title: accErr + ' (click to try again)', run: () => saveToServer() };
+    if (st.dirty) return { text: '☁ saving soon', title: 'Changes go to the server a few seconds after you stop (click to save now)', run: () => saveToServer() };
+    if (st.synced) return { text: '☁ saved ' + new Date(st.synced).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), title: `Saved to the server${l ? ' for ' + l.name : ' in your account'}: ${new Date(st.synced).toLocaleString()} (click to save again)`, run: () => saveToServer() };
+    return { text: '☁ not saved yet', title: 'Click to save to the server', run: () => saveToServer() };
+  }
+  // File › Save to the server, and the title bar's ☁: now, not in a few seconds
+  async function saveToServer() {
+    const A = CA(); if (!A) { if (window.CraftAccount && CraftAccount.loginDialog) { toast('Log in first: then Save to the server.'); CraftAccount.loginDialog(); } else toast('Saving to the server needs the account page (AccountCraft).'); return; }
+    if (plan.example) { toast('This is the example schedule: open or make your own first.'); return; }
+    if (!curLoc()) { const r = await A.api('GET', 'locations').catch(() => ({ locations: [] })); if (r.locations.length) { toast('Choose the location to save to.'); return chooseLocation(); } }
+    if (!locSaves()) { toast(`${LROLE[curLoc().role]} at ${curLoc().name}: you cannot save the location’s schedule.`); return; }
+    clearTimeout(accT); setAcc({ dirty: true }); await accountSend();
+    if (!accErr && !accState().dirty) toast(`Saved to the server${curLoc() ? ' for ' + curLoc().name : ' (your account)'}, ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}: everything (team, schedules, time off, calendar, settings).`);
+  }
   let accAgain = false, accT = 0, accBusy = false, accLast = '', accQuiet = false, accSeen = 0, viewTold = false;
   function accountSoon(txt) {
     if (txt === accLast) return; accLast = txt;
@@ -26,17 +53,19 @@
   }
   async function accountSend(force) {
     const A = CA(); if (!A || plan.example) return;
-    const savedAt = new Date().toISOString(), l = curLoc();
+    const savedAt = new Date().toISOString(), l = curLoc(), extras = extrasNow();
+    accSending = true; accErr = ''; try { render(); } catch (e) { /* starting */ }
     try {
-      if (!l) { await A.put('shiftcraft', accKey(), { savedAt, plan }); setAcc({ synced: savedAt, dirty: false }); return; }
+      if (!l) { await A.put('shiftcraft', accKey(), { savedAt, plan, extras }); setAcc({ synced: savedAt, dirty: false }); return; }
       if (!locSaves()) return;
-      const r = await A.api('PUT', locPath(l), { value: { savedAt, plan }, base: accState().base || '', force: !!force });
+      const r = await A.api('PUT', locPath(l), { value: { savedAt, plan, extras }, base: accState().base || '', force: !!force });
       setAcc({ base: r.changed, synced: savedAt, dirty: false });
     } catch (e) {
-      if (e.status === 413) toast('This plan is too big for your account (over 4 MB): Settings › Clear old weeks.');
-      else if (e.status === 409) locConflict(e.info || {});
+      accErr = e.status === 413 ? 'Too big for the server (over 4 MB)' : e.status === 409 ? 'Someone else saved since' : e.status === 403 ? e.message : 'The server could not be reached';
+      if (e.status === 413) toast('This plan is too big for the server (over 4 MB): Settings › Clear old weeks.');
+      else if (e.status === 409) { accErr = ''; locConflict(e.info || {}); }
       else if (e.status === 403 && l) toast(e.message);
-    }
+    } finally { accSending = false; try { render(); } catch (e) { /* starting */ } }
   }
   // someone else saved the location since this browser opened it
   function locConflict(info) {
@@ -50,7 +79,7 @@
   }
   async function locTake(quietly) {
     const A = CA(), l = curLoc(); if (!A || !l) return;
-    try { const r = await A.api('GET', locPath(l)); takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`, quietly); } catch (e) { toast(e.message); }
+    try { const r = await A.api('GET', locPath(l)); extrasBack(r.value.extras); takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`, quietly); } catch (e) { toast(e.message); }
   }
   function takePlan(np, savedAt, base, note, quiet) {
     snapshot(); normalize(np); const l = curLoc(); if (l) { np.location = locLabel(l); np.company = l.company || np.company; }
@@ -66,13 +95,13 @@
         if (!r) return locEmpty(l);
         if (r.changed === st.base) { if (st.dirty && locSaves()) await accountSend(); return; }
         try { const same = JSON.parse(JSON.stringify(r.value.plan)); normalize(same); if (JSON.stringify(same.staff) === JSON.stringify(plan.staff) && JSON.stringify(same.shifts) === JSON.stringify(plan.shifts)) { setAcc({ base: r.changed, synced: r.value.savedAt }); if (st.dirty && locSaves()) await accountSend(); return; } } catch (e) { /* compare below */ }
-        if (!st.dirty || plan.example || !locSaves()) return takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`);
+        if (!st.dirty || plan.example || !locSaves()) { extrasBack(r.value.extras); return takePlan(r.value.plan, r.value.savedAt, r.changed, `${l.name}: opened the copy ${r.by ? 'saved by ' + r.by + ', ' : ''}${new Date(r.changed).toLocaleString()}`); }
         return locConflict({ by: r.by, changed: r.changed });
       }
       const r = await A.get('shiftcraft', accKey());
       if (!r || !r.plan) { if (!plan.example) await accountSend(); return; }
       if (r.savedAt === st.synced) { if (st.dirty) await accountSend(); return; }
-      const take = () => takePlan(r.plan, r.savedAt, '', `Opened your account’s copy, saved ${new Date(r.savedAt).toLocaleString()}`);
+      const take = () => (extrasBack(r.extras), takePlan(r.plan, r.savedAt, '', `Opened your account’s copy, saved ${new Date(r.savedAt).toLocaleString()}`));
       if (!st.dirty || plan.example) return take();
       modal({ title: 'Your account has a newer copy', body: h('p', null, `Your account’s copy of ${placeName()} was saved ${new Date(r.savedAt).toLocaleString()} on another computer, and this browser has changes of its own since then. Which one do you want to keep?`),
         actions: [{ label: 'Keep this browser’s', onClick: () => { accountSend(); } }, { label: 'Open the account’s', primary: true, onClick: take }] });

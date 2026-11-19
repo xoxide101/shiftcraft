@@ -95,7 +95,8 @@
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
         { icon: 'wand', title: 'Start (wizard)', run: showStart },
-        { icon: 'save', title: 'Save everything (team, availability, schedules, time off and all settings)', key: 'Ctrl+S', run: () => saveFile('location') },
+        { icon: 'save', title: 'Save everything to a file (team, availability, schedules, time off, calendar and all settings)', key: 'Ctrl+S', run: () => saveFile('location') },
+        { icon: 'cloud', title: 'Save to the server (your location in AccountCraft): everything, now', run: () => saveToServer() },
         { icon: 'open', title: 'Open (load) a saved file: Save everything brings back the team, schedules, time off and all settings', key: 'Ctrl+O', run: () => openFile() },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
@@ -103,9 +104,10 @@
         { icon: 'check', title: 'Check the schedule', run: checkDialog },
       ],
       getTitle: () => ui.fileName || placeName(),
-      getStatus: () => ({ text: plan.example ? 'Example data · autosaves in this browser' : CA() ? 'Autosaves in this browser and your account' : 'Autosaves in this browser' }),
+      getStatus: () => ({ text: plan.example ? 'Example data · autosaves in this browser' : CA() ? `Autosaves in this browser and on the server${curLoc() ? ' (' + curLoc().name + ')' : ''}` : 'Autosaves in this browser (log in to save on the server)' }),
       getInfo: () => [
         (() => { const l = curLoc(); return l ? { text: `📍 ${l.name}${l.number ? ' #' + l.number : ''}${locSaves() ? '' : ' · ' + LROLE[l.role]}`, title: `${l.company ? l.company + ' › ' : ''}${l.name}: the location’s schedule, shared by everyone who works there (click to choose another location)`, run: chooseLocation } : { text: placeName(), title: CA() ? 'Company and location (click to choose a location from your account)' : 'Company and location (click to change)', run: () => { if (CA()) chooseLocation(); else { ui.tab = 'company'; persist(); render(); } } }; })(),
+        serverState(),
         { text: 'Week of ' + shortDate(weekDays(weekOf(ui.day))[0]), title: 'The week you are working on' },
       ],
       rightEls: [window.CraftAccount && CraftAccount.button ? CraftAccount.button() : null, document.getElementById('theme-btn')].filter(Boolean),

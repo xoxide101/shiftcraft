@@ -24,7 +24,8 @@
     return staff.map((p) => (Array.isArray(p.trained) ? { ...p, trained: [...new Set(p.trained.map((id) => idOf[id] || id))] } : p));
   }
   const weeksOnly = (first, count) => scheduleRange(weekDays(first)[0], count * 7, first === 0 && count === plan.weeks ? plan.month : null);
-  const locationAll = () => ({ ...plan, app: 'ShiftCraft', kind: 'location', version: 4, prefs: prefsNow() });
+  // everything: the plan, this browser's choices, the store profile, and the contact barcodes made for this team
+  const locationAll = () => { const o = { ...plan, app: 'ShiftCraft', kind: 'location', version: 4, prefs: prefsNow(), place: loadPlace() }; try { const b = JSON.parse(localStorage.getItem('craft-barcodes') || '[]'); if (Array.isArray(b) && b.length) o.barcodes = b; } catch (e) { /* none */ } return o; };
   // This browser's own choices go inside Save everything too, so opening the file (on this or another computer) brings
   // them back: theme, picture and print choices, the availability list paper, the quick access bar, the ribbon, the
   // Staff section and the Start window. Not the plan itself (that is the file), the account link, the emailable files
@@ -113,6 +114,9 @@
     const replace = () => {
       snapshot();
       const prefs = data.prefs; delete data.prefs;
+      // the store profile and contact barcodes the file carries
+      if (data.place && typeof data.place === 'object') { try { localStorage.setItem(PLACE_KEY, JSON.stringify(data.place)); } catch (e) { /* blocked */ } } delete data.place;
+      if (Array.isArray(data.barcodes)) { try { const have = JSON.parse(localStorage.getItem('craft-barcodes') || '[]') || [], seen = new Set(have.map((x) => JSON.stringify(x))); localStorage.setItem('craft-barcodes', JSON.stringify(have.concat(data.barcodes.filter((x) => !seen.has(JSON.stringify(x)))))); } catch (e) { /* full */ } } delete data.barcodes;
       plan = data; delete plan.kind; normalize(plan); ui.day = plan.startDate; ui.fileName = name;
       if (handle) ui.handles.location = handle;
       const n = prefsBack(prefs);
