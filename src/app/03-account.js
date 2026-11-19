@@ -45,7 +45,7 @@
       const v = l ? r && r.value : r; if (!v || !v.plan) { toast(`The server has nothing saved${serverWhere()} yet: use ☁ Save first.`); return; }
       const what = `${v.plan.staff.length} people, ${Object.keys(v.plan.shifts || {}).length} days with shifts, saved ${new Date(l ? r.changed : v.savedAt).toLocaleString()}${l && r.by ? ' by ' + r.by : ''}`;
       modal({ title: `☁ Load: server → this browser${serverWhere()}`, body: h('p', null, `What is open here is replaced by the server’s copy (${what}). Undo brings this browser’s back.`),
-        actions: [{ label: 'Cancel' }, { label: 'Load it', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
+        actions: [{ label: 'Cancel' }, { label: '☁ Open the server’s copy here', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
     } catch (e) { toast(e.message); }
   }
   // ⇄ Bring in from another location (one you can open) or a copy in your own account: replaces or merges into what is
@@ -73,7 +73,27 @@
     modal({ title: '⇄ Bring in from another location or account', body: h('div', null,
         h('p', null, `Take a schedule you can open into what is open here${l ? ` (${l.name}, which then saves it to the server for ${l.name})` : ''}.`), h('label', { class: 'field' }, h('span', null, 'From'), sel),
         h('p', { class: 'muted' }, 'Replace: theirs instead of what is here. Merge: people matched by name, their shifts, events, time off and the rest added without doubles. Undo works for both.')),
-      actions: [{ label: 'Cancel' }, { label: 'Merge into this', onClick: () => go('merge') }, { label: 'Replace with it', primary: true, onClick: () => go('replace') }] });
+      actions: [{ label: 'Cancel' }, { label: 'Merge it into this browser’s', onClick: () => go('merge') }, { label: 'Open it here instead (this browser’s is replaced)', primary: true, onClick: () => go('replace') }] });
+  }
+  // Save: this browser → a chosen location. It becomes your location (later saves go there). A location that already has
+  // a different schedule asks first: replace it with this browser's, merge this browser's into it, or cancel.
+  async function saveToLocation(x) {
+    const A = CA(), u = A && A.user(); if (!A || plan.example) return;
+    const cur = curLoc(), mine = { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id };
+    if (cur && cur.id === x.id) return saveToServer();
+    let r = null; try { r = await A.api('GET', `locations/${x.id}/data/shiftcraft/plan`); } catch (e) { if (e.status !== 404) { toast(e.message); return; } }
+    const put = (np, how) => { setAcc({ loc: mine, base: r ? r.changed : '', synced: '', dirty: true }); viewTold = false;
+      if (np !== plan) { snapshot(); plan = np; }
+      plan.location = locLabel(mine); if (mine.company) plan.company = mine.company; normalize(plan); persist();
+      accountSend(true).then(() => { render(); refreshLogo(); toast(`${how} ${mine.name}, ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. From now on this browser saves there.`); }); };
+    const theirs = r && r.value && r.value.plan;
+    if (!theirs || !(theirs.staff || []).length) return put(plan, 'Saved to');
+    const same = (() => { try { const t = JSON.parse(JSON.stringify(theirs)); normalize(t); return JSON.stringify(t.staff) === JSON.stringify(plan.staff) && JSON.stringify(t.shifts) === JSON.stringify(plan.shifts); } catch (e) { return false; } })();
+    if (same) return put(plan, 'Saved to');
+    modal({ title: `${mine.name} already has a schedule`, body: h('div', null,
+        h('p', null, `On the server, ${mine.name} has ${theirs.staff.length} people and ${Object.keys(theirs.shifts || {}).length} days with shifts, saved ${new Date(r.changed).toLocaleString()}${r.by ? ' by ' + r.by : ''}. This browser has ${plan.staff.length} people and ${Object.keys(plan.shifts).length} days with shifts.`),
+        h('p', { class: 'muted' }, 'Replace: the server gets this browser’s. Merge: people matched by name, shifts, events, time off and the rest put together without doubles. Either way it is in the location’s latest changes (AccountCraft), and Undo works here.')),
+      actions: [{ label: 'Cancel' }, { label: 'Merge this browser’s into it', onClick: () => put(mergeInto(theirs, plan), 'Merged into') }, { label: 'Replace it with this browser’s', primary: true, onClick: () => put(plan, 'Saved to') }] });
   }
   // File › Save to the server, and the title bar's ☁: now, not in a few seconds
   async function saveToServer() {
@@ -112,10 +132,10 @@
     const l = curLoc(); if (!l || document.querySelector('.loc-conflict')) return;
     modal({ title: `${info.by || 'Someone'} saved ${l.name} since you opened it`, body: h('div', { class: 'loc-conflict' },
         h('p', null, `${info.by || 'Someone'} saved ${l.name} at ${info.changed ? new Date(info.changed).toLocaleString() : 'just now'}, and this browser has changes of its own. Which one do you want to keep?`),
-        h('p', { class: 'muted' }, 'Keep both: yours is saved as a file first, then theirs opens (nothing is lost).')),
-      actions: [{ label: 'Keep mine', onClick: () => accountSend(true) },
-        { label: 'Keep both', onClick: () => { downloadBlob(`${placeName()} - my copy.json`, new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })); locTake(true); } },
-        { label: 'Keep theirs', primary: true, onClick: () => locTake(true) }] });
+        h('p', { class: 'muted' }, 'Saving a file first keeps yours, then theirs opens: nothing is lost. Undo also brings yours back.')),
+      actions: [{ label: '☁ Save mine over theirs', onClick: () => accountSend(true) },
+        { label: '💾 Save mine to a file, then open theirs', onClick: () => { downloadBlob(`${placeName()} - my copy.json`, new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })); locTake(true); } },
+        { label: '☁ Open theirs here (mine is replaced)', primary: true, onClick: () => locTake(true) }] });
   }
   async function locTake(quietly) {
     const A = CA(), l = curLoc(); if (!A || !l) return;
@@ -149,7 +169,7 @@
       const take = () => (extrasBack(r.extras), takePlan(r.plan, r.savedAt, '', `Opened your account’s copy, saved ${new Date(r.savedAt).toLocaleString()}`));
       if (!st.dirty || plan.example) return take();
       modal({ title: 'Your account has a newer copy', body: h('p', null, `Your account’s copy of ${placeName()} was saved ${new Date(r.savedAt).toLocaleString()} on another computer, and this browser has changes of its own since then. Which one do you want to keep?`),
-        actions: [{ label: 'Keep this browser’s', onClick: () => { accountSend(); } }, { label: 'Open the account’s', primary: true, onClick: take }] });
+        actions: [{ label: '☁ Save this browser’s over it', onClick: () => { accountSend(); } }, { label: '☁ Open the account’s here (this browser’s is replaced)', primary: true, onClick: take }] });
     } catch (e) { /* not reachable now: tried again later */ } finally { accBusy = false; if (accAgain) { accAgain = false; setTimeout(() => accountCheck().then(render), 0); } }
   }
   // a location with nothing saved yet: bring in what is open here, or start new
@@ -158,11 +178,12 @@
     if (!locSaves()) { toast(`${l.name} has nothing saved yet: its managers bring in the schedule.`); return; }
     const here = !plan.example && (plan.staff || []).length;
     if (here && accState().auto) { setAcc({ auto: false }); plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); return accountSend(true).then(() => { render(); toast(`Saved this schedule as ${l.company ? l.company + ' › ' : ''}${l.name}: everyone working there sees it now.`); }); }
-    modal({ title: `${l.name} has nothing saved yet`, body: h('div', null,
-        h('p', null, here ? `Bring in what is open here (${placeName()}: ${plan.staff.length} people, ${Object.keys(plan.shifts || {}).length} days with shifts) as ${l.name}’s schedule, for everyone who works there?` : `Start ${l.name} new? (Or open a schedule file first with File › Open, then choose the location again.)`)),
-      actions: [{ label: 'Not now', onClick: () => { setAcc({ loc: null }); render(); } },
-        ...(here ? [{ label: 'Start new instead', onClick: () => locNew(l) }] : []),
-        { label: here ? 'Bring it in' : 'Start new', primary: true, onClick: () => (here ? (() => { plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); accountSend(true).then(() => { render(); toast(`${l.name} now has this schedule: everyone working there sees it.`); }); })() : locNew(l)) }] });
+    modal({ title: `${l.name}: nothing on the server yet`, body: h('div', null,
+        h('p', null, here ? `This browser has a schedule (${placeName()}: ${plan.staff.length} people, ${Object.keys(plan.shifts || {}).length} days with shifts). The server has nothing for ${l.name} yet.` : `The server has nothing for ${l.name} yet, and this browser has no schedule of its own.`),
+        h('p', { class: 'muted' }, here ? `☁ Save it there: everyone at ${l.name} then sees this schedule. Empty: ${l.name} starts with a new, empty schedule (this browser’s is replaced; Undo brings it back).` : `Empty: ${l.name} starts with a new, empty schedule. (To use a file instead: Save › Load: file → this browser, then Save › to this location.)`)),
+      actions: [{ label: 'Don’t use a location now', onClick: () => { setAcc({ loc: null }); render(); } },
+        ...(here ? [{ label: `Start ${l.name} empty`, onClick: () => locNew(l) }] : []),
+        { label: here ? `☁ Save this browser’s schedule to ${l.name}` : `Start ${l.name} empty`, primary: true, onClick: () => (here ? (() => { plan.location = locLabel(l); if (l.company) plan.company = l.company; setAcc({ base: '' }); persist(); accountSend(true).then(() => { render(); toast(`${l.name} now has this schedule: everyone working there sees it.`); }); })() : locNew(l)) }] });
   }
   function locNew(l) {
     snapshot(); const np = { app: 'ShiftCraft', version: 2, company: l.company || '', location: locLabel(l), splh: 85, startDate: mondayOf(iso(new Date())), weeks: 4, staff: [], shifts: {}, forecast: {}, history: {} };
@@ -176,13 +197,14 @@
     const cur = curLoc(), u = A.user(), by = {};
     for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
     const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
-    modal({ title: 'Which location?', wide: true, body: h('div', null,
+    modal({ title: 'Open a location', wide: true, body: h('div', null,
+      h('p', { class: 'muted' }, 'Its schedule opens here, from the server. (To save this browser’s schedule to a location instead: Save › The server.)'),
       list.length ? Object.entries(by).map(([co, ls]) => h('div', null, h('h3', { style: 'margin:10px 0 4px' }, co),
         ...ls.map((x) => h('button', { class: 'btn' + (cur && cur.id === x.id ? ' primary' : ''), style: 'display:flex;width:100%;justify-content:space-between;margin:4px 0', onclick: () => pick(x) },
           h('span', null, `📍 ${x.name}${x.number ? ' #' + x.number : ''}`), h('span', { class: 'muted' }, `${LROLE[x.myRole] || x.myRole}${x.lastSaved ? ' · saved ' + new Date(x.lastSaved).toLocaleDateString() : ' · nothing saved yet'}`)))))
         : h('p', null, 'You do not work at a location yet: the admin or a location manager adds you (AccountCraft › Companies).'),
       h('p', { class: 'muted', style: 'margin-top:12px' }, cur ? `Open now: ${cur.name}. ` : '', 'A location’s schedule is shared by everyone who works there.')),
-      actions: [{ label: 'Just this browser (no location)', onClick: () => pick(null) }, { label: 'Manage locations…', onClick: () => window.open(A.server().replace(/account\.php$/, ''), '_blank') }] });
+      actions: [{ label: 'Work without a location (this browser only)', onClick: () => pick(null) }, { label: 'Manage locations…', onClick: () => window.open(A.server().replace(/account\.php$/, ''), '_blank') }] });
   }
   // logged in, no location chosen yet, and you work at some: ask once (per login)
   const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

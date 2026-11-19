@@ -48,6 +48,27 @@
     cloud: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M14 38h22a9 9 0 0 0 1.4-17.9A13 13 0 0 0 12.2 18 10 10 0 0 0 14 38z" fill="#0ea5e9"/><path d="M24 33V21m-6 6 6-6 6 6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     browser: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><rect x="5" y="9" width="38" height="30" rx="4" fill="#64748b"/><rect x="5" y="9" width="38" height="7" rx="3" fill="#475569"/><circle cx="10" cy="12.5" r="1.6" fill="#f87171"/><circle cx="15" cy="12.5" r="1.6" fill="#fbbf24"/><circle cx="20" cy="12.5" r="1.6" fill="#34d399"/><path d="M15 29l5 5 13-12" fill="none" stroke="#bbf7d0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
+  // the Save window's server part: which location to save to (remembered), and the button saying where it goes
+  function locPickRow() {
+    const sel = h('select', { class: 'input', 'aria-label': 'Save to which location' }, h('option', { value: '' }, 'Looking for your locations…'));
+    const go = h('button', { type: 'button', class: 'btn primary', disabled: true }, 'Select a location first');
+    let list = [];
+    const paint = () => { const x = list.find((y) => y.id === sel.value), cur = curLoc();
+      if (!x) { go.disabled = true; go.textContent = 'Select a location first'; return; }
+      const can = ['admin', 'manager', 'scheduler'].includes(x.myRole);
+      go.disabled = plan.example || !can; go.textContent = plan.example ? 'The example schedule is not saved' : !can ? `${LROLE[x.myRole]} at ${x.name}: you cannot save here` : `☁ Save: this browser → ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`;
+      go.title = cur && cur.id === x.id ? 'Your location: saves everything there now' : 'Saves this browser’s schedule to that location; from now on it saves there'; };
+    CA().api('GET', 'locations').then((r) => { list = r.locations; const cur = curLoc();
+      sel.innerHTML = ''; sel.append(h('option', { value: '' }, list.length ? 'Select a location…' : 'You do not work at a location yet (your account copy instead)'));
+      const by = {}; for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
+      for (const [co, ls] of Object.entries(by)) sel.append(h('optgroup', { label: co }, ...ls.map((x) => h('option', { value: x.id, selected: !!(cur && cur.id === x.id) }, `📍 ${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''} · ${LROLE[x.myRole] || x.myRole}${x.lastSaved ? '' : ' · nothing saved yet'}`))));
+      if (!list.length) { go.disabled = plan.example; go.textContent = '☁ Save: this browser → your account (private copy)'; go.onclick = () => { closeSave(); saveToServer(); }; return; }
+      paint(); }).catch(() => { sel.innerHTML = '<option value="">The server could not be reached</option>'; });
+    sel.onchange = paint;
+    go.onclick = async () => { const x = list.find((y) => y.id === sel.value); if (!x) return; closeSave(); await saveToLocation(x); };
+    return h('div', { class: 'stack', style: { gap: '6px' } }, h('span', { class: 'muted small' }, 'Save to which location'), sel, go);
+  }
+  let closeSave = () => {};
   function saveDialog() {
     const A = CA(), l = curLoc(), st = accState(), icon = (k) => { const s = h('span', { class: 'save-ic' }); s.innerHTML = SAVE_ICON[k]; return s; };
     const card = (k, title, sub, kids) => h('div', { class: 'save-card' }, h('div', { class: 'save-head' }, k === 'cloud' && companyLogo() ? h('img', { src: companyLogo(), alt: '', style: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', background: '#fff' } }) : icon(k), h('div', null, h('b', null, title), h('div', { class: 'muted small' }, sub))), h('div', { class: 'save-btns' }, ...kids));
@@ -59,9 +80,9 @@
       : `Your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`;
     const body = h('div', { class: 'save-grid' },
       card('cloud', 'The server' + (A ? serverWhere() : ''), cloudLine, !A ? [btn('Log in…', 'Log in with your Craft account', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true })] : [
-        btn('Save: this browser → server', 'Everything (team, schedules, time off, calendar, settings, store profile, designs), now', saveToServer, { primary: !plan.example && locSaves(), disabled: plan.example || !locSaves() }),
+        locPickRow(),
         btn('Load: server → this browser', 'What is open here is replaced by the server’s copy (Undo brings it back)', loadFromServer),
-        btn('📍 Switch location…', 'Open another location you work at', chooseLocation),
+        btn('📍 Open a location… (its schedule opens here)', 'Opens another location’s schedule from the server, in place of this browser’s', chooseLocation),
         btn('⇄ Bring in from another location or account…', 'Replace or merge what is open here with a schedule you can open', bringIn)]),
       card('file', 'This computer (a file)', 'A .json file you keep, copy or email. Everything: the team, every week, time off, calendar, forecast, settings, store profile and designs.', [
         btn('Save: this browser → file (everything)', 'Saves a file with everything', () => saveFile('location'), { primary: !A || plan.example }),
@@ -70,7 +91,7 @@
         btn('📂 Load: file → this browser', 'Opens a saved file', () => openFile())]),
       card('browser', 'This browser', 'Every change is kept here by itself, as you work (even with nobody logged in). It stays on this computer and in this browser only.', [
         h('span', { class: 'muted small' }, plan.example ? 'Example data: not kept.' : `Kept now: ${plan.staff.length} people, ${Object.keys(plan.shifts).length} days with shifts.`)]));
-    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close;
+    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close; closeSave = close;
     setTimeout(() => { const p = document.querySelector('.save-grid .btn.primary:not([disabled])'); if (p) p.focus(); }, 0);
   }
   function saveAsDialog(preset = {}) {

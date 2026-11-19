@@ -10,7 +10,7 @@
       '-',
       { label: () => `☁ Save: this browser → server${serverWhere()}`, run: () => saveToServer() },
       { label: () => `☁ Load: server → this browser${serverWhere()}`, run: () => loadFromServer() },
-      { label: '📍 Switch location…', run: () => chooseLocation() },
+      { label: '📍 Open a location… (its schedule opens here)', run: () => chooseLocation() },
       { label: '⇄ Bring in from another location or account…', run: () => bringIn() },
       '-',
       { label: '💾 Save: this browser → file (everything)', run: () => saveFile('location') },
