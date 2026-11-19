@@ -84,6 +84,8 @@
     useOnPrint: (on) => borderUseOnPrint(on),
     useAndLeave: () => { borderUseOnPrint(true); if (borderBack) window.BORDER_HOST.goBack(); else { borderUse = null; ui.tab = 'schedule'; persist(); render(); toast('Printouts use your border'); } },
     usingOnPrint: () => borderOnPrint(),
+    // a clip-art picture for a design: pick(file, name)
+    clipart: window.CraftClipartPicker ? (pick) => window.CraftClipartPicker.open({ app: 'ShiftCraft', svg: true, onPick: (p) => pick(p.file, p.name) }) : null,
   };
   function borderView(main) {
     if (!window.BORDER_LAB_SRC) { main.append(h('div', { class: 'card' }, h('p', null, 'The Border designer is not in this copy of ShiftCraft.'))); return; }

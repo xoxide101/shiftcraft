@@ -185,6 +185,14 @@ const CATS = [...ORDER, ...Object.values(CAT)].filter((c, i, a) => a.indexOf(c) 
 // an attribute given twice keeps the later one (the colour or weight asked for), so saved SVG files stay valid XML
 const tidy = (s) => s.replace(/<([a-zA-Z]+)((?:\s+[a-zA-Z:-]+="[^"]*")+)\s*(\/?)>/g, (m, t, a, z) => { const at = new Map(); a.replace(/([a-zA-Z:-]+)="([^"]*)"/g, (q, k, v) => { at.delete(k); at.set(k, v); }); return `<${t}${[...at].map(([k, v]) => ` ${k}="${v}"`).join('')}${z ? '/' : ''}>`; });
 Object.values(ICONS).forEach((v) => { v[1] = tidy(v[1]); });
+// your own pictures (clip art, or a picture file): kept in the design itself as data (S.own = { id: [name, data URL] }),
+// so they go wherever the design goes (this browser, the location on the server, the everything file). Never a file.
+const MINE = 'My pictures';
+if (!CATS.includes(MINE)) CATS.unshift(MINE);
+function ownSync() {
+  Object.keys(ICONS).forEach((k) => { if (k.startsWith('my-') && !(S.own && S.own[k])) { delete ICONS[k]; delete CAT[k]; } });
+  Object.entries(S.own || {}).forEach(([k, v]) => { if (!Array.isArray(v) || !/^data:image\//.test(v[1] || '')) return; ICONS[k] = [v[0] || 'My picture', `<image class="own" x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet" href="${v[1].replace(/"/g, '%22')}"/>`]; CAT[k] = MINE; });
+}
 // line art (black and white): every fill white, every outline black; class "k" (eyes, mouths, dots) stays black
 const lineArt = (s) => s.replace(/(<[a-z]+)([^>]*?)(\/?>)/g, (m, a, attrs, z) => {
   // every fill white, every line black (white lines too, unless class "w": the candy cane's stripe); class "k" (eyes,
@@ -240,7 +248,7 @@ const USES = [['free', 'Any page (no limit)', 0], ['calendar', 'ShiftCraft month
 
 // ---------------- settings ----------------
 const S = { paper: 'letter', orient: 'portrait', theme: 'halloween', margin: 0.42, weight: 1.6, gap: 5, dash: 'solid', amp: 7, waves: 2, offPos: 25, bw: false, showPts: false,
-  rCorner: 22, rCenter: 18, rOff: 12, szCorner: 44, szCenter: 34, szOff: 24, szFlow: 24, use: 'free', room: 0.5, size: 100, slim: 100, pt: {}, stk: [] };
+  rCorner: 22, rCenter: 18, rOff: 12, szCorner: 44, szCenter: 34, szOff: 24, szFlow: 24, use: 'free', room: 0.5, size: 100, slim: 100, pt: {}, stk: [], own: {} };
 const BASE = JSON.parse(JSON.stringify(S)); // every setting's own default (a theme's values come first)
 const STK = 40; // a placed picture's starting size
 const themeVals = (k) => { const t = THEMES[k]; return { lines: t.lines, color: t.color, accent: t.accent, shape: t.shape, waves: t.waves || 2, corner: t.corner, center: t.center, off: t.off, icCorner: t.ic.corner, icCenter: t.ic.center, icOff: t.ic.off, flow: t.flow, list: t.list.join(',') }; };
@@ -332,7 +340,7 @@ const ptId = (j, p) => (S.pt[j] != null ? S.pt[j] : p.k === 'c' ? S.icCorner : p
 const szOf = (p) => (p.k === 'c' ? S.szCorner : p.k === 'm' ? S.szCenter : S.szOff);
 function iconAt(id, x, y, size, rot = 0) {
   const ic = ICONS[id]; if (!ic) return '';
-  const body = S.bw ? lineArt(ic[1]) : ic[1], k = size / 24;
+  const body = S.bw ? lineArt(ic[1]).replace('<image class="own"', '<image class="own" style="filter:grayscale(1) contrast(1.6)"') : ic[1], k = size / 24;
   return `<g transform="translate(${(x).toFixed(1)} ${(y).toFixed(1)}) rotate(${rot}) scale(${k.toFixed(3)}) translate(-12 -12)">${body}</g>`;
 }
 function borderBody(W, H) {
@@ -540,7 +548,7 @@ let design = null, keepT = 0;
 const DESIGN_SKIP = ['showPts', 'paper', 'orient'];
 const designOf = () => { const o = JSON.parse(JSON.stringify(S)); DESIGN_SKIP.forEach((k) => delete o[k]); return o; };
 const newId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-function loadDesign(d) { const keep = { paper: S.paper, orient: S.orient, showPts: S.showPts }; Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, JSON.parse(JSON.stringify(BASE)), themeVals(d.s.theme || BASE.theme), JSON.parse(JSON.stringify(d.s)), keep); design = d; hist = []; fut = []; cur = -1; }
+function loadDesign(d) { const keep = { paper: S.paper, orient: S.orient, showPts: S.showPts }; Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, JSON.parse(JSON.stringify(BASE)), themeVals(d.s.theme || BASE.theme), JSON.parse(JSON.stringify(d.s)), keep); design = d; hist = []; fut = []; cur = -1; ownSync(); }
 function hostStart() {
   const b = HOST.get(); let d = b.designs.find((x) => x.id === b.current) || b.designs[0];
   if (!d) { d = { id: newId(), name: 'My border', s: designOf() }; b.designs.push(d); b.current = d.id; HOST.put(b); }
@@ -664,7 +672,10 @@ function buildPicker() {
       el('div', { class: 'pane', 'data-pane': 'spots' }, el('div', { class: 'tiny' }, 'As on the page: C corners, M centres, O off-centres. Drop a picture on a spot to replace just that one, or click a spot, then a picture.'), el('div', { class: 'map', id: 'map' })),
       el('div', { class: 'pane', 'data-pane': 'flow' }, el('div', { class: 'tiny' }, 'These take turns along the border. Click a picture below to add it; drag to reorder; drag one off to take it out.'), el('div', { class: 'strip', id: 'strip' })),
       el('div', { class: 'pane', 'data-pane': 'placed', id: 'foot' })),
-    el('div', { class: 'find' }, lens, q), el('div', { class: 'found', id: 'found' }), el('label', {}, c)),
+    el('div', { class: 'find' }, lens, q), el('div', { class: 'found', id: 'found' }), el('label', {}, c),
+    el('div', { class: 'row', style: 'gap:6px;margin-top:6px;flex-wrap:wrap' },
+      HOST && HOST.clipart ? el('button', { class: 'btn', title: 'A picture from the clip-art library (the clip-art server, or this browser’s): kept in this design', onclick: () => HOST.clipart((file, name) => addOwn(file, name)) }, '+ Clip art…') : null,
+      el('button', { class: 'btn', title: 'A picture file from this computer: kept in this design', onclick: () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = () => i.files[0] && addOwn(i.files[0]); i.click(); } }, '+ Picture file…'))),
   el('div', { class: 'grid', id: 'grid' }));
   setTab(pickTab);
   fillGrid(); fillStrip(); fillMap(); foot();
@@ -702,10 +713,22 @@ function fillGrid() {
     const ids = Object.keys(ICONS).filter((id) => CAT[id] === grp && ok(id)); if (!ids.length) return;
     if (pickCat === '*all' || q) g.append(el('div', { class: 'grp' }, grp));
     ids.forEach((id) => { const b = el('div', { class: 'tile', role: 'button', tabindex: '0', title: ICONS[id][0], 'data-id': id, 'aria-pressed': String(on.includes(id)), onpointerdown: (e) => startDrag(e, { kind: 'pic', from: 'picker', id }) });
-      b.innerHTML = svgOf(id); g.append(b); });
+      b.innerHTML = svgOf(id);
+      if (id.startsWith('my-')) { b.style.position = 'relative'; b.append(el('span', { class: 'x', title: 'Take this picture out of the design', style: 'position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:#1d2330;color:#fff;font:700 11px/16px system-ui;text-align:center;cursor:pointer', onpointerdown: (e) => { e.stopPropagation(); e.preventDefault(); snap(); delete S.own[id]; refresh(); } }, '×')); }
+      g.append(b); });
   });
   if (!g.children.length) g.append(el('div', { class: 'grp' }, 'No pictures match'));
   const n = g.querySelectorAll('.tile').length, f = $('#found'); if (f) f.textContent = q ? `${n} picture${n === 1 ? '' : 's'} found for “${pickQ.trim()}” in all groups` : '';
+}
+// a picture made into data for the design: an SVG as it is when small (sharp at any size), else a PNG at most 400 pixels
+async function addOwn(file, name) {
+  try {
+    let url;
+    if (/svg/.test(file.type) && file.size < 60000) { const t = await file.text(); url = 'data:image/svg+xml;base64,' + btoa(Array.from(new TextEncoder().encode(t), (b) => String.fromCharCode(b)).join('')); }
+    else { const u = URL.createObjectURL(file); try { const img = new Image(); img.src = u; await img.decode(); const n = Math.max(img.naturalWidth, img.naturalHeight) || 400, k = Math.min(1, 400 / n), c = document.createElement('canvas'); c.width = Math.max(1, Math.round((img.naturalWidth || 400) * k)); c.height = Math.max(1, Math.round((img.naturalHeight || 400) * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); url = c.toDataURL('image/png'); } finally { URL.revokeObjectURL(u); } }
+    snap(); const id = 'my-' + newId(); S.own = { ...(S.own || {}), [id]: [name || file.name.replace(/\.\w+$/, '') || 'My picture', url] };
+    pickCat = MINE; pickQ = ''; refresh();
+  } catch (e) { alert('That picture could not be read.'); }
 }
 function fillStrip() {
   const s = $('#strip'); if (!s) return; s.innerHTML = '';
@@ -743,7 +766,8 @@ let fut = [];
 const snap = () => { const st = state(); if (hist[hist.length - 1] !== st) { hist.push(st); if (hist.length > 120) hist.shift(); } fut = []; };
 function undo() { const h = hist.pop(); if (!h) return; fut.push(state()); Object.assign(S, JSON.parse(h)); cur = -1; refresh(); }
 function redo() { const h = fut.pop(); if (!h) return; hist.push(state()); Object.assign(S, JSON.parse(h)); cur = -1; refresh(); }
-function refresh() { build(); fillStrip(); fillMap(); foot(); draw(); }
+let ownSeen = ''; // (the picture list is made again when your own pictures change: added, taken out, undone, another design)
+function refresh() { ownSync(); const ow = Object.keys(S.own || {}).join(','); if (ow !== ownSeen) { ownSeen = ow; if (document.getElementById('pick')) buildPicker(); } build(); fillStrip(); fillMap(); foot(); draw(); }
 function toPage(e) { const r = $('#paper').getBoundingClientRect(), [W, H] = size(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H, k: r.width / W, W, H, inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom }; }
 // the point a drop goes to: the nearest, if close enough (on screen about 40 px, or most of the picture's size)
 function nearPt(p) { let best = -1, bd = 1e9; curPoints(p.W, p.H).forEach((q, j) => { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = j; } }); const q = curPoints(p.W, p.H)[best]; return bd <= Math.max(40 / p.k, szOf(q) * 0.6 * picScale()) ? best : -1; }

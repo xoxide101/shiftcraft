@@ -873,6 +873,7 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 /* the week choosers (Schedule's Week out, the Week and Forecast pages) as tabs, the same look and colours as the other
    tabs: week 1 blue, 2 teal, 3 violet, 4 amber, 5 rose, 6 green, 7 orange */
 .weekout, .weeks { align-items: flex-end; gap: 4px; border-bottom: 2px solid var(--line); }
+@media (max-width: 700px) { .weekout, .weeks { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; touch-action: pan-x; scrollbar-width: none; } .weekout > .btn, .weeks > .btn { flex: none; } .days { max-width: 100%; overflow-x: auto; } }
 .weekout > span { align-self: center; }
 .weekout > .btn, .weeks > .btn { --tab-hue: #3e63dd; position: relative; bottom: -2px; display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px 5px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 9px 9px 0 0; background: none; color: var(--muted); font-weight: 600; box-shadow: inset 0 3px 0 color-mix(in srgb, var(--tab-hue) 35%, transparent); }
 .weekout > .btn:nth-of-type(7n+2), .weeks > .btn:nth-of-type(7n+2) { --tab-hue: #12a594; }

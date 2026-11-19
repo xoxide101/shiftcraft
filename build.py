@@ -45,7 +45,7 @@ def border():
         "window.makeBorderEngine = function () {\n'use strict';\n"
         "let drag = null, cur = -1; const LBL = [], flowList = () => [], $ = () => null;\n" + engine +
         "const render = (design, W, H, over) => { Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, JSON.parse(JSON.stringify(BASE)), "
-        "themeVals(design.theme || BASE.theme), JSON.parse(JSON.stringify(design)), over || {}, { showPts: false }); return drawSvg(W, H, false); };\n"
+        "themeVals(design.theme || BASE.theme), JSON.parse(JSON.stringify(design)), over || {}, { showPts: false }); ownSync(); return drawSvg(W, H, false); };\n"
         "// how far in from the paper edge the border reaches (inches): the printout starts inside it\n"
         "const inset = (design, over) => { render(design, 816, 1056, over); return fitted(() => { const r = reach(); return (S.margin * IN + SHIFT + r.inn) / IN; }); };\n"
         "return { render, inset, icons: ICONS, cat: CAT };\n};\n")
