@@ -898,6 +898,14 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .wk-browse .wk-nav { align-self: center; min-width: 30px; font-weight: 700; }
 .weeks > .btn.out { font-style: italic; }
 .wk-browse .wk-nav { font-size: 16px; line-height: 1; padding: 3px 9px; }
+
+/* the Save dialog: where it goes, with a picture each */
+.save-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.save-card { border: 1px solid var(--line, #d0d5dd); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--panel, transparent); }
+.save-head { display: flex; gap: 10px; align-items: flex-start; } .save-head b { font-size: 15px; }
+.save-ic { flex: none; line-height: 0; }
+.save-btns { display: flex; flex-direction: column; gap: 6px; } .save-btns .btn { text-align: left; justify-content: flex-start; white-space: normal; height: auto; min-height: 32px; line-height: 1.3; }
+.ctb-info .co-logo { height: 20px; max-width: 60px; object-fit: contain; border-radius: 3px; background: #fff; padding: 1px; align-self: center; }
 </style>
 </head>
 <body>
@@ -2310,6 +2318,46 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     if (st.synced) return { text: '☁ saved ' + new Date(st.synced).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), title: `Saved to the server${l ? ' for ' + l.name : ' in your account'}: ${new Date(st.synced).toLocaleString()} (click to save again)`, run: () => saveToServer() };
     return { text: '☁ not saved yet', title: 'Click to save to the server', run: () => saveToServer() };
   }
+  const serverWhere = () => { const l = curLoc(); return l ? ` (${l.name}${l.number && !String(l.name).includes(l.number) ? ' #' + l.number : ''})` : CA() ? ' (your account)' : ' (log in first)'; };
+  // ☁ Load: server → this browser (what is open here is replaced; Undo brings it back)
+  async function loadFromServer() {
+    const A = CA(); if (!A) { toast('Log in first.'); if (window.CraftAccount && CraftAccount.loginDialog) CraftAccount.loginDialog(); return; }
+    const l = curLoc();
+    try {
+      const r = l ? await A.api('GET', locPath(l)).catch((e) => { if (e.status === 404) return null; throw e; }) : await A.get('shiftcraft', accKey());
+      const v = l ? r && r.value : r; if (!v || !v.plan) { toast(`The server has nothing saved${serverWhere()} yet: use ☁ Save first.`); return; }
+      const what = `${v.plan.staff.length} people, ${Object.keys(v.plan.shifts || {}).length} days with shifts, saved ${new Date(l ? r.changed : v.savedAt).toLocaleString()}${l && r.by ? ' by ' + r.by : ''}`;
+      modal({ title: `☁ Load: server → this browser${serverWhere()}`, body: h('p', null, `What is open here is replaced by the server’s copy (${what}). Undo brings this browser’s back.`),
+        actions: [{ label: 'Cancel' }, { label: 'Load it', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
+    } catch (e) { toast(e.message); }
+  }
+  // ⇄ Bring in from another location (one you can open) or a copy in your own account: replaces or merges into what is
+  // open here, which then goes to this browser's location as usual
+  function mergeInto(a, b) {
+    const pa = JSON.parse(JSON.stringify(a)), idMap = {}, key = (n) => String(n || '').trim().toLowerCase();
+    for (const s of b.staff || []) { const same = pa.staff.find((x) => key(x.name) === key(s.name)); if (same) idMap[s.id] = same.id; else { const n = JSON.parse(JSON.stringify(s)); if (pa.staff.some((x) => x.id === n.id)) n.id = uid(); idMap[s.id] = n.id; pa.staff.push(n); } }
+    for (const [d, list] of Object.entries(b.shifts || {})) { const here = (pa.shifts[d] = pa.shifts[d] || []); for (const sh of list) { const n = { ...sh, staffId: idMap[sh.staffId] || sh.staffId }; if (!here.some((x) => x.staffId === n.staffId && x.start === n.start && x.end === n.end)) { n.id = uid(); here.push(n); } } }
+    for (const [k, v] of Object.entries(b)) { if (k === 'staff' || k === 'shifts') continue;
+      if (pa[k] === undefined) pa[k] = v;
+      else if (Array.isArray(pa[k]) && Array.isArray(v)) { const seen = new Set(pa[k].map((x) => JSON.stringify(x))); for (const x of v) if (!seen.has(JSON.stringify(x))) pa[k].push(x); }
+      else if (pa[k] && typeof pa[k] === 'object' && v && typeof v === 'object') for (const [kk, vv] of Object.entries(v)) if (pa[k][kk] === undefined) pa[k][kk] = vv; }
+    return pa;
+  }
+  async function bringIn() {
+    const A = CA(); if (!A) { toast('Log in first: then you can bring in a location’s or your account’s schedule. (A file: 📂 Load.)'); if (window.CraftAccount && CraftAccount.loginDialog) CraftAccount.loginDialog(); return; }
+    const l = curLoc(), src = [];
+    try { for (const x of (await A.api('GET', 'locations')).locations) if (!l || x.id !== l.id) src.push({ label: `📍 ${x.companyName ? x.companyName + ' › ' : ''}${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`, get: async () => { const r = await A.api('GET', `locations/${x.id}/data/shiftcraft/plan`); return r.value; } }); } catch (e) { /* none */ }
+    try { const mine = await A.all('shiftcraft'); for (const [k, v] of Object.entries(mine || {})) if (/^plan /.test(k) && v.value && v.value.plan) src.push({ label: `👤 My account: ${k.slice(5)}`, get: async () => v.value }); } catch (e) { /* none */ }
+    if (!src.length) { toast('Nothing else to bring in: no other location or account copy.'); return; }
+    const sel = h('select', { class: 'input' }, ...src.map((s, i) => h('option', { value: i }, s.label)));
+    const go = async (how) => { try { const v = await src[+sel.value].get(); if (!v || !v.plan) return toast('That one has nothing saved.'); const np = how === 'merge' ? mergeInto(plan, v.plan) : v.plan;
+      if (l) { np.location = locLabel(l); np.company = l.company || np.company; }
+      snapshot(); normalize(np); plan = np; delete plan.example; persist(); render(); toast(`${how === 'merge' ? 'Merged' : 'Brought in'}: ${src[+sel.value].label.replace(/^\S+ /, '')} → this browser${l ? ', then to ' + l.name + ' on the server' : ''}. (Undo brings back what was here.)`); } catch (e) { toast(e.message); } };
+    modal({ title: '⇄ Bring in from another location or account', body: h('div', null,
+        h('p', null, `Take a schedule you can open into what is open here${l ? ` (${l.name}, which then saves it to the server for ${l.name})` : ''}.`), h('label', { class: 'field' }, h('span', null, 'From'), sel),
+        h('p', { class: 'muted' }, 'Replace: theirs instead of what is here. Merge: people matched by name, their shifts, events, time off and the rest added without doubles. Undo works for both.')),
+      actions: [{ label: 'Cancel' }, { label: 'Merge into this', onClick: () => go('merge') }, { label: 'Replace with it', primary: true, onClick: () => go('replace') }] });
+  }
   // File › Save to the server, and the title bar's ☁: now, not in a few seconds
   async function saveToServer() {
     const A = CA(); if (!A) { if (window.CraftAccount && CraftAccount.loginDialog) { toast('Log in first: then Save to the server.'); CraftAccount.loginDialog(); } else toast('Saving to the server needs the account page (AccountCraft).'); return; }
@@ -2361,11 +2409,16 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     accQuiet = true; plan = np; delete plan.example; persist(); accQuiet = false; accLast = JSON.stringify(plan); setAcc({ synced: savedAt, base: base || '', dirty: false }); render();
     if (!quiet || note) toast(note + ' (Undo brings back this browser’s)');
   }
+  // the company's logo (AccountCraft › the company): kept in this browser for the title bar, the Save window and printouts
+  const LOGO_KEY = KEY + '-colog';
+  function companyLogo() { try { const o = JSON.parse(localStorage.getItem(LOGO_KEY) || 'null'), l = curLoc(); return o && l && o.company === l.companyId ? o.logo || '' : ''; } catch (e) { return ''; } }
+  async function refreshLogo() { const A = CA(), l = curLoc(); if (!A || !l || !l.companyId) return; try { const c = (await A.api('GET', 'companies')).companies.find((x) => x.id === l.companyId); const was = companyLogo(), now = (c && c.logo) || ''; localStorage.setItem(LOGO_KEY, JSON.stringify({ company: l.companyId, logo: now })); if (was !== now) render(); } catch (e) { /* later */ } }
   async function accountCheck() {
     const A = CA(); if (!A) return; if (accBusy) { accAgain = true; return; } accBusy = true; accSeen = Date.now();
     try {
       const st = accState(), l = curLoc();
       if (l) {
+        refreshLogo();
         let r = null; try { r = await A.api('GET', locPath(l)); } catch (e) { if (e.status === 403) { setAcc({ loc: null }); toast(`You no longer work at ${l.name}: back to this browser’s plan.`); render(); return; } if (e.status !== 404) throw e; }
         if (!r) return locEmpty(l);
         if (r.changed === st.base) { if (st.dirty && locSaves()) await accountSend(); return; }
@@ -2405,7 +2458,7 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     let list = []; try { list = (await A.api('GET', 'locations')).locations; } catch (e) { toast(e.message); return; }
     const cur = curLoc(), u = A.user(), by = {};
     for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
-    const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
+    const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
     modal({ title: 'Which location?', wide: true, body: h('div', null,
       list.length ? Object.entries(by).map(([co, ls]) => h('div', null, h('h3', { style: 'margin:10px 0 4px' }, co),
         ...ls.map((x) => h('button', { class: 'btn' + (cur && cur.id === x.id ? ' primary' : ''), style: 'display:flex;width:100%;justify-content:space-between;margin:4px 0', onclick: () => pick(x) },
@@ -2433,12 +2486,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
       if (curLoc() && curLoc().id === want) return;
       return A.api('GET', 'locations').then((r) => { const x = r.locations.find((l) => l.id === want); if (!x) return toast('You do not work at that location (ask its manager or the admin).');
         if (accState().dirty && curLoc() && locSaves()) accountSend();
-        setAcc({ loc: { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', role: x.myRole, user: u.id }, base: '', synced: '', dirty: false }); viewTold = false; return accountCheck().then(render); }).catch(() => {}); }
+        setAcc({ loc: { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id }, base: '', synced: '', dirty: false }); viewTold = false; return accountCheck().then(render); }).catch(() => {}); }
     if (curLoc() || accState().asked === u.id) return; setAcc({ asked: u.id });
     A.api('GET', 'locations').then((r) => {
       if (!r.locations.length) return;
       const m = matchLocation(r.locations);
-      if (m) { setAcc({ loc: { id: m.id, name: m.name, number: m.number || '', company: m.companyName || '', role: m.myRole, user: u.id }, base: '', synced: '', dirty: true, auto: true }); toast(`This schedule is ${m.companyName ? m.companyName + ' › ' : ''}${m.name}: linked to that location.`); return accountCheck().then(render); }
+      if (m) { setAcc({ loc: { id: m.id, name: m.name, number: m.number || '', company: m.companyName || '', companyId: m.company || '', role: m.myRole, user: u.id }, base: '', synced: '', dirty: true, auto: true }); toast(`This schedule is ${m.companyName ? m.companyName + ' › ' : ''}${m.name}: linked to that location.`); return accountCheck().then(render); }
       chooseLocation();
     }).catch(() => {});
   }
@@ -6830,6 +6883,38 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
     } }] });
   }
   // The one Save dialog: what, then (for schedules) how much.
+  // ---- Save: where it goes. This computer (a file you keep), the server (your location, or your own account copy), and
+  // what this browser keeps by itself. Ctrl+S and the Save button open it; the likely choice is ready for Enter.
+  const SAVE_ICON = {
+    file: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><rect x="8" y="6" width="32" height="36" rx="3" fill="#3b82f6"/><rect x="14" y="6" width="20" height="12" rx="1" fill="#dbeafe"/><rect x="28" y="8" width="4" height="8" fill="#3b82f6"/><rect x="13" y="25" width="22" height="13" rx="2" fill="#eff6ff"/><path d="M17 30h14M17 34h10" stroke="#93c5fd" stroke-width="2"/></svg>',
+    cloud: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M14 38h22a9 9 0 0 0 1.4-17.9A13 13 0 0 0 12.2 18 10 10 0 0 0 14 38z" fill="#0ea5e9"/><path d="M24 33V21m-6 6 6-6 6 6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    browser: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><rect x="5" y="9" width="38" height="30" rx="4" fill="#64748b"/><rect x="5" y="9" width="38" height="7" rx="3" fill="#475569"/><circle cx="10" cy="12.5" r="1.6" fill="#f87171"/><circle cx="15" cy="12.5" r="1.6" fill="#fbbf24"/><circle cx="20" cy="12.5" r="1.6" fill="#34d399"/><path d="M15 29l5 5 13-12" fill="none" stroke="#bbf7d0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+  function saveDialog() {
+    const A = CA(), l = curLoc(), st = accState(), icon = (k) => { const s = h('span', { class: 'save-ic' }); s.innerHTML = SAVE_ICON[k]; return s; };
+    const card = (k, title, sub, kids) => h('div', { class: 'save-card' }, h('div', { class: 'save-head' }, k === 'cloud' && companyLogo() ? h('img', { src: companyLogo(), alt: '', style: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', background: '#fff' } }) : icon(k), h('div', null, h('b', null, title), h('div', { class: 'muted small' }, sub))), h('div', { class: 'save-btns' }, ...kids));
+    const btn = (label, desc, run, o = {}) => h('button', { type: 'button', class: 'btn' + (o.primary ? ' primary' : ''), title: desc, disabled: !!o.disabled, onclick: () => { close(); run(); } }, label);
+    let close = () => {};
+    const cloudLine = !A ? 'Log in to save on the server: the same schedule at work and at home, shared with the people at your location.'
+      : plan.example ? 'This is the example schedule: open or make your own first.'
+      : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}${!locSaves() ? ' You can look here, not save (' + LROLE[l.role] + ').' : ''}`
+      : `Your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`;
+    const body = h('div', { class: 'save-grid' },
+      card('cloud', 'The server' + (A ? serverWhere() : ''), cloudLine, !A ? [btn('Log in…', 'Log in with your Craft account', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true })] : [
+        btn('Save: this browser → server', 'Everything (team, schedules, time off, calendar, settings, store profile, designs), now', saveToServer, { primary: !plan.example && locSaves(), disabled: plan.example || !locSaves() }),
+        btn('Load: server → this browser', 'What is open here is replaced by the server’s copy (Undo brings it back)', loadFromServer),
+        btn('📍 Switch location…', 'Open another location you work at', chooseLocation),
+        btn('⇄ Bring in from another location or account…', 'Replace or merge what is open here with a schedule you can open', bringIn)]),
+      card('file', 'This computer (a file)', 'A .json file you keep, copy or email. Everything: the team, every week, time off, calendar, forecast, settings, store profile and designs.', [
+        btn('Save: this browser → file (everything)', 'Saves a file with everything', () => saveFile('location'), { primary: !A || plan.example }),
+        btn('Save as… (choose the folder and name)', 'Saves everything, asking where', () => saveFile('location', { as: true })),
+        btn('Save a part only…', 'This week, the month, the team or one day', () => saveAsDialog({ what: 'schedule' })),
+        btn('📂 Load: file → this browser', 'Opens a saved file', () => openFile())]),
+      card('browser', 'This browser', 'Every change is kept here by itself, as you work (even with nobody logged in). It stays on this computer and in this browser only.', [
+        h('span', { class: 'muted small' }, plan.example ? 'Example data: not kept.' : `Kept now: ${plan.staff.length} people, ${Object.keys(plan.shifts).length} days with shifts.`)]));
+    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close;
+    setTimeout(() => { const p = document.querySelector('.save-grid .btn.primary:not([disabled])'); if (p) p.focus(); }, 0);
+  }
   function saveAsDialog(preset = {}) {
     const c = { what: preset.what || 'all', range: preset.range || 'week' };
     const wkFrom = h('select', { class: 'input' }, Array.from({ length: plan.weeks }, (_, k) => h('option', { value: k, selected: k === weekOf(ui.day) }, `Week ${k + 1} (${shortDate(weekDays(k)[0])})`)));
@@ -8208,17 +8293,20 @@ function hourlyWeekDialog() { HW.dialog(); }
   const MENUS = [
     ['File', [
       { label: 'New plan…', run: newPlan },
-      { label: 'Open… (location, team or weeks)', key: 'Ctrl+O', run: () => openFile() },
+      { label: 'Save… (this computer, the server)', key: 'Ctrl+S', run: () => saveDialog() },
       '-',
-      { label: 'Save to the server (everything, now)', run: () => saveToServer() },
-      { label: 'Choose the location…', run: () => chooseLocation() },
+      { label: () => `☁ Save: this browser → server${serverWhere()}`, run: () => saveToServer() },
+      { label: () => `☁ Load: server → this browser${serverWhere()}`, run: () => loadFromServer() },
+      { label: '📍 Switch location…', run: () => chooseLocation() },
+      { label: '⇄ Bring in from another location or account…', run: () => bringIn() },
       '-',
-      { label: 'Save everything to a file', key: 'Ctrl+S', run: () => saveFile('location') },
-      { label: 'Save everything to a file as…', run: () => saveFile('location', { as: true }) },
-      { label: 'Save a part only: this week’s schedule', run: () => saveWeek(false) },
-      { label: 'Save a part only: the month’s schedules (all weeks)', run: () => saveMonth(false) },
-      { label: 'Save a part only: the team…', run: saveStaff },
-      { label: 'Save a part only: one day', run: () => saveFile('day', { as: true }) },
+      { label: '💾 Save: this browser → file (everything)', run: () => saveFile('location') },
+      { label: '💾 Save: this browser → file as… (everything)', run: () => saveFile('location', { as: true }) },
+      { label: '📂 Load: file → this browser', key: 'Ctrl+O', run: () => openFile() },
+      { label: 'Save a part only → file: this week’s schedule', run: () => saveWeek(false) },
+      { label: 'Save a part only → file: the month’s schedules', run: () => saveMonth(false) },
+      { label: 'Save a part only → file: the team…', run: saveStaff },
+      { label: 'Save a part only → file: one day', run: () => saveFile('day', { as: true }) },
       { label: 'Save… (choose what to save)', key: 'Ctrl+Shift+S', run: () => saveAsDialog() },
       { label: 'Save emailable file (.html)…', run: saveEmailable },
       { label: 'Email or share…', run: emailDialog },
@@ -8318,7 +8406,7 @@ function hourlyWeekDialog() { HW.dialog(); }
     if ($('.backdrop')) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveFile('location'); return; }
+    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveDialog(); return; }
     if (mod && k === 'o') { e.preventDefault(); openFile(); return; }
     if (mod && k === 'p' && e.shiftKey) { e.preventDefault(); printScreenDialog(); return; }
     if (mod && k === 'p') { e.preventDefault(); if (inFrame) blockedHere(); else if (ui.tab === 'calendar') calPrintDialog(); else printPageDialog(); return; }
@@ -8341,6 +8429,7 @@ function hourlyWeekDialog() { HW.dialog(); }
     'use strict';
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const ICONS = {
+      cloud: '<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.1 4.5 4.5 0 0 0 7 18z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 16v-5m-2.2 2.2L12 11l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
       save: '<path d="M5 3h11l3 3v15H5Z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
       open: '<path d="M3 6h6l2 2h10v11H3Z"/>',
       new: '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v4h4M12 11v6M9 14h6"/>',
@@ -8626,7 +8715,7 @@ function hourlyWeekDialog() { HW.dialog(); }
         const all = commands();
         custom.add.forEach((label) => {
           const c = all.find((x) => x.label === label);
-          if (c) add({ title: c.label, short: c.label.replace(/…$/, '').slice(0, 18), icon: c.icon || '', key: c.key, run: c.run, disabled: c.disabled }, !c.icon);
+          if (c) add({ title: c.label, short: String(c.label).replace(/…$/, '').slice(0, 18), icon: c.icon || '', key: c.key, run: c.run, disabled: c.disabled }, !c.icon);
         });
         const more = mk('button', 'ctb-q ctb-more'); more.type = 'button';
         more.innerHTML = svg('more'); more.title = 'Customize the quick buttons'; more.setAttribute('aria-label', 'Customize the quick buttons');
@@ -8898,8 +8987,8 @@ function hourlyWeekDialog() { HW.dialog(); }
     st.textContent = '.ctb { position: sticky; top: 0; z-index: 56; } body > .bar { display: none !important; } .crb .month-pick { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; } .crb .month-pick select { height: 28px; }';
     document.head.append(st);
     // Ribbon buttons reuse the menu commands, so both always do the same thing.
-    const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
-    const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
+    const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label), text = (it) => (typeof it.label === 'function' ? it.label() : it.label);
+    const item = (start) => all().find((it) => text(it) === start) || all().find((it) => text(it).startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
     const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company', 'border'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
@@ -8942,7 +9031,7 @@ function hourlyWeekDialog() { HW.dialog(); }
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true }), C('Undo', 'Undo', I.undo, { big: true })]],
         ] },
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
-          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save this week’s schedule only', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
+          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save a part only → file: this week', 'Week → file', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
         ] },
         { id: 'calendar', label: 'Calendar', hue: '#3c8d3c', onSelect: view('calendar'), groups: [
@@ -8957,7 +9046,7 @@ function hourlyWeekDialog() { HW.dialog(); }
           ['Hand-off', [C('Print…', 'Print this list', I.print, { big: true }), C('Save as text or CSV', 'Text or CSV', I.textFile, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
         ] },
         { id: 'staff', label: 'Staff', hue: '#d1408a', onSelect: view('staff'), groups: [
-          ['Team', [C('Save team only', 'Save team', I.save, { big: true }), C('Open', 'Open a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
+          ['Team', [C('Save a part only → file: the team', 'Team → file', I.save, { big: true }), C('📂 Load: file', 'Load a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
           ['Time off', [C('Time off request', 'Time off request…', I.calendar, { big: true }), { col: [C('Not available some hours', 'Appointment…', I.clock), C('Time off list', 'Time off list', I.list)] }]],
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
@@ -8973,7 +9062,7 @@ function hourlyWeekDialog() { HW.dialog(); }
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save the hourly week', 'Hourly week', I.timeline, { big: true }), C('Print the calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
-          ['Save and open', [C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save month', 'Save month', I.save), C('Save location', 'Save everything', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
+          ['Save and open', [C('☁ Save: this browser', 'Browser → server', I.save, { big: true, title: 'Save: this browser → server (your location): everything, now' }), C('☁ Load: server', 'Server → browser', I.folder, { big: true, title: 'Load: server → this browser (what is open here is replaced; Undo brings it back)' }), C('⇄ Bring in', 'Bring in…', I.folder, { big: true, title: 'Bring in from another location or account: replace or merge into what is open here' }), C('📂 Load: file', 'File → browser', I.folder, { big: true, title: 'Load: file → this browser. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save a part only → file: the month', 'Month → file', I.save), C('💾 Save: this browser → file (everything)', 'Everything → file', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
         ] },
       ],
     });
@@ -8985,9 +9074,9 @@ function hourlyWeekDialog() { HW.dialog(); }
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
         { icon: 'wand', title: 'Start (wizard)', run: showStart },
-        { icon: 'save', title: 'Save everything to a file (team, availability, schedules, time off, calendar and all settings)', key: 'Ctrl+S', run: () => saveFile('location') },
-        { icon: 'export', title: 'Save to the server (your location in AccountCraft): everything, now', run: () => saveToServer() },
-        { icon: 'open', title: 'Open (load) a saved file: Save everything brings back the team, schedules, time off and all settings', key: 'Ctrl+O', run: () => openFile() },
+        { icon: 'save', title: 'Save: on this computer (a file) or the server (your location): choose', key: 'Ctrl+S', run: () => saveDialog() },
+        { icon: 'cloud', title: 'Save: this browser → server (your location): everything, now', run: () => saveToServer() },
+        { icon: 'open', title: 'Load: file → this browser (a file saved with Save everything brings back the team, schedules, time off and settings)', key: 'Ctrl+O', run: () => openFile() },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },
@@ -9006,6 +9095,9 @@ function hourlyWeekDialog() { HW.dialog(); }
     // the top line keeps what you act on (menu, quick buttons, search, Log in, theme, help); what you are working on (the
     // store, the week) is always on the second line, at the right of the ribbon's tabs
     { const info = document.querySelector('.ctb-info'), extra = document.querySelector('.crb-extra'); if (info && extra) extra.prepend(info); }
+    // the company's logo before the location's chip (AccountCraft › the company)
+    const logoNow = () => { const info = document.querySelector('.ctb-info'); if (!info) return; let im = info.querySelector('.co-logo'); const src = companyLogo(); if (!src) { if (im) im.remove(); return; } if (!im) { im = h('img', { class: 'co-logo', alt: '' }); info.prepend(im); } if (im.src !== src) im.src = src; };
+    window.addEventListener('sc-rendered', logoNow); setInterval(logoNow, 3000); logoNow();
     const ic = document.createElement('link'); ic.rel = 'icon';
     ic.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
     document.head.append(ic);

@@ -41,6 +41,38 @@
     } }] });
   }
   // The one Save dialog: what, then (for schedules) how much.
+  // ---- Save: where it goes. This computer (a file you keep), the server (your location, or your own account copy), and
+  // what this browser keeps by itself. Ctrl+S and the Save button open it; the likely choice is ready for Enter.
+  const SAVE_ICON = {
+    file: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><rect x="8" y="6" width="32" height="36" rx="3" fill="#3b82f6"/><rect x="14" y="6" width="20" height="12" rx="1" fill="#dbeafe"/><rect x="28" y="8" width="4" height="8" fill="#3b82f6"/><rect x="13" y="25" width="22" height="13" rx="2" fill="#eff6ff"/><path d="M17 30h14M17 34h10" stroke="#93c5fd" stroke-width="2"/></svg>',
+    cloud: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M14 38h22a9 9 0 0 0 1.4-17.9A13 13 0 0 0 12.2 18 10 10 0 0 0 14 38z" fill="#0ea5e9"/><path d="M24 33V21m-6 6 6-6 6 6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    browser: '<svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><rect x="5" y="9" width="38" height="30" rx="4" fill="#64748b"/><rect x="5" y="9" width="38" height="7" rx="3" fill="#475569"/><circle cx="10" cy="12.5" r="1.6" fill="#f87171"/><circle cx="15" cy="12.5" r="1.6" fill="#fbbf24"/><circle cx="20" cy="12.5" r="1.6" fill="#34d399"/><path d="M15 29l5 5 13-12" fill="none" stroke="#bbf7d0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+  function saveDialog() {
+    const A = CA(), l = curLoc(), st = accState(), icon = (k) => { const s = h('span', { class: 'save-ic' }); s.innerHTML = SAVE_ICON[k]; return s; };
+    const card = (k, title, sub, kids) => h('div', { class: 'save-card' }, h('div', { class: 'save-head' }, k === 'cloud' && companyLogo() ? h('img', { src: companyLogo(), alt: '', style: { width: '44px', height: '44px', objectFit: 'contain', borderRadius: '6px', background: '#fff' } }) : icon(k), h('div', null, h('b', null, title), h('div', { class: 'muted small' }, sub))), h('div', { class: 'save-btns' }, ...kids));
+    const btn = (label, desc, run, o = {}) => h('button', { type: 'button', class: 'btn' + (o.primary ? ' primary' : ''), title: desc, disabled: !!o.disabled, onclick: () => { close(); run(); } }, label);
+    let close = () => {};
+    const cloudLine = !A ? 'Log in to save on the server: the same schedule at work and at home, shared with the people at your location.'
+      : plan.example ? 'This is the example schedule: open or make your own first.'
+      : l ? `${l.company ? l.company + ' › ' : ''}${l.name}: shared with everyone who works there.${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ' Not saved there yet.'}${!locSaves() ? ' You can look here, not save (' + LROLE[l.role] + ').' : ''}`
+      : `Your own account (only you see it).${st.synced ? ' Last saved ' + new Date(st.synced).toLocaleString() + '.' : ''}`;
+    const body = h('div', { class: 'save-grid' },
+      card('cloud', 'The server' + (A ? serverWhere() : ''), cloudLine, !A ? [btn('Log in…', 'Log in with your Craft account', () => window.CraftAccount && CraftAccount.loginDialog && CraftAccount.loginDialog(), { primary: true })] : [
+        btn('Save: this browser → server', 'Everything (team, schedules, time off, calendar, settings, store profile, designs), now', saveToServer, { primary: !plan.example && locSaves(), disabled: plan.example || !locSaves() }),
+        btn('Load: server → this browser', 'What is open here is replaced by the server’s copy (Undo brings it back)', loadFromServer),
+        btn('📍 Switch location…', 'Open another location you work at', chooseLocation),
+        btn('⇄ Bring in from another location or account…', 'Replace or merge what is open here with a schedule you can open', bringIn)]),
+      card('file', 'This computer (a file)', 'A .json file you keep, copy or email. Everything: the team, every week, time off, calendar, forecast, settings, store profile and designs.', [
+        btn('Save: this browser → file (everything)', 'Saves a file with everything', () => saveFile('location'), { primary: !A || plan.example }),
+        btn('Save as… (choose the folder and name)', 'Saves everything, asking where', () => saveFile('location', { as: true })),
+        btn('Save a part only…', 'This week, the month, the team or one day', () => saveAsDialog({ what: 'schedule' })),
+        btn('📂 Load: file → this browser', 'Opens a saved file', () => openFile())]),
+      card('browser', 'This browser', 'Every change is kept here by itself, as you work (even with nobody logged in). It stays on this computer and in this browser only.', [
+        h('span', { class: 'muted small' }, plan.example ? 'Example data: not kept.' : `Kept now: ${plan.staff.length} people, ${Object.keys(plan.shifts).length} days with shifts.`)]));
+    close = modal({ title: 'Save', wide: true, body, actions: [{ label: 'Close' }] }).close;
+    setTimeout(() => { const p = document.querySelector('.save-grid .btn.primary:not([disabled])'); if (p) p.focus(); }, 0);
+  }
   function saveAsDialog(preset = {}) {
     const c = { what: preset.what || 'all', range: preset.range || 'week' };
     const wkFrom = h('select', { class: 'input' }, Array.from({ length: plan.weeks }, (_, k) => h('option', { value: k, selected: k === weekOf(ui.day) }, `Week ${k + 1} (${shortDate(weekDays(k)[0])})`)));

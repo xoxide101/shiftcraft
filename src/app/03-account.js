@@ -35,6 +35,46 @@
     if (st.synced) return { text: '☁ saved ' + new Date(st.synced).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), title: `Saved to the server${l ? ' for ' + l.name : ' in your account'}: ${new Date(st.synced).toLocaleString()} (click to save again)`, run: () => saveToServer() };
     return { text: '☁ not saved yet', title: 'Click to save to the server', run: () => saveToServer() };
   }
+  const serverWhere = () => { const l = curLoc(); return l ? ` (${l.name}${l.number && !String(l.name).includes(l.number) ? ' #' + l.number : ''})` : CA() ? ' (your account)' : ' (log in first)'; };
+  // ☁ Load: server → this browser (what is open here is replaced; Undo brings it back)
+  async function loadFromServer() {
+    const A = CA(); if (!A) { toast('Log in first.'); if (window.CraftAccount && CraftAccount.loginDialog) CraftAccount.loginDialog(); return; }
+    const l = curLoc();
+    try {
+      const r = l ? await A.api('GET', locPath(l)).catch((e) => { if (e.status === 404) return null; throw e; }) : await A.get('shiftcraft', accKey());
+      const v = l ? r && r.value : r; if (!v || !v.plan) { toast(`The server has nothing saved${serverWhere()} yet: use ☁ Save first.`); return; }
+      const what = `${v.plan.staff.length} people, ${Object.keys(v.plan.shifts || {}).length} days with shifts, saved ${new Date(l ? r.changed : v.savedAt).toLocaleString()}${l && r.by ? ' by ' + r.by : ''}`;
+      modal({ title: `☁ Load: server → this browser${serverWhere()}`, body: h('p', null, `What is open here is replaced by the server’s copy (${what}). Undo brings this browser’s back.`),
+        actions: [{ label: 'Cancel' }, { label: 'Load it', primary: true, onClick: () => { extrasBack(v.extras); takePlan(v.plan, v.savedAt, l ? r.changed : '', `Loaded from the server${serverWhere()}`); } }] });
+    } catch (e) { toast(e.message); }
+  }
+  // ⇄ Bring in from another location (one you can open) or a copy in your own account: replaces or merges into what is
+  // open here, which then goes to this browser's location as usual
+  function mergeInto(a, b) {
+    const pa = JSON.parse(JSON.stringify(a)), idMap = {}, key = (n) => String(n || '').trim().toLowerCase();
+    for (const s of b.staff || []) { const same = pa.staff.find((x) => key(x.name) === key(s.name)); if (same) idMap[s.id] = same.id; else { const n = JSON.parse(JSON.stringify(s)); if (pa.staff.some((x) => x.id === n.id)) n.id = uid(); idMap[s.id] = n.id; pa.staff.push(n); } }
+    for (const [d, list] of Object.entries(b.shifts || {})) { const here = (pa.shifts[d] = pa.shifts[d] || []); for (const sh of list) { const n = { ...sh, staffId: idMap[sh.staffId] || sh.staffId }; if (!here.some((x) => x.staffId === n.staffId && x.start === n.start && x.end === n.end)) { n.id = uid(); here.push(n); } } }
+    for (const [k, v] of Object.entries(b)) { if (k === 'staff' || k === 'shifts') continue;
+      if (pa[k] === undefined) pa[k] = v;
+      else if (Array.isArray(pa[k]) && Array.isArray(v)) { const seen = new Set(pa[k].map((x) => JSON.stringify(x))); for (const x of v) if (!seen.has(JSON.stringify(x))) pa[k].push(x); }
+      else if (pa[k] && typeof pa[k] === 'object' && v && typeof v === 'object') for (const [kk, vv] of Object.entries(v)) if (pa[k][kk] === undefined) pa[k][kk] = vv; }
+    return pa;
+  }
+  async function bringIn() {
+    const A = CA(); if (!A) { toast('Log in first: then you can bring in a location’s or your account’s schedule. (A file: 📂 Load.)'); if (window.CraftAccount && CraftAccount.loginDialog) CraftAccount.loginDialog(); return; }
+    const l = curLoc(), src = [];
+    try { for (const x of (await A.api('GET', 'locations')).locations) if (!l || x.id !== l.id) src.push({ label: `📍 ${x.companyName ? x.companyName + ' › ' : ''}${x.name}${x.number && !String(x.name).includes(x.number) ? ' #' + x.number : ''}`, get: async () => { const r = await A.api('GET', `locations/${x.id}/data/shiftcraft/plan`); return r.value; } }); } catch (e) { /* none */ }
+    try { const mine = await A.all('shiftcraft'); for (const [k, v] of Object.entries(mine || {})) if (/^plan /.test(k) && v.value && v.value.plan) src.push({ label: `👤 My account: ${k.slice(5)}`, get: async () => v.value }); } catch (e) { /* none */ }
+    if (!src.length) { toast('Nothing else to bring in: no other location or account copy.'); return; }
+    const sel = h('select', { class: 'input' }, ...src.map((s, i) => h('option', { value: i }, s.label)));
+    const go = async (how) => { try { const v = await src[+sel.value].get(); if (!v || !v.plan) return toast('That one has nothing saved.'); const np = how === 'merge' ? mergeInto(plan, v.plan) : v.plan;
+      if (l) { np.location = locLabel(l); np.company = l.company || np.company; }
+      snapshot(); normalize(np); plan = np; delete plan.example; persist(); render(); toast(`${how === 'merge' ? 'Merged' : 'Brought in'}: ${src[+sel.value].label.replace(/^\S+ /, '')} → this browser${l ? ', then to ' + l.name + ' on the server' : ''}. (Undo brings back what was here.)`); } catch (e) { toast(e.message); } };
+    modal({ title: '⇄ Bring in from another location or account', body: h('div', null,
+        h('p', null, `Take a schedule you can open into what is open here${l ? ` (${l.name}, which then saves it to the server for ${l.name})` : ''}.`), h('label', { class: 'field' }, h('span', null, 'From'), sel),
+        h('p', { class: 'muted' }, 'Replace: theirs instead of what is here. Merge: people matched by name, their shifts, events, time off and the rest added without doubles. Undo works for both.')),
+      actions: [{ label: 'Cancel' }, { label: 'Merge into this', onClick: () => go('merge') }, { label: 'Replace with it', primary: true, onClick: () => go('replace') }] });
+  }
   // File › Save to the server, and the title bar's ☁: now, not in a few seconds
   async function saveToServer() {
     const A = CA(); if (!A) { if (window.CraftAccount && CraftAccount.loginDialog) { toast('Log in first: then Save to the server.'); CraftAccount.loginDialog(); } else toast('Saving to the server needs the account page (AccountCraft).'); return; }
@@ -86,11 +126,16 @@
     accQuiet = true; plan = np; delete plan.example; persist(); accQuiet = false; accLast = JSON.stringify(plan); setAcc({ synced: savedAt, base: base || '', dirty: false }); render();
     if (!quiet || note) toast(note + ' (Undo brings back this browser’s)');
   }
+  // the company's logo (AccountCraft › the company): kept in this browser for the title bar, the Save window and printouts
+  const LOGO_KEY = KEY + '-colog';
+  function companyLogo() { try { const o = JSON.parse(localStorage.getItem(LOGO_KEY) || 'null'), l = curLoc(); return o && l && o.company === l.companyId ? o.logo || '' : ''; } catch (e) { return ''; } }
+  async function refreshLogo() { const A = CA(), l = curLoc(); if (!A || !l || !l.companyId) return; try { const c = (await A.api('GET', 'companies')).companies.find((x) => x.id === l.companyId); const was = companyLogo(), now = (c && c.logo) || ''; localStorage.setItem(LOGO_KEY, JSON.stringify({ company: l.companyId, logo: now })); if (was !== now) render(); } catch (e) { /* later */ } }
   async function accountCheck() {
     const A = CA(); if (!A) return; if (accBusy) { accAgain = true; return; } accBusy = true; accSeen = Date.now();
     try {
       const st = accState(), l = curLoc();
       if (l) {
+        refreshLogo();
         let r = null; try { r = await A.api('GET', locPath(l)); } catch (e) { if (e.status === 403) { setAcc({ loc: null }); toast(`You no longer work at ${l.name}: back to this browser’s plan.`); render(); return; } if (e.status !== 404) throw e; }
         if (!r) return locEmpty(l);
         if (r.changed === st.base) { if (st.dirty && locSaves()) await accountSend(); return; }
@@ -130,7 +175,7 @@
     let list = []; try { list = (await A.api('GET', 'locations')).locations; } catch (e) { toast(e.message); return; }
     const cur = curLoc(), u = A.user(), by = {};
     for (const x of list) (by[x.companyName || 'No company'] = by[x.companyName || 'No company'] || []).push(x);
-    const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
+    const pick = (x) => { if (accState().dirty && cur && locSaves()) accountSend(); setAcc({ loc: x ? { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id } : null, base: '', synced: '', dirty: false }); viewTold = false; document.querySelectorAll('.backdrop').forEach(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); accountCheck().then(render); };
     modal({ title: 'Which location?', wide: true, body: h('div', null,
       list.length ? Object.entries(by).map(([co, ls]) => h('div', null, h('h3', { style: 'margin:10px 0 4px' }, co),
         ...ls.map((x) => h('button', { class: 'btn' + (cur && cur.id === x.id ? ' primary' : ''), style: 'display:flex;width:100%;justify-content:space-between;margin:4px 0', onclick: () => pick(x) },
@@ -158,12 +203,12 @@
       if (curLoc() && curLoc().id === want) return;
       return A.api('GET', 'locations').then((r) => { const x = r.locations.find((l) => l.id === want); if (!x) return toast('You do not work at that location (ask its manager or the admin).');
         if (accState().dirty && curLoc() && locSaves()) accountSend();
-        setAcc({ loc: { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', role: x.myRole, user: u.id }, base: '', synced: '', dirty: false }); viewTold = false; return accountCheck().then(render); }).catch(() => {}); }
+        setAcc({ loc: { id: x.id, name: x.name, number: x.number || '', company: x.companyName || '', companyId: x.company || '', role: x.myRole, user: u.id }, base: '', synced: '', dirty: false }); viewTold = false; return accountCheck().then(render); }).catch(() => {}); }
     if (curLoc() || accState().asked === u.id) return; setAcc({ asked: u.id });
     A.api('GET', 'locations').then((r) => {
       if (!r.locations.length) return;
       const m = matchLocation(r.locations);
-      if (m) { setAcc({ loc: { id: m.id, name: m.name, number: m.number || '', company: m.companyName || '', role: m.myRole, user: u.id }, base: '', synced: '', dirty: true, auto: true }); toast(`This schedule is ${m.companyName ? m.companyName + ' › ' : ''}${m.name}: linked to that location.`); return accountCheck().then(render); }
+      if (m) { setAcc({ loc: { id: m.id, name: m.name, number: m.number || '', company: m.companyName || '', companyId: m.company || '', role: m.myRole, user: u.id }, base: '', synced: '', dirty: true, auto: true }); toast(`This schedule is ${m.companyName ? m.companyName + ' › ' : ''}${m.name}: linked to that location.`); return accountCheck().then(render); }
       chooseLocation();
     }).catch(() => {});
   }

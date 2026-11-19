@@ -5,7 +5,7 @@
     if ($('.backdrop')) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveFile('location'); return; }
+    if (mod && k === 's') { e.preventDefault(); if (e.shiftKey) saveAsDialog(); else saveDialog(); return; }
     if (mod && k === 'o') { e.preventDefault(); openFile(); return; }
     if (mod && k === 'p' && e.shiftKey) { e.preventDefault(); printScreenDialog(); return; }
     if (mod && k === 'p') { e.preventDefault(); if (inFrame) blockedHere(); else if (ui.tab === 'calendar') calPrintDialog(); else printPageDialog(); return; }

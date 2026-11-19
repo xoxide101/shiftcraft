@@ -8,8 +8,8 @@
     st.textContent = '.ctb { position: sticky; top: 0; z-index: 56; } body > .bar { display: none !important; } .crb .month-pick { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; } .crb .month-pick select { height: 28px; }';
     document.head.append(st);
     // Ribbon buttons reuse the menu commands, so both always do the same thing.
-    const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label);
-    const item = (start) => all().find((it) => it.label === start) || all().find((it) => it.label.startsWith(start)) || {};
+    const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label), text = (it) => (typeof it.label === 'function' ? it.label() : it.label);
+    const item = (start) => all().find((it) => text(it) === start) || all().find((it) => text(it).startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
     const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company', 'border'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
@@ -52,7 +52,7 @@
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true }), C('Undo', 'Undo', I.undo, { big: true })]],
         ] },
         { id: 'week', label: 'Week', hue: '#1e9e8a', onSelect: view('week'), groups: [
-          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save this week’s schedule only', 'Save week', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
+          ['This week', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Save a part only → file: this week', 'Week → file', I.save, { big: true }), C('Copy a week', 'Copy week…', I.copy, { big: true })]],
           ['Check', [C('Check schedule', 'Check schedule', I.check, { big: true })]],
         ] },
         { id: 'calendar', label: 'Calendar', hue: '#3c8d3c', onSelect: view('calendar'), groups: [
@@ -67,7 +67,7 @@
           ['Hand-off', [C('Print…', 'Print this list', I.print, { big: true }), C('Save as text or CSV', 'Text or CSV', I.textFile, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
         ] },
         { id: 'staff', label: 'Staff', hue: '#d1408a', onSelect: view('staff'), groups: [
-          ['Team', [C('Save team only', 'Save team', I.save, { big: true }), C('Open', 'Open a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
+          ['Team', [C('Save a part only → file: the team', 'Team → file', I.save, { big: true }), C('📂 Load: file', 'Load a team file', I.folder, { big: true }), C('Print schedule for a person', 'Print for a person', I.person, { big: true })]],
           ['Time off', [C('Time off request', 'Time off request…', I.calendar, { big: true }), { col: [C('Not available some hours', 'Appointment…', I.clock), C('Time off list', 'Time off list', I.list)] }]],
           ['New hires', [C('New-hire checklist', 'New-hire checklist', I.checklist, { big: true })]],
         ] },
@@ -83,7 +83,7 @@
         { id: 'share', label: 'Print & share', hue: '#138a9e', groups: [
           ['Print or save pictures', [C('Print or save week table', 'Week table', I.table, { big: true }), C('Print or save visual timeline', 'Timeline', I.timeline, { big: true }), C('Print or save the hourly week', 'Hourly week', I.timeline, { big: true }), C('Print the calendar', 'Calendar', I.calendar, { big: true }), C('Print schedule for a person', 'Person or group', I.person, { big: true }), C('Print availability and contact list', 'Availability list', I.table, { big: true, title: 'Everyone’s phone, positions trained, day-by-day availability and validated, on one landscape page' }), C('Print screen', 'Print screen', I.screen, { big: true })]],
           ['Share', [C('Email or share', 'Email or share', I.mail, { big: true }), C('Save emailable file', 'Emailable file', I.share, { big: true })]],
-          ['Save and open', [C('Open', 'Open…', I.folder, { big: true, title: 'Open a saved file. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save month', 'Save month', I.save), C('Save location', 'Save everything', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
+          ['Save and open', [C('☁ Save: this browser', 'Browser → server', I.save, { big: true, title: 'Save: this browser → server (your location): everything, now' }), C('☁ Load: server', 'Server → browser', I.folder, { big: true, title: 'Load: server → this browser (what is open here is replaced; Undo brings it back)' }), C('⇄ Bring in', 'Bring in…', I.folder, { big: true, title: 'Bring in from another location or account: replace or merge into what is open here' }), C('📂 Load: file', 'File → browser', I.folder, { big: true, title: 'Load: file → this browser. A Save everything file brings back the team, schedules, time off and all the settings.' }), C('Save…', 'Save…', I.save, { big: true }), { col: [C('Save a part only → file: the month', 'Month → file', I.save), C('💾 Save: this browser → file (everything)', 'Everything → file', I.save), C('Save as text or CSV', 'Text or CSV', I.textFile)] }]],
         ] },
       ],
     });
@@ -95,9 +95,9 @@
       mount: document.body, toast: (m) => toast(m), logo: LOGO, menus: () => MENUS, ribbon,
       quick: [
         { icon: 'wand', title: 'Start (wizard)', run: showStart },
-        { icon: 'save', title: 'Save everything to a file (team, availability, schedules, time off, calendar and all settings)', key: 'Ctrl+S', run: () => saveFile('location') },
-        { icon: 'cloud', title: 'Save to the server (your location in AccountCraft): everything, now', run: () => saveToServer() },
-        { icon: 'open', title: 'Open (load) a saved file: Save everything brings back the team, schedules, time off and all settings', key: 'Ctrl+O', run: () => openFile() },
+        { icon: 'save', title: 'Save: on this computer (a file) or the server (your location): choose', key: 'Ctrl+S', run: () => saveDialog() },
+        { icon: 'cloud', title: 'Save: this browser → server (your location): everything, now', run: () => saveToServer() },
+        { icon: 'open', title: 'Load: file → this browser (a file saved with Save everything brings back the team, schedules, time off and settings)', key: 'Ctrl+O', run: () => openFile() },
         { icon: 'undo', title: 'Undo', key: 'Ctrl+Z', run: undo, disabled: () => !undoStack.length },
         { icon: 'print', title: 'Print or save: week table, timeline, calendar or the availability and contact list', run: () => exportImageDialog({ layout: 'table' }) },
         { icon: 'export', title: 'Email or share', run: emailDialog },
@@ -116,6 +116,9 @@
     // the top line keeps what you act on (menu, quick buttons, search, Log in, theme, help); what you are working on (the
     // store, the week) is always on the second line, at the right of the ribbon's tabs
     { const info = document.querySelector('.ctb-info'), extra = document.querySelector('.crb-extra'); if (info && extra) extra.prepend(info); }
+    // the company's logo before the location's chip (AccountCraft › the company)
+    const logoNow = () => { const info = document.querySelector('.ctb-info'); if (!info) return; let im = info.querySelector('.co-logo'); const src = companyLogo(); if (!src) { if (im) im.remove(); return; } if (!im) { im = h('img', { class: 'co-logo', alt: '' }); info.prepend(im); } if (im.src !== src) im.src = src; };
+    window.addEventListener('sc-rendered', logoNow); setInterval(logoNow, 3000); logoNow();
     const ic = document.createElement('link'); ic.rel = 'icon';
     ic.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
     document.head.append(ic);

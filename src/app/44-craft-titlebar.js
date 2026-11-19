@@ -292,7 +292,7 @@
         const all = commands();
         custom.add.forEach((label) => {
           const c = all.find((x) => x.label === label);
-          if (c) add({ title: c.label, short: c.label.replace(/…$/, '').slice(0, 18), icon: c.icon || '', key: c.key, run: c.run, disabled: c.disabled }, !c.icon);
+          if (c) add({ title: c.label, short: String(c.label).replace(/…$/, '').slice(0, 18), icon: c.icon || '', key: c.key, run: c.run, disabled: c.disabled }, !c.icon);
         });
         const more = mk('button', 'ctb-q ctb-more'); more.type = 'button';
         more.innerHTML = svg('more'); more.title = 'Customize the quick buttons'; more.setAttribute('aria-label', 'Customize the quick buttons');

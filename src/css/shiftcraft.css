@@ -891,3 +891,11 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .wk-browse .wk-nav { align-self: center; min-width: 30px; font-weight: 700; }
 .weeks > .btn.out { font-style: italic; }
 .wk-browse .wk-nav { font-size: 16px; line-height: 1; padding: 3px 9px; }
+
+/* the Save dialog: where it goes, with a picture each */
+.save-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.save-card { border: 1px solid var(--line, #d0d5dd); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--panel, transparent); }
+.save-head { display: flex; gap: 10px; align-items: flex-start; } .save-head b { font-size: 15px; }
+.save-ic { flex: none; line-height: 0; }
+.save-btns { display: flex; flex-direction: column; gap: 6px; } .save-btns .btn { text-align: left; justify-content: flex-start; white-space: normal; height: auto; min-height: 32px; line-height: 1.3; }
+.ctb-info .co-logo { height: 20px; max-width: 60px; object-fit: contain; border-radius: 3px; background: #fff; padding: 1px; align-self: center; }
