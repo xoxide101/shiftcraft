@@ -105,7 +105,7 @@
       getTitle: () => ui.fileName || placeName(),
       getStatus: () => ({ text: plan.example ? 'Example data · autosaves in this browser' : CA() ? 'Autosaves in this browser and your account' : 'Autosaves in this browser' }),
       getInfo: () => [
-        { text: placeName(), title: 'Company and location (click to change)', run: () => { ui.tab = 'company'; persist(); render(); } },
+        (() => { const l = curLoc(); return l ? { text: `📍 ${l.name}${l.number ? ' #' + l.number : ''}${locSaves() ? '' : ' · ' + LROLE[l.role]}`, title: `${l.company ? l.company + ' › ' : ''}${l.name}: the location’s schedule, shared by everyone who works there (click to choose another location)`, run: chooseLocation } : { text: placeName(), title: CA() ? 'Company and location (click to choose a location from your account)' : 'Company and location (click to change)', run: () => { if (CA()) chooseLocation(); else { ui.tab = 'company'; persist(); render(); } } }; })(),
         { text: 'Week of ' + shortDate(weekDays(weekOf(ui.day))[0]), title: 'The week you are working on' },
       ],
       rightEls: [window.CraftAccount && CraftAccount.button ? CraftAccount.button() : null, document.getElementById('theme-btn')].filter(Boolean),

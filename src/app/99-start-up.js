@@ -2,5 +2,5 @@
   started = true;
   accLast = JSON.stringify(plan);
   checkEmbedded();
-  accountCheck();
+  accountCheck(); askLocationOnce();
 })();
