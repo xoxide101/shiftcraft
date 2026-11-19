@@ -646,7 +646,7 @@ table.cal td.cal-day { padding: 0; }
 td.cal-day { position: relative; }
 td.cal-day.cal-sel { outline: 3px solid #3e63dd; outline-offset: -3px; }
 /* the days picked: a footer locked to the bottom of the window (it never moves the month, so double-clicks land where aimed) */
-.cal-selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 18px; background: var(--panel); color: var(--fg); border-top: 2px solid #3e63dd; box-shadow: 0 -4px 14px rgba(0, 0, 0, .12); }
+.cal-selbar { position: fixed; left: var(--craft-rail, 0px); right: 0; bottom: 0; z-index: 40; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 18px; background: var(--panel); color: var(--fg); border-top: 2px solid #3e63dd; box-shadow: 0 -4px 14px rgba(0, 0, 0, .12); }
 body:has(.cal-selbar:not([hidden])) .main { padding-bottom: 64px; }
 .cal-selbar[hidden] { display: none; }
 .cal-dpics { position: absolute; top: 3px; right: 24px; display: flex; gap: 2px; z-index: 1; pointer-events: none; }
