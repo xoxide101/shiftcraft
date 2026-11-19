@@ -105,6 +105,21 @@ The Staff tab has four sections:
 - Autosaves in the browser; **Settings** shows how much storage is used and can clear old weeks.
 - If something goes wrong at start-up, a banner offers a backup of your data.
 
+## Your account, locations and the server
+
+ShiftCraft works on its own in the browser, with no login (everything is kept in this browser, and in files you save).
+With a Craft account (AccountCraft, on the same web server), it can also keep the schedule on the server:
+
+- **Locations.** An admin sets up companies and their locations in AccountCraft and gives people a role at each
+  (location manager, scheduler, associate or view only). A location's schedule belongs to the location: everyone who
+  works there sees the same one. The 📍 chip in the title bar chooses the location; logging in links a matching one.
+- **Save and open** (Ctrl+S): **Computer → Server**, **Server → Computer**, **Computer → File**, **File → Computer**.
+  The ☁ chip says when it was last saved. If someone else saved the location since you opened it, you choose:
+  keep yours, keep theirs, or keep both.
+- **Nothing is lost.** Whenever one copy replaces a different one, the replaced copy is kept as a backup (with the
+  date and both sides' counts); deleted things wait in the admin's bin in AccountCraft.
+- **The Craft apps bar** on the left goes to the other Craft apps; the unified ones (one account) are at the top.
+
 ## Keyboard shortcuts
 
 | Action | Keys |
