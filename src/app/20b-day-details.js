@@ -32,7 +32,7 @@
     if (p.img) return h('img', { class: cls, src: p.img, alt: '' });
     const ic = dayIcons()[p.icon]; const s = h('span', { class: cls }); if (ic) s.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ic[1]}</svg>`; return s;
   };
-  const picName = (p) => (p.img ? 'Your picture' : (dayIcons()[p.icon] || [p.icon])[0]);
+  const picName = (p) => (p.img ? p.name || 'Your picture' : (dayIcons()[p.icon] || [p.icon])[0]);
   // on the Calendar's day: small pictures by the date, big faded ones behind
   function dayPicsEl(d) {
     const x = dayLook(d); if (!x || !x.pics || !x.pics.length) return null;
@@ -41,7 +41,7 @@
       corner.length ? h('div', { class: 'cal-dpics', title: corner.map(picName).join(', ') }, corner.slice(0, 3).map((p) => picEl(p, 'cal-dpic'))) : null];
   }
 
-  // ---------- choosing a picture: the Border designer's, by group and search, or a picture file ----------
+  // ---------- choosing a picture: the Border designer's, by group and search, clip art, or a picture file ----------
   function picturePicker(pick) {
     const ic = dayIcons(), en = typeof bEng === 'function' ? bEng() : null, cat = (en && en.cat) || {};
     const groups = [...new Set(Object.keys(ic).map((k) => cat[k] || 'Other'))];
@@ -55,9 +55,21 @@
     q.addEventListener('input', fill); g.addEventListener('change', fill);
     const file = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async () => { const f = file.files[0]; if (!f) return;
       try { const url = await smallPicture(f); m.close(); pick({ img: url }); } catch (e) { toast('Could not read that picture: ' + e.message); } } });
-    m = modal({ title: 'Add a picture', wide: true, body: [h('div', { class: 'inline', style: { gap: '8px', marginBottom: '8px' } }, q, g, h('button', { class: 'btn sm', type: 'button', onclick: () => file.click() }, 'From a picture file…'), file), grid],
+    m = modal({ title: 'Add a picture', wide: true, body: [h('div', { class: 'inline', style: { gap: '8px', marginBottom: '8px' } }, q, g, window.CraftClipartPicker ? h('button', { class: 'btn sm', type: 'button', title: 'From the clip-art library (the clip-art server, or this browser’s)', onclick: () => { m.close(); fromClipart(pick); } }, 'From clip art…') : null, h('button', { class: 'btn sm', type: 'button', onclick: () => file.click() }, 'From a picture file…'), file), grid],
       actions: [{ label: 'Cancel' }] });
     fill();
+  }
+  // a clip-art picture: kept in the schedule itself (as data, never a file of its own), so it goes to the server with the
+  // location's schedule. An SVG stays an SVG (sharp in printouts) when it is small; else a picture at most 360 pixels across
+  function fromClipart(pick) {
+    window.CraftClipartPicker.open({ app: 'ShiftCraft', svg: true, onPick: async (c) => {
+      try {
+        let img;
+        if (c.svg && c.svg.length < 60000) img = 'data:image/svg+xml;base64,' + btoa(Array.from(new TextEncoder().encode(c.svg), (b) => String.fromCharCode(b)).join(''));
+        else img = await smallPicture(c.png ? new File([c.png], 'clip.png', { type: 'image/png' }) : c.file);
+        pick({ img, name: c.name });
+      } catch (e) { toast('Could not use that picture: ' + e.message); }
+    } });
   }
   // your own picture, made small enough to keep in the schedule file (at most 360 pixels across)
   async function smallPicture(f) {
