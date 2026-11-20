@@ -1,7 +1,7 @@
   // ===================================================================
   // Screens
   // ===================================================================
-  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['calendar', 'Calendar'], ['forecast', 'Forecast'], ['handoff', 'Hand-off'], ['staff', 'Staff'], ['company', 'Company & Location'], ['border', 'Border designer']];
+  const TABS = [['schedule', 'Schedule'], ['week', 'Week'], ['calendar', 'Calendar'], ['forecast', 'Forecast'], ['reports', 'Reports'], ['handoff', 'Hand-off'], ['staff', 'Staff'], ['company', 'Company & Location'], ['border', 'Border designer']];
   function render() {
     if (!planDays().includes(ui.day)) ui.day = plan.startDate;
     $('#tabs').replaceChildren(...TABS.map(([k, l]) => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(ui.tab === k), onclick: () => { ui.tab = k; persist(); render(); } }, l)));
@@ -10,7 +10,7 @@
     fillMonthSelect();
     const main = $('#main');
     main.replaceChildren();
-    ({ schedule: scheduleView, week: weekView, calendar: calendarView, forecast: forecastView, handoff: handoffView, staff: staffView, company: companyView, border: borderView })[ui.tab](main);
+    ({ schedule: scheduleView, week: weekView, calendar: calendarView, forecast: forecastView, reports: reportsView, handoff: handoffView, staff: staffView, company: companyView, border: borderView })[ui.tab](main);
     document.title = (ui.fileName ? ui.fileName + ' – ' : '') + 'ShiftCraft';
     paintThemeButton();
   }

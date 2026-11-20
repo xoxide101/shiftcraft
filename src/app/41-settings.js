@@ -29,12 +29,12 @@
   }
   function clearOldDialog() {
     const before = h('input', { class: 'input', type: 'date', value: addDays(plan.startDate, -182) });
-    modal({ title: 'Clear old weeks', body: [h('label', { class: 'field' }, h('span', null, 'Remove shifts and forecasts before'), before),
-      h('p', { class: 'hint' }, 'Only needed if the browser’s storage fills up. Save those months to files first (File › Save all weeks) if you may want them again. Past sales are kept for the trend.')],
+    modal({ title: 'Clear old weeks', body: [h('label', { class: 'field' }, h('span', null, 'Remove shifts before'), before),
+      h('p', { class: 'hint' }, 'Only needed if the browser’s storage fills up. Save those months to files first (File › Save all weeks) if you may want them again. Past sales and forecasts are kept (they are small) for the trend and the reports.')],
     actions: [{ label: 'Cancel' }, { label: 'Clear', danger: true, onClick: () => {
       if (!before.value) return false;
       let n = 0;
-      change(() => { Object.keys(plan.shifts).forEach((d) => { if (d < before.value) { n += plan.shifts[d].length; delete plan.shifts[d]; } }); Object.keys(plan.forecast).forEach((d) => { if (d < before.value) delete plan.forecast[d]; }); });
+      change(() => { Object.keys(plan.shifts).forEach((d) => { if (d < before.value) { n += plan.shifts[d].length; delete plan.shifts[d]; } }); });
       toast(`Removed ${n} old shift${n === 1 ? '' : 's'}. You can undo this.`);
     } }] });
   }

@@ -63,18 +63,26 @@
     fileIn.onchange = async () => { const f = fileIn.files[0]; if (f) ta.value = await f.text(); };
     modal({ title: 'Paste or import past sales', wide: true, body: [h('p', { class: 'hint' }, 'One day per line: a date and an amount, separated by a comma, tab or spaces. A heading line is skipped. Dates like 10/05/2026, 2026-10-05 or 5 Oct 2026 work.'), ta, fileIn],
       actions: [{ label: 'Cancel' }, { label: 'Import', primary: true, onClick: () => {
-        let n = 0, bad = 0;
+        // RAD's Forecast table pasted here by mistake (a date, then trend and forecast): offer it as the forecast instead
+        const today = iso(new Date()), rad = compParse(ta.value);
+        if (rad.days.length >= 2 && rad.days.filter((r) => r.d > today).length >= rad.days.length / 2 && (ta.value.match(/\$/g) || []).length >= rad.days.length * 2) {
+          setTimeout(() => modal({ title: 'This looks like a forecast', body: h('p', null, `These ${rad.days.length} days (${usDate(rad.days[0].d)} to ${usDate(rad.days[rad.days.length - 1].d)}) are mostly still to come, with a trend and a forecast each: ${companion().name}’s Forecast table. Past sales are what each day actually sold.`),
+            actions: [{ label: 'Cancel' }, { label: 'Use it as the forecast', primary: true, onClick: () => { setTimeout(() => companionImport(rad), 0); } }] }), 0);
+          return;
+        }
+        let n = 0, bad = 0, future = 0;
         const add = {};
         ta.value.split(/\r?\n/).forEach((line) => {
           if (!line.trim()) return;
-          const parts = line.split(/[,\t;]|\s{2,}/).map((x) => x.trim()).filter(Boolean);
+          // cells copied from a web table can come with nothing between them ("11/23/2026$2,830"): split before each $ amount
+          const parts = line.replace(/(\S)(?=-?\$)/g, '$1\t').split(/(?<!\d),|,(?!\d{3}(?!\d))|[\t;]|\s{2,}/).map((x) => x.trim()).filter((x) => x && !/%$/.test(x)); // (a comma inside 2,830 stays)
           const date = parts.map(parseDateText).find(Boolean);
           const amt = [...parts].reverse().map((x) => (parseDateText(x) ? null : parseAmount(x))).find((x) => x != null);
-          if (date && amt != null) { add[date] = amt; n++; } else bad++;
+          if (date && amt != null) { if (date > today) future++; else { add[date] = amt; n++; } } else bad++;
         });
-        if (!n) { toast('No dates with amounts found.'); return false; }
+        if (!n) { toast(future ? 'Those days are still to come: past sales are what a day actually sold.' : 'No dates with amounts found.'); return false; }
         change(() => Object.assign(plan.history, add));
-        toast(`Imported ${n} day${n === 1 ? '' : 's'}${bad > 1 ? `, skipped ${bad} line${bad === 1 ? '' : 's'}` : ''}`);
+        toast(`Imported ${n} day${n === 1 ? '' : 's'}${future ? `, left out ${future} still to come` : ''}${bad > 1 ? `, skipped ${bad} line${bad === 1 ? '' : 's'}` : ''}`);
       } }] });
   }
   function parseAmount(s) { const t = String(s).replace(/[$\s]/g, '').replace(/,(?=\d{3}\b)/g, ''); return /^-?\d+(\.\d+)?$/.test(t) ? +t : null; }

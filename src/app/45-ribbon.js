@@ -11,7 +11,7 @@
     const all = () => MENUS.flatMap((m) => m[1]).filter((it) => it && it.label), text = (it) => (typeof it.label === 'function' ? it.label() : it.label);
     const item = (start) => all().find((it) => text(it) === start) || all().find((it) => text(it).startsWith(start)) || {};
     const C = (start, label, icon, o = {}) => { const it = item(start); return { label: label || it.label, icon, key: it.key, run: () => it.run && it.run(), ...o }; };
-    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'handoff', 'staff', 'company', 'border'];
+    const VIEWS = ['schedule', 'week', 'calendar', 'forecast', 'reports', 'handoff', 'staff', 'company', 'border'];
     const view = (id) => () => { if (ui.tab !== id) { ui.tab = id; persist(); render(); } };
     // Start (the wizard): what do you want to do? Each tile goes to the place (or the window) for that job.
     const go = (start) => () => { const it = item(start); if (it.run) it.run(); };
@@ -21,6 +21,7 @@
       { title: 'Staff', what: 'Add people, phone, email, positions, training', run: view('staff') },
       { title: 'Availability', what: 'Who can work when (on each person’s Staff card)', run: view('staff') },
       { title: 'Forecast and labour', what: 'Sales, labour hours, AM / MID / PM', run: view('forecast') },
+      { title: 'Sales reports', what: 'Days, weeks, months, years: actual, forecast, last year', run: view('reports') },
       { title: 'Print or share', what: 'Week table, timeline, calendar, availability list, email', run: go('Print or save week table') },
       { title: 'Check the schedule', what: 'Gaps, overlaps, availability and hours', run: go('Check schedule') },
       { title: 'Calendar', what: 'Time off requests, holiday store hours and events; iCal in and out', run: view('calendar') },
@@ -64,6 +65,11 @@
           ['Companion site', [{ label: 'Paste forecast', icon: I.import, big: true, title: 'Paste the companion site’s Forecast table or whole page (copied there with Ctrl+C)', run: () => { view('forecast')(); companionPaste(); } },
             { col: [{ label: 'Open site', icon: I.screen, title: 'Open the companion site in its own tab', run: () => openCompanion() }, { label: 'Which site…', icon: I.gear, title: 'Name and address of the companion site', run: () => companionDialog() }] }]],
           ['Settings', [C('Settings', 'Settings…', I.gear, { big: true, title: 'Sales per labor hour, AM / MID / PM times, plan length' }), C('Company & location', 'Company & location', I.store, { big: true })]],
+        ] },
+        { id: 'reports', label: 'Reports', hue: '#2f9e8f', onSelect: view('reports'), groups: [
+          ['Show by', [['days', 'Days', I.calendar], ['weeks', 'Weeks', I.severalDays], ['months', 'Months', I.table], ['years', 'Years', I.list]].map(([k, l, ic]) => ({ label: l, icon: ic, big: true, pressed: () => rep.by === k, run: () => { rep.by = k; repSave(); view('reports')(); render(); } }))],
+          ['Go', [{ label: 'Today', icon: I.calendar, big: true, title: 'This month (Days) or this year', run: () => { rep.at = iso(new Date()); repSave(); view('reports')(); render(); } }, { col: [{ label: 'Before', icon: I.prev, run: () => { view('reports')(); repStep(-1); } }, { label: 'After', icon: I.next, run: () => { view('reports')(); repStep(1); } }] }]],
+          ['Save', [{ label: 'Save as CSV', icon: I.textFile, big: true, title: 'The table on the screen, for Excel', run: () => { view('reports')(); const b = [...document.querySelectorAll('#main button')].find((x) => x.textContent.startsWith('Save as CSV')); b && b.click(); } }]],
         ] },
         { id: 'handoff', label: 'Hand-off', hue: '#7b4fd6', onSelect: view('handoff'), groups: [
           ['Hand-off', [C('Print…', 'Print this list', I.print, { big: true }), C('Save as text or CSV', 'Text or CSV', I.textFile, { big: true }), C('Print screen', 'Print screen', I.screen, { big: true })]],
