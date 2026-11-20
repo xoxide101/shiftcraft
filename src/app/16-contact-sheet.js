@@ -377,6 +377,13 @@
           { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
       return;
     }
+    // with a border: the pages printed as 300 DPI pictures, as saved (the border drawn over each page)
+    if (deco.border) {
+      (async () => { toast('Getting the pages ready…');
+        try { const a = await availabilityCanvas(availPaperPref, 300), cs = [a.canvas]; if (a.sheet.notesPage) cs.push((await availabilityCanvas(availPaperPref, 300, a.sheet.notesPage)).canvas); printSurfaces(cs, { paper: availPaper(availPaperPref).key, orient: 'landscape' }); }
+        catch (e) { toast('Could not get the pages ready: ' + e.message); } })();
+      return;
+    }
     const area = $('#print-area'), sheet = availabilitySheet();
     // no margins on the page, so the browser leaves out its own header and footer (date, title, address, page number):
     // the sheet has its title and version already; the space round it is put back inside the page

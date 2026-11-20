@@ -920,3 +920,6 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .save-bk { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-bk-b { display: flex; gap: 6px; flex: none; }
 .cmp-table { width: 100%; border-collapse: collapse; } .cmp-table td, .cmp-table th { padding: 6px 8px; border-bottom: 1px solid var(--line, #d0d5dd); text-align: left; }
 @media (max-width: 720px) { .save-wrap { grid-template-columns: 1fr; } .save-nav { flex-direction: row; overflow-x: auto; border-right: 0; padding: 0 0 8px; border-bottom: 1px solid var(--line, #d0d5dd); } .save-nav small { display: none; } }
+
+/* phones: the logo and quick buttons scroll sideways when they do not fit (a swipe), nothing cut off */
+@media (max-width: 760px) { .ctb.ctb > .ctb-left:first-child { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; } .ctb.ctb > .ctb-left:first-child::-webkit-scrollbar { display: none; } .ctb.ctb > .ctb-left:first-child > * { flex: none; } }

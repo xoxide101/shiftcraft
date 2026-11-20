@@ -70,6 +70,7 @@
     const showPage = () => {
       const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
       const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: pg.m * 96 + 'px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
+      { const bl = domBorderLayer(pg.W, pg.H); if (bl) inner.append(bl); } // the border chosen (My border, Thin frame), over the page
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };

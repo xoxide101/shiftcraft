@@ -927,6 +927,9 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 .save-bk { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line, #d0d5dd); border-radius: 10px; } .save-bk-b { display: flex; gap: 6px; flex: none; }
 .cmp-table { width: 100%; border-collapse: collapse; } .cmp-table td, .cmp-table th { padding: 6px 8px; border-bottom: 1px solid var(--line, #d0d5dd); text-align: left; }
 @media (max-width: 720px) { .save-wrap { grid-template-columns: 1fr; } .save-nav { flex-direction: row; overflow-x: auto; border-right: 0; padding: 0 0 8px; border-bottom: 1px solid var(--line, #d0d5dd); } .save-nav small { display: none; } }
+
+/* phones: the logo and quick buttons scroll sideways when they do not fit (a swipe), nothing cut off */
+@media (max-width: 760px) { .ctb.ctb > .ctb-left:first-child { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; } .ctb.ctb > .ctb-left:first-child::-webkit-scrollbar { display: none; } .ctb.ctb > .ctb-left:first-child > * { flex: none; } }
 </style>
 </head>
 <body>
@@ -2115,7 +2118,11 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
   const all = UNIFIED.concat(OTHER), me = all.find((a) => a[0] === here) ? here : (all.find((a) => location.pathname.toLowerCase().includes('/' + a[0] + '/')) || [''])[0];
   const baseOf = () => { const i = location.href.toLowerCase().lastIndexOf('/' + me + '/'); return i < 0 ? null : location.href.slice(0, i + 1); };
   const urlOf = (app) => { const b = baseOf(); if (!b) return null; return b + app + '/' + (location.protocol === 'file:' ? 'index.html' : ''); };
-  let folded = false; try { folded = localStorage.getItem(KEY) === 'folded'; } catch (e) { /* blocked */ }
+  // folded or open, remembered: phones and folded phones (narrower than 600) on their own, and folded at first there (the page needs the room)
+  const SMALL = () => innerWidth < 600, FKEY = () => (SMALL() ? KEY + '-phone' : KEY);
+  const foldedNow = () => { let v = null; try { v = localStorage.getItem(FKEY()); } catch (e) { /* blocked */ } return v ? v === 'folded' : SMALL(); };
+  let folded = foldedNow(), wasSmall = SMALL();
+  window.addEventListener('resize', () => { if (SMALL() === wasSmall) return; wasSmall = SMALL(); const f = foldedNow(); if (f !== folded) { folded = f; paint(); } });
   // wide: the bar opened out to show the apps' names (» / «, remembered); WW its width
   let wide = false; try { wide = localStorage.getItem(KEY + '-wide') === '1'; } catch (e) { /* blocked */ }
   const WW = 196;
@@ -2128,11 +2135,12 @@ var qrcode=function(){function i(t,r){function a(t,r){g=function(t){for(var r=ne
 .craft-rail .nm{display:none}.craft-rail.wide a{width:auto;grid-template-columns:28px 1fr;justify-items:start;gap:8px;padding:0 8px;font-size:18px}.craft-rail.wide a .nm{display:block;font-size:13px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.craft-rail.wide a .nm small{display:block;font-size:10.5px;color:#9aa0b0;overflow:hidden;text-overflow:ellipsis}.craft-rail.wide a.on .nm small{color:#dfe6ff}.craft-rail.wide a .tip{display:none!important}.craft-rail.wide .lbl{text-align:left;padding-left:8px}
 .craft-rail .fold{width:40px;height:22px;border:0;border-radius:7px;background:none;color:#7d8394;cursor:pointer;font-size:13px}.craft-rail .fold:hover{background:#2a2d38;color:#e8e9ee}
 .craft-rail a .tip{display:none;position:fixed;left:${W + 4}px;padding:4px 9px;border-radius:7px;background:#000d;color:#fff;white-space:nowrap;font-size:12.5px;pointer-events:none;z-index:2401}
-.craft-rail a:hover .tip{display:block}.craft-rail-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:2400;width:12px;height:56px;border:0;border-radius:0 7px 7px 0;background:#2f5bea;color:#fff;cursor:pointer;padding:0;font-size:11px}
+.craft-rail a:hover .tip{display:block}.craft-rail-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:2400;width:12px;height:56px;touch-action:manipulation;border:0;border-radius:0 7px 7px 0;background:#2f5bea;color:#fff;cursor:pointer;padding:0;font-size:11px}
 html.craft-railed body{margin-left:var(--craft-rail,0px)!important}
 /* the apps' start pages (What do you want to make?) cover the window: they begin right of the bar, and on tablets and phones everything on them is 10% smaller */
 html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px)!important}
 @media (max-width:1100px){:is(#start.start,#lc-start.lc-start)>*{zoom:.9}}
+@media (pointer:coarse){.craft-rail-tab{width:18px;height:64px;font-size:14px}}
 @media print{.craft-rail,.craft-rail-tab{display:none!important}html.craft-railed body{margin-left:0!important}}`;
   function paint() {
     document.querySelectorAll('.craft-rail, .craft-rail-tab').forEach((x) => x.remove());
@@ -2155,7 +2163,7 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
     document.body.append(bar);
   }
   function setWide(f) { wide = f; try { localStorage.setItem(KEY + '-wide', f ? '1' : '0'); } catch (e) { /* blocked */ } paint(); window.dispatchEvent(new Event('resize')); }
-  function setFold(f) { folded = f; try { localStorage.setItem(KEY, f ? 'folded' : 'open'); } catch (e) { /* blocked */ } paint(); window.dispatchEvent(new Event('resize')); }
+  function setFold(f) { folded = f; try { localStorage.setItem(FKEY(), f ? 'folded' : 'open'); } catch (e) { /* blocked */ } paint(); window.dispatchEvent(new Event('resize')); }
   // the apps on this site (logged in, on a web address): only those that are there and that your account may use
   async function learn() {
     const A = window.CraftAccount; if (!A || !A.user || !A.user() || !/^https?:/.test(location.protocol)) { allowed = null; return paint(); }
@@ -4615,6 +4623,13 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
       modal({ title: 'Phone numbers missing', body: h('div', null, h('p', null, `${noPhone.length === 1 ? 'This person has' : 'These people have'} no phone number yet:`), h('ul', null, noPhone.map((p) => h('li', null, p.name))), h('p', { class: 'hint' }, 'Add them on Staff › Day by day (or Contact & training). Printing anyway leaves a line to write the number in.')),
         actions: [{ label: 'Print anyway', left: true, onClick: () => { setTimeout(() => printAvailability(true, paper)); } }, { label: 'Cancel' },
           { label: 'Add numbers', primary: true, onClick: () => { staffTab = 'avail'; try { localStorage.setItem('shiftcraft-staff-tab', 'avail'); } catch (e) {} ui.tab = 'staff'; persist(); render(); setTimeout(() => { const x = document.querySelector('input.need'); x && x.focus(); }, 60); } }] });
+      return;
+    }
+    // with a border: the pages printed as 300 DPI pictures, as saved (the border drawn over each page)
+    if (deco.border) {
+      (async () => { toast('Getting the pages ready…');
+        try { const a = await availabilityCanvas(availPaperPref, 300), cs = [a.canvas]; if (a.sheet.notesPage) cs.push((await availabilityCanvas(availPaperPref, 300, a.sheet.notesPage)).canvas); printSurfaces(cs, { paper: availPaper(availPaperPref).key, orient: 'landscape' }); }
+        catch (e) { toast('Could not get the pages ready: ' + e.message); } })();
       return;
     }
     const area = $('#print-area'), sheet = availabilitySheet();
@@ -8251,6 +8266,7 @@ function hourlyWeekDialog() { HW.dialog(); }
     const showPage = () => {
       const pg = availPaper(o.availPaper), PW = Math.round(pg.W * 96), PH = Math.round(pg.H * 96), sh = availabilitySheet(); fitAvailability(sh, pg);
       const inner = h('div', { style: { position: 'absolute', left: 0, top: 0, width: PW + 'px', height: PH + 'px', padding: pg.m * 96 + 'px', boxSizing: 'border-box', background: '#fff', color: '#000', transformOrigin: '0 0', overflow: 'hidden' } }, sh);
+      { const bl = domBorderLayer(pg.W, pg.H); if (bl) inner.append(bl); } // the border chosen (My border, Thin frame), over the page
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
