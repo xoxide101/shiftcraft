@@ -32,7 +32,8 @@
           h('span', { class: 'spacer' }),
           h('button', { class: 'btn sm primary', title: 'Copy a week’s past sales or forecast onto other weeks (past to future, week by week)', onclick: () => copyForecastDialog(w) }, 'Copy a week…'),
           h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { const t = trend(d); if (t != null) plan.forecast[d] = Math.round(t); })) }, 'Fill week from trend'),
-          h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { delete plan.forecast[d]; })) }, 'Clear my forecasts'))),
+          h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { delete plan.forecast[d]; })) }, 'Clear my forecasts')),
+        companionCard()),
       historyCard()));
   }
   function historyCard() {

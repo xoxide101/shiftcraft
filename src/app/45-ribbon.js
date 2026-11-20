@@ -61,6 +61,8 @@
           ['Find', [{ label: 'Search', icon: I.search, big: true, title: 'Search time off, store hours and events', run: () => { view('calendar')(); setTimeout(() => { const x = document.querySelector('#cal-q'); x && x.focus(); }, 60); } }, C('Calendar list', 'List', I.list, { big: true, title: 'Everything as a list you can sort' })]],
         ] },
         { id: 'forecast', label: 'Forecast', hue: '#e09f1f', onSelect: view('forecast'), groups: [
+          ['Companion site', [{ label: 'Paste forecast', icon: I.import, big: true, title: 'Paste the companion site’s Forecast table or whole page (copied there with Ctrl+C)', run: () => { view('forecast')(); companionPaste(); } },
+            { col: [{ label: 'Open site', icon: I.screen, title: 'Open the companion site in its own tab', run: () => openCompanion() }, { label: 'Which site…', icon: I.gear, title: 'Name and address of the companion site', run: () => companionDialog() }] }]],
           ['Settings', [C('Settings', 'Settings…', I.gear, { big: true, title: 'Sales per labor hour, AM / MID / PM times, plan length' }), C('Company & location', 'Company & location', I.store, { big: true })]],
         ] },
         { id: 'handoff', label: 'Hand-off', hue: '#7b4fd6', onSelect: view('handoff'), groups: [
