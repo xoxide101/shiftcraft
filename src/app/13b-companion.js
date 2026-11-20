@@ -68,7 +68,7 @@
     modal({ title: `Forecast from ${c.name}`, wide: true, body, onClose: () => { compOpen = false; },
       actions: [{ label: 'Cancel' }, { label: 'Use these', primary: true, onClick: () => {
         const use = rows.filter((r, i) => boxes[i].checked); if (!use.length) return;
-        change(() => { use.forEach((r) => { plan.forecast[r.d] = r.ops; }); plan.companionLast = { site: got.site || c.name, at: new Date().toISOString(), from: use[0].d, to: use[use.length - 1].d, days: use.length }; if (inPlan.has(use[0].d)) ui.day = use[0].d; });
+        change(() => { use.forEach((r) => { plan.forecast[r.d] = r.ops; }); plan.companionLast = { site: got.site || c.name, at: new Date().toISOString(), from: use[0].d, to: use[use.length - 1].d, days: use.length }; if (inPlan.has(use[0].d)) ui.day = use[0].d; fcAt = mondayOf(use[0].d); try { localStorage.setItem(FC_KEY, fcAt); } catch (e) { /* ignore */ } });
         toast(`Forecast for ${use.length} day${use.length === 1 ? '' : 's'} from ${c.name} is in.`);
       } }] });
   }

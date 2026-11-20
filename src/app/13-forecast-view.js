@@ -1,7 +1,19 @@
   // ---------- Forecast ----------
+  // The Forecast screen has its own week (any week, not only the plan's): it starts on this week and is kept per computer.
+  const FC_KEY = KEY + '-fcweek';
+  let fcAt = (() => { try { const v = localStorage.getItem(FC_KEY); return /^\d{4}-\d\d-\d\d$/.test(v || '') ? v : null; } catch (e) { return null; } })();
+  function fcGo(d) { fcAt = mondayOf(d); try { localStorage.setItem(FC_KEY, fcAt); } catch (e) { /* ignore */ } if (ui.tab === 'forecast') render(); }
   function forecastView(main) {
-    const w = weekOf(ui.day), days = weekDays(w);
-    const weeks = h('div', { class: 'weeks' }, Array.from({ length: plan.weeks }, (_, k) => h('button', { class: 'btn sm', 'aria-pressed': String(k === w), onclick: () => { ui.day = weekDays(k)[0]; persist(); render(); } }, `Week ${k + 1}`)));
+    if (!fcAt) fcAt = mondayOf(iso(new Date()));
+    const days = Array.from({ length: 7 }, (_, i) => addDays(fcAt, i));
+    const planMondays = Array.from({ length: plan.weeks }, (_, k) => weekDays(k)[0]), w = planMondays.indexOf(fcAt);
+    const thisWeek = mondayOf(iso(new Date()));
+    const pick = h('input', { class: 'input', type: 'date', value: fcAt, style: { width: '150px' }, 'aria-label': 'Go to the week of', onchange: () => { if (pick.value) fcGo(pick.value); } });
+    const weeks = h('div', { class: 'weeks' },
+      h('button', { class: 'btn sm', 'aria-label': 'Week before', onclick: () => fcGo(addDays(fcAt, -7)) }, '‹'),
+      h('button', { class: 'btn sm', 'aria-label': 'Week after', onclick: () => fcGo(addDays(fcAt, 7)) }, '›'),
+      pick, h('button', { class: 'btn sm', 'aria-pressed': String(fcAt === thisWeek), onclick: () => fcGo(thisWeek) }, 'This week'),
+      ...planMondays.map((m, k) => h('button', { class: 'btn sm', 'aria-pressed': String(k === w), title: 'Plan week ' + (k + 1) + ': ' + usDate(m), onclick: () => fcGo(m) }, `Week ${k + 1}`)));
     const tot = { trend: 0, fc: 0, sched: 0, target: 0 };
     const rows = days.map((d) => {
       const t = trend(d), f = forecastOf(d), set = plan.forecast[d] != null && plan.forecast[d] !== '';
@@ -20,7 +32,7 @@
     splh.addEventListener('change', () => change(() => { plan.splh = Math.max(1, +splh.value || plan.splh); }));
     main.append(h('div', { class: 'cols2' },
       h('div', { class: 'card' },
-        h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Forecast · Week ${w + 1}`), h('span', { class: 'spacer' }), weeks),
+        h('div', { class: 'daynav' }, h('h2', { style: { margin: 0 } }, `Forecast · ${shortDate(fcAt)} – ${shortDate(addDays(fcAt, 6))}${w >= 0 ? ` · plan week ${w + 1}` : ''}`), h('span', { class: 'spacer' }), weeks),
         h('p', { class: 'hint', style: { margin: '6px 0 12px' } }, 'Trend = average of the same weekday over the last 4 weeks of sales. Type a forecast to override it; leave it empty to use the trend.'),
         h('div', { class: 'table-wrap' }, h('table', { class: 't' },
           h('thead', null, h('tr', null, ['Date', 'Net $ trend', 'Forecast', 'vs trend', 'Target hrs', 'Scheduled', 'Hours variance'].map((x, i) => h('th', { class: i ? 'num' : '' }, x)))),
@@ -30,14 +42,14 @@
         h('div', { class: 'inline', style: { marginTop: '12px' } },
           h('label', { class: 'inline' }, h('span', null, 'Sales per labor hour target $'), splh),
           h('span', { class: 'spacer' }),
-          h('button', { class: 'btn sm primary', title: 'Copy a week’s past sales or forecast onto other weeks (past to future, week by week)', onclick: () => copyForecastDialog(w) }, 'Copy a week…'),
+          h('button', { class: 'btn sm primary', title: 'Copy a week’s past sales or forecast onto other weeks (past to future, week by week)', onclick: () => copyForecastDialog(fcAt) }, 'Copy a week…'),
           h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { const t = trend(d); if (t != null) plan.forecast[d] = Math.round(t); })) }, 'Fill week from trend'),
           h('button', { class: 'btn sm', onclick: () => change(() => days.forEach((d) => { delete plan.forecast[d]; })) }, 'Clear my forecasts')),
         companionCard()),
       historyCard()));
   }
   function historyCard() {
-    const from = addDays(plan.startDate, -28), n = 28 + plan.weeks * 7;
+    const from = addDays(fcAt || mondayOf(iso(new Date())), -28), n = 28 + 7 * 5; // 4 weeks before the week on the Forecast screen, it and 4 after
     const dates = Array.from({ length: n }, (_, i) => addDays(from, i));
     const today = iso(new Date());
     const byWeek = [];
@@ -110,7 +122,7 @@
     const salesOf = (m) => days7(m).reduce((t, d) => t + (has(plan.history[d]) ? +plan.history[d] : 0), 0), nSales = (m) => days7(m).filter((d) => has(plan.history[d])).length;
     const fcOf = (m) => days7(m).reduce((t, d) => t + (has(plan.forecast[d]) ? +plan.forecast[d] : 0), 0), nFc = (m) => days7(m).filter((d) => has(plan.forecast[d])).length;
     const label = (m) => `${shortDate(m)} – ${shortDate(addDays(m, 6))}${m.slice(0, 4) !== today.slice(0, 4) ? ', ' + m.slice(0, 4) : ''}${m >= plan.startDate && m <= planEnd ? ` (plan week ${weekOf(m) + 1})` : ''}`;
-    const viewed = weekDays(atWeek)[0];
+    const viewed = typeof atWeek === 'string' ? atWeek : weekDays(atWeek)[0];
     // from: the last week with sales before the week being looked at
     const lastSales = [...weeks].reverse().find((m) => m < viewed && nSales(m)) || weeks[0];
     let what = nSales(lastSales) ? 'sales' : 'forecast';
