@@ -513,16 +513,17 @@
       return [h('div', { class: 'main' }, kids.filter((k) => k !== sep).map((k) => k.cloneNode(true))), sep ? h('div', { class: 'main' }, sep.cloneNode(true)) : null].filter(Boolean); };
     const MARGIN = 10 / 25.4;
     pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`, use: 'calendar', kind: 'calendar', reopen: () => calPrintDialog(), keep: () => { kept = true; calpSave(); },
-      opts: [...paperChoices(calp, changed),
+      opts: printFrame({
+        what: pfFixed('What', `The month: ${monthLabel(cal.ym)} (as on the Calendar)`),
+        paper: paperChoices(calp, changed), save: saveChoices(calp, changed),
+        notes: [field('Numbered notes and details', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })), tablesBox],
+        deco: field('Decorations', decoControls(() => { render(); pw && pw.refresh(); })),
+        extraTitle: 'Options for the calendar', extra: [
         field('On the month', tick(calp.grid, 'look', 'Day colours, hatching, pictures and notes'), tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
         field('Month heading', calSeg('Month heading', [['left', 'Large left'], ['center', 'Large centre'], ['right', 'Large right']], calp.title || 'left', (v) => { calp.title = v; changed(); })),
         field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),
         field('Days before the 1st and after the last day (blank: the legend can go there)', calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], calp.out, (v) => { calp.out = v; changed(); })),
-        field('Details: store hours, time off, events and holidays, with the numbers from the month', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })),
-        tablesBox,
-        field('Decorations', decoControls(() => { render(); pw && pw.refresh(); })),
-        ...saveChoices(calp, changed),
-        h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks up top: requests, approved, store hours, events, holidays).')],
+        h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks up top: requests, approved, store hours, events, holidays). Details = store hours, time off, events and holidays, with the numbers from the month.')] }),
       draw: (pv) => { const [w, hgt] = paperOf(calp), n = pvDom(pv, sections(), { pw: w, ph: hgt, m: MARGIN }); return `${monthLabel(cal.ym)} · ${PAPERS[calp.paper][2]} ${calp.orient} · ${n} page${n > 1 ? 's' : ''}${notesWhere === 'separate' ? ' · details on a page of their own' : ''}`; },
       onClose: () => { if (kept) return; Object.keys(calp).forEach((k) => delete calp[k]); Object.assign(calp, before); calpSave(); setNotesWhere(whereBefore); render(); },
       actions: [{ label: 'Cancel' },

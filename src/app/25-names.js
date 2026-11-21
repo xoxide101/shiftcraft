@@ -19,10 +19,23 @@
   // (… v2026.11.18.14.05.33.pdf); a name that has one already keeps it. A batch (pages) shares one stamp.
   const stampNow = () => { const n = new Date(), p = (x) => String(x).padStart(2, '0'); return `${n.getFullYear()}.${p(n.getMonth() + 1)}.${p(n.getDate())}.${p(n.getHours())}.${p(n.getMinutes())}.${p(n.getSeconds())}`; };
   const uniqueName = (name, stamp = stampNow()) => (/ v\d{4}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}(\.|$)/.test(name) ? name : name.replace(/(\.[a-z0-9]{1,5})?$/i, (ext) => ` v${stamp}${ext}`));
+  // A download (and the Save as window) needs a click that is still fresh: a page may start one download on its own,
+  // then the browser quietly blocks more until the page is reloaded. Pictures and PDFs take a few seconds to make, so the
+  // click that asked for them is stale by then: the files come in a small window with a button to click for each.
+  const freshClick = () => !navigator.userActivation || navigator.userActivation.isActive;
+  function readyToSave(files) {
+    return new Promise((done) => {
+      let n = 0;
+      const btns = files.map((f) => { const b = h('button', { class: 'btn' + (files.length === 1 ? ' primary' : ''), style: { justifyContent: 'flex-start', textAlign: 'left' }, onclick: async () => { b.disabled = true; const r = await saveBlob(f.name, f.blob, f.type); if (r) { n++; b.textContent = '✓ ' + r; } else b.disabled = false; } }, '⤓ Save ' + f.name); return b; });
+      modal({ title: files.length === 1 ? 'Your file is ready' : `Your ${files.length} files are ready`, body: [h('p', { class: 'hint' }, files.length === 1 ? 'Click to save it.' : 'Click each one to save it (the browser lets a page save one file a click).'), h('div', { style: { display: 'grid', gap: '6px' } }, btns)],
+        actions: [{ label: 'Done', primary: files.length > 1 }], onClose: () => done(n) });
+    });
+  }
   // Save one file: reuses the remembered file for handleKey when there is one, otherwise asks where.
   async function saveBlob(name, blob, type, handleKey) {
     if (blockedHere()) return null;
     name = uniqueName(name);
+    if (!freshClick() && !(handleKey && ui.handles[handleKey])) return (await readyToSave([{ name, blob, type }])) ? name : null;
     if (window.showSaveFilePicker) {
       try {
         const handle = (handleKey && ui.handles[handleKey]) || await window.showSaveFilePicker({ suggestedName: name, types: [type] });
@@ -45,14 +58,13 @@
     if (blockedHere()) return 0;
     { const st = stampNow(); files = files.map((f) => ({ ...f, name: uniqueName(f.name, st) })); }
     if (files.length === 1) return (await saveBlob(files[0].name, files[0].blob, files[0].type)) ? 1 : 0;
-    if (window.showDirectoryPicker) {
+    if (window.showDirectoryPicker && freshClick()) {
       try {
         const dir = await window.showDirectoryPicker({ id: 'shiftcraft-out', mode: 'readwrite' });
         for (const f of files) { const w = await (await dir.getFileHandle(f.name, { create: true })).createWritable(); await w.write(f.blob); await w.close(); }
         return files.length;
       } catch (e) { if (e.name === 'AbortError') return 0; }
     }
-    for (const f of files) { downloadBlob(f.name, f.blob); await new Promise((r) => setTimeout(r, 400)); }
-    return files.length;
+    return readyToSave(files); // several downloads at once: the browser would block all but the first
   }
 

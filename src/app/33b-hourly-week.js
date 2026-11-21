@@ -248,8 +248,12 @@ function buildWeek() {
     const head = (t) => h('div', { class: 'pd-head' }, t);
     const weekSel = h('select', { class: 'input', onchange: () => { wk = +weekSel.value; refresh(); } }, ws.map((w, i) => h('option', { value: i, selected: i === wk }, `Week ${i + 1}: ${short(w)} – ${short(addDays(w, 6))}${i === tw ? ' (this week)' : ''}`)));
     const fileName = () => fileStem('hourly week', fileDate(weeksList()[wk]));
-    pw = printWindow({ title: 'Hourly week: print or save', kind: 'hourly', use: 'hourly', reopen: () => hourlyWeekDialog(), opts: [
-      fld('Week', weekSel), ...paperChoices(O, refresh), fld('Print in', sel('page', [['color', 'Colour'], ['gray', 'Black and white']])),
+    pw = printWindow({ title: 'Hourly week: print or save', kind: 'hourly', use: 'hourly', reopen: () => hourlyWeekDialog(), opts: printFrame({
+      what: pfFixed('What', 'One week: 7 days on a page'), week: fld('Week', weekSel),
+      paper: paperChoices(O, refresh), color: fld('Print in', sel('page', [['color', 'Colour'], ['gray', 'Black and white']])),
+      save: saveChoices(O, refresh),
+      notes: fld('Numbered notes and details', sel('notes', [['auto', 'On the page if room'], ['page', 'On a page of their own'], ['off', 'Off']])),
+      extraTitle: 'Options for the hourly week', extra: [
       head('The shifts'),
       fld('Names', sel('name', [['first', 'First name (Luke)'], ['full', 'First Last (Luke Smith)'], ['firstl', 'First L. (Luke S.)'], ['lastfirst', 'Last, First (Smith, Luke)'], ['lastf', 'Last F. (Smith L.)'], ['init', 'Initials (LS)'], ['none', 'None']])), tick('time', 'Times in the pill'),
       fld('Colour', sel('col', [['role', 'By role'], ['person', 'By person'], ['mono', 'One colour'], ['bw', 'Black and white (leads filled)']])), fld('Shape', sel('shape', [['pill', 'Pill'], ['sq', 'Box']])),
@@ -258,9 +262,7 @@ function buildWeek() {
       fld('Hour lines', sel('grid', [[1, 'Every hour'], [2, 'Every 2 hours'], [0.5, 'Every half hour'], [0, 'None']], true)), tick('shut', 'Shade the hours the store is closed'), tick('cov', 'How many on, each hour'), tick('past', 'Dim the days gone by'), tick('now', 'A line at the time now (today, on screen)'),
       head('By the day’s name'),
       tick('signs', 'Signs (truck, produce, payday…)'), tick('hol', 'Holidays'), tick('ev', 'Events'), tick('off', 'Time off'), tick('at', 'Markers at their time of day'),
-      head('Notes and legend'),
-      fld('Notes', sel('notes', [['auto', 'On the page if room'], ['page', 'On a page of their own'], ['off', 'Off']])), tick('legend', 'Legend (roles, signs)'),
-      ...saveChoices(O, refresh)],
+      head('Legend'), tick('legend', 'Legend (roles, signs)')] }),
     draw: (pv) => {
       const r = buildPages(false), w = pvWidth(pv), k = w / (r.pw * 96);
       pv.replaceChildren(...r.pages.flatMap((p, i) => { p.style.transform = `scale(${k})`; p.style.transformOrigin = '0 0';

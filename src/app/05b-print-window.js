@@ -23,7 +23,7 @@
     if (kind) { const ks = h('select', { class: 'input', 'aria-label': 'Layout', onchange: () => { const v = ks.value; if (onKind && onKind(v)) return; md.close(); setTimeout(() => openPrint(v), 30); } },
       (PRINT_KINDS.some(([v]) => v === kind) ? PRINT_KINDS : [[kind, 'This page'], ...PRINT_KINDS]).map(([v, l]) => h('option', { value: v, selected: v === kind }, l)));
       opts = [h('label', { class: 'field pd-layout' }, h('span', null, 'Layout'), ks), ...opts]; }
-    opts = [...opts, borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); })];
+    opts = [...opts, h('div', { class: 'pf-sec' }, h('div', { class: 'pd-head' }, 'Border'), borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); }))];
     let t = 0, n = 0;
     const refresh = () => { clearTimeout(t); t = setTimeout(async () => { const me = ++n; try { const s = await draw(pv); if (me === n) info.textContent = s || ''; } catch (e) { info.textContent = 'No preview: ' + e.message; } }, 40); };
     const md = modal({ title, wide: true, body: [h('div', { class: 'pd-grid' }, h('div', { class: 'pd-opts' }, opts), h('div', { class: 'pd-right' }, info, pv))], actions, onClose });
@@ -32,6 +32,30 @@
     refresh();
     return { refresh, close: md.close, el: md.el, info };
   }
+  // The same frame in every print window: the same sections, in the same order, with the same boxes in the same places,
+  // whatever is being printed. A box this layout does not use stays in its place, greyed out ("not used for this
+  // layout"); a choice that is fixed for it shows its value, greyed. What only one layout has goes under "Options for …".
+  //   printFrame({ what, week, day, paper: [size, orientation], color, save: [file type, resolution], notes, lines, extra: [..], extraTitle, deco })
+  // (each an element, an array of them, or null for not used)
+  const PF_OFF = 'not used for this layout';
+  function pfOff(label, check) {
+    if (check) return h('label', { class: 'check pf-off', title: 'Not used for this layout' }, h('input', { type: 'checkbox', disabled: true }), ` ${label} (${PF_OFF})`);
+    return h('label', { class: 'field pf-off', title: 'Not used for this layout' }, h('span', null, label), h('select', { class: 'input', disabled: true }, h('option', null, '— ' + PF_OFF)));
+  }
+  const pfFixed = (label, text) => h('label', { class: 'field pf-off', title: 'Fixed for this layout' }, h('span', null, label), h('select', { class: 'input', disabled: true }, h('option', null, text)));
+  function printFrame(s) {
+    const one = (v, label, check) => (v == null || v === false ? [pfOff(label, check)] : [].concat(v).filter(Boolean));
+    const sec = (title, kids) => h('div', { class: 'pf-sec' }, h('div', { class: 'pd-head' }, title), ...kids);
+    return [
+      sec('What to print', [...one(s.what, 'What'), ...one(s.week, 'Week'), ...one(s.day, 'Day')]),
+      sec('Paper', [...(s.paper ? [].concat(s.paper) : [pfOff('Paper size'), pfOff('Orientation')]), ...one(s.color, 'Print in')]),
+      sec('Saving', s.save ? [].concat(s.save) : [pfOff('File type (for saving)'), pfOff('Resolution (for saving)')]),
+      sec('Notes', [...one(s.notes, 'Numbered notes and details'), ...one(s.lines, 'Notes area with lines', true)]),
+      sec(s.extraTitle || 'Options for this layout', s.extra && [].concat(s.extra).filter(Boolean).length ? [].concat(s.extra).filter(Boolean) : [h('p', { class: 'hint', style: { margin: 0 } }, 'None: everything for this layout is above.')]),
+      sec('Decorations', one(s.deco, 'Decorations')),
+    ];
+  }
+  const pfField = (label, ...kids) => h('label', { class: 'field' }, h('span', null, label), ...kids);
   const pvWidth = (pv) => Math.max(260, (pv.clientWidth || 760) - 56);
   // pictures (canvas pages): each on a sheet of paper; at most `max` shown, then how many more
   function pvPictures(pv, canvases, total = canvases.length) {
@@ -205,8 +229,10 @@
     const tabName = (TABS.find(([k]) => k === ui.tab) || [0, 'This page'])[1];
     const keep = () => { try { localStorage.setItem(KEY + '-pagepr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
     const content = () => [h('div', { class: 'main' }, [...$('#main').children].map((c) => c.cloneNode(true)))];
-    const pw = printWindow({ title: `Print or save · ${tabName}`, kind: 'page', reopen: () => printPageDialog(), opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
-      h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
+    const pw = printWindow({ title: `Print or save · ${tabName}`, kind: 'page', reopen: () => printPageDialog(), opts: printFrame({
+      what: pfFixed('What', `The ${tabName} tab, as it is now`),
+      paper: paperChoices(o, () => pw.refresh()), color: pfFixed('Print in', 'Light colours'), save: saveChoices(o, () => pw.refresh()),
+      extraTitle: 'Options for this page', extra: [h('p', { class: 'hint', style: { margin: 0 } }, 'Print screen makes a picture of the screen itself.')] }),
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(content(), o, w, hgt); return; } setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },

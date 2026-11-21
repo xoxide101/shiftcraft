@@ -16,13 +16,14 @@
       return sortStaff(people); };
     const sheets = () => peopleOf().map((p) => personSheet(p, weeksOf(), tasks.checked));
     const keep = () => { try { localStorage.setItem(KEY + '-people-pr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
-    pw = printWindow({ title: 'Print or save a schedule for a person or group', use: 'person', kind: 'person', reopen: () => printPeopleDialog(presetId), opts: [
-      h('label', { class: 'field' }, h('span', null, 'Who'), who),
-      h('label', { class: 'field' }, h('span', null, 'Weeks'), range),
-      h('label', { class: 'check' }, tasks, ' Include tasks and training'),
-      h('label', { class: 'check' }, onlyScheduled, ' Skip people with no shifts in these weeks (groups only)'),
-      ...paperChoices(o, changed), ...saveChoices(o, changed),
-      h('p', { class: 'hint' }, 'Each person gets their own page.')],
+    pw = printWindow({ title: 'Print or save a schedule for a person or group', use: 'person', kind: 'person', reopen: () => printPeopleDialog(presetId), opts: printFrame({
+      what: h('label', { class: 'field' }, h('span', null, 'What: who'), who),
+      week: h('label', { class: 'field' }, h('span', null, 'Week'), range),
+      paper: paperChoices(o, changed), save: saveChoices(o, changed),
+      extraTitle: 'Options for a person or group', extra: [
+        h('label', { class: 'check' }, tasks, ' Include tasks and training'),
+        h('label', { class: 'check' }, onlyScheduled, ' Skip people with no shifts in these weeks (groups only)'),
+        h('p', { class: 'hint', style: { margin: 0 } }, 'Each person gets their own page.')] }),
     draw: (pv) => { const list = sheets(); if (!list.length) { pv.replaceChildren(h('p', { class: 'hint' }, 'Nobody to print for those weeks.')); return 'Nobody'; } const [w, hgt] = paperOf(o), n = pvDom(pv, list, { pw: w, ph: hgt }); return `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
     actions: [{ label: 'Cancel' },
       { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(sheets(), o, w, hgt); return; } setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },

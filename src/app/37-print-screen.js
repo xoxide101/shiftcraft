@@ -91,13 +91,13 @@
         : big ? `At ${o.dpi} DPI this screen would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, too big for a picture file, so it will be saved as SVG (sharp at any size).`
           : `${tabName} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels · ${o.dpi} DPI (the screen is drawn ${scale.toFixed(1)}× sharper than it looks) · prints on ${sheets.length} page${sheets.length > 1 ? 's' : ''}`;
     };
-    pw = printWindow({ title: `Print screen · ${tabName}`, kind: 'screen', reopen: () => printScreenDialog(), opts: [
-        sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type'),
-        sel('dpi', DPI_OPTIONS, 'Resolution'),
-        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper (for printing and PDF)'),
-        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation (for printing and PDF)'),
-      h('p', { class: 'hint' }, 'Pictures and printouts always use light colors, even when you edit in dark mode.'),
-      h('p', { class: 'hint' }, 'Takes the whole page of the tab you are on, including parts you would have to scroll to. Change tabs or days first to capture something else.')],
+    pw = printWindow({ title: `Print screen · ${tabName}`, kind: 'screen', reopen: () => printScreenDialog(), opts: printFrame({
+        what: pfFixed('What', `The ${tabName} tab, as on the screen`),
+        paper: [sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'), sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation')],
+        color: pfFixed('Print in', 'Light colours (always, even in dark mode)'),
+        save: [sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')],
+        extraTitle: 'Options for print screen',
+        extra: [h('p', { class: 'hint', style: { margin: 0 } }, 'Takes the whole page of the tab you are on, including parts you would have to scroll to. Change tabs or days first to capture something else.')] }),
     draw: drawPv,
     actions: [{ label: 'Cancel' },
       { label: 'Print', onClick: async () => {

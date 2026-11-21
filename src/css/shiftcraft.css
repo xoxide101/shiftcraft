@@ -923,3 +923,8 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 
 /* phones: the logo and quick buttons scroll sideways when they do not fit (a swipe), nothing cut off */
 @media (max-width: 760px) { .ctb.ctb > .ctb-left:first-child { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; } .ctb.ctb > .ctb-left:first-child::-webkit-scrollbar { display: none; } .ctb.ctb > .ctb-left:first-child > * { flex: none; } }
+.pf-sec { display: grid; gap: 8px; align-content: start; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+.pf-sec:last-child { border-bottom: 0; }
+.pf-sec > .pd-head { margin: 0; }
+.pf-off { opacity: .5; }
+.pf-off select { cursor: not-allowed; }

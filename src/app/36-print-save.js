@@ -64,7 +64,7 @@
     const o = { layout: 'table', range: 'week', format: 'png', paper: 'letter', orient: 'landscape', dpi: 300, notes: true, coverage: true, ...imgPrefs, ...preset };
     o.range = preset.range || ONE[o.layout] || 'week';
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
-    const box = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } });
+    const box = h('div', { style: { display: 'grid', gap: '10px' } });
     // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
@@ -74,7 +74,6 @@
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
-    const checks = h('div', { class: 'inline' });
     const curWeek = () => weekDays(weekOf(PD))[0];
     const items = () => {
       if (o.layout === 'timeline') return o.range === 'day' ? [PD] : o.range === 'weektile' ? [weekDays(weekOf(PD))[0]] : o.range === 'week' ? weekDays(weekOf(PD)) : planDays();
@@ -125,29 +124,39 @@
       // place. Its code (35-calendar-sheet.js) stays, to bring back or remove later.
       if (!RANGES[o.layout] || o.layout === 'calendar') o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
+      const deco = pfField('Decorations', decoControls(() => update()));
+      // every layout fills the same frame (printFrame, 05b-print-window.js): what it does not use is greyed in its place
+      if (o.layout === 'avail') {
+        if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; if (!o.availFormat) o.availFormat = 'pdf';
         const ds = (key, opts, label) => { const x = h('select', { class: 'input', 'aria-label': label, onchange: () => { availDet[key] = x.value; saveAvailDet(); update(); } }, opts.map(([v, l]) => h('option', { value: v, selected: availDet[key] === v }, l))); return h('label', { class: 'field' }, h('span', null, label), x); };
-        checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'),
-          h('div', { class: 'field' }, h('span', null, 'On the page'), ...[['key', 'The colour key'], ['qr', 'Contact QR codes (name and phone: scan to add to a phone)']].map(([k, l]) =>
+        box.replaceChildren(...printFrame({
+          what: sel('range', RANGES.avail(), 'What'),
+          paper: [sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size (printer stock)'), pfFixed('Orientation', 'Landscape (wide): always for this list')],
+          color: ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Print in'),
+          save: [sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')],
+          notes: [ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Numbered notes and details'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)')],
+          extraTitle: 'Options for the availability list',
+          extra: [h('div', { class: 'field' }, h('span', null, 'On the page'), ...[['key', 'The colour key'], ['qr', 'Contact QR codes (name and phone: scan to add to a phone)']].map(([k, l]) =>
             h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet[k] !== false && (k !== 'qr' || availDet.qr), onchange: (e) => { availDet[k] = e.target.checked; saveAvailDet(); update(); } }), ' ' + l)),
             ...[['hours', 'Store hours'], ['timeoff', 'Time off'], ['events', 'Events'], ['holidays', 'Holidays']].map(([k, l]) =>
-              h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet.tables[k] !== false, onchange: (e) => { availDet.tables[k] = e.target.checked; saveAvailDet(); update(); } }), ` Details: ${l}`))));
-        return; }
-      // (nulls left out: replaceChildren would write them as the word “null”)
-      box.replaceChildren(...[
-        sel('range', RANGES[o.layout](), 'What'),
-        o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
-        o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
-        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
-        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
-        sel('format', [['pdf', 'PDF – all pages in one file'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
-        sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')].filter(Boolean));
-      checks.replaceChildren(...[
-        notesWhereSel(),
-        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
-        o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
-        o.layout === 'cards' ? cardChecks() : null,
-        o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
+              h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet.tables[k] !== false, onchange: (e) => { availDet.tables[k] = e.target.checked; saveAvailDet(); update(); } }), ` Details: ${l}`)))],
+          deco }));
+        return;
+      }
+      const NAMES = { table: 'the week table', timeline: 'the visual timeline', cards: 'contact cards' };
+      box.replaceChildren(...printFrame({
+        what: sel('range', RANGES[o.layout](), 'What'),
+        week: o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
+        day: o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
+        paper: [sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'), sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation')],
+        save: [sel('format', [['pdf', 'PDF – all pages in one file'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')],
+        notes: pfField('Numbered notes and details', notesWhereSel()),
+        lines: h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
+        extraTitle: 'Options for ' + NAMES[o.layout],
+        extra: [o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
+          o.layout === 'cards' ? cardChecks() : null,
+          o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null],
+        deco }));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     let pw = null;
@@ -173,7 +182,7 @@
       return text;
     };
     build();
-    pw = printWindow({ title: 'Print or save', kind: o.layout, onKind: (k) => { if (!['table', 'timeline', 'avail', 'cards'].includes(k)) return false; o.layout = k; o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); update(); return true; }, use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
+    pw = printWindow({ title: 'Print or save', kind: o.layout, onKind: (k) => { if (!['table', 'timeline', 'avail', 'cards'].includes(k)) return false; o.layout = k; o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); update(); return true; }, use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box], draw: drawPv,
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {

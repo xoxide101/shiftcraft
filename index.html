@@ -930,6 +930,11 @@ td.cal-day .cal-in { position: relative; z-index: 1; }
 
 /* phones: the logo and quick buttons scroll sideways when they do not fit (a swipe), nothing cut off */
 @media (max-width: 760px) { .ctb.ctb > .ctb-left:first-child { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; } .ctb.ctb > .ctb-left:first-child::-webkit-scrollbar { display: none; } .ctb.ctb > .ctb-left:first-child > * { flex: none; } }
+.pf-sec { display: grid; gap: 8px; align-content: start; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+.pf-sec:last-child { border-bottom: 0; }
+.pf-sec > .pd-head { margin: 0; }
+.pf-off { opacity: .5; }
+.pf-off select { cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -3117,7 +3122,7 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
     if (kind) { const ks = h('select', { class: 'input', 'aria-label': 'Layout', onchange: () => { const v = ks.value; if (onKind && onKind(v)) return; md.close(); setTimeout(() => openPrint(v), 30); } },
       (PRINT_KINDS.some(([v]) => v === kind) ? PRINT_KINDS : [[kind, 'This page'], ...PRINT_KINDS]).map(([v, l]) => h('option', { value: v, selected: v === kind }, l)));
       opts = [h('label', { class: 'field pd-layout' }, h('span', null, 'Layout'), ks), ...opts]; }
-    opts = [...opts, borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); })];
+    opts = [...opts, h('div', { class: 'pf-sec' }, h('div', { class: 'pd-head' }, 'Border'), borderField(() => { if (typeof pwOpen === 'function') pwOpen(); }, () => { if (keep) keep(); md.close(); openBorderDesigner(use || 'free', reopen || null); }))];
     let t = 0, n = 0;
     const refresh = () => { clearTimeout(t); t = setTimeout(async () => { const me = ++n; try { const s = await draw(pv); if (me === n) info.textContent = s || ''; } catch (e) { info.textContent = 'No preview: ' + e.message; } }, 40); };
     const md = modal({ title, wide: true, body: [h('div', { class: 'pd-grid' }, h('div', { class: 'pd-opts' }, opts), h('div', { class: 'pd-right' }, info, pv))], actions, onClose });
@@ -3126,6 +3131,30 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
     refresh();
     return { refresh, close: md.close, el: md.el, info };
   }
+  // The same frame in every print window: the same sections, in the same order, with the same boxes in the same places,
+  // whatever is being printed. A box this layout does not use stays in its place, greyed out ("not used for this
+  // layout"); a choice that is fixed for it shows its value, greyed. What only one layout has goes under "Options for …".
+  //   printFrame({ what, week, day, paper: [size, orientation], color, save: [file type, resolution], notes, lines, extra: [..], extraTitle, deco })
+  // (each an element, an array of them, or null for not used)
+  const PF_OFF = 'not used for this layout';
+  function pfOff(label, check) {
+    if (check) return h('label', { class: 'check pf-off', title: 'Not used for this layout' }, h('input', { type: 'checkbox', disabled: true }), ` ${label} (${PF_OFF})`);
+    return h('label', { class: 'field pf-off', title: 'Not used for this layout' }, h('span', null, label), h('select', { class: 'input', disabled: true }, h('option', null, '— ' + PF_OFF)));
+  }
+  const pfFixed = (label, text) => h('label', { class: 'field pf-off', title: 'Fixed for this layout' }, h('span', null, label), h('select', { class: 'input', disabled: true }, h('option', null, text)));
+  function printFrame(s) {
+    const one = (v, label, check) => (v == null || v === false ? [pfOff(label, check)] : [].concat(v).filter(Boolean));
+    const sec = (title, kids) => h('div', { class: 'pf-sec' }, h('div', { class: 'pd-head' }, title), ...kids);
+    return [
+      sec('What to print', [...one(s.what, 'What'), ...one(s.week, 'Week'), ...one(s.day, 'Day')]),
+      sec('Paper', [...(s.paper ? [].concat(s.paper) : [pfOff('Paper size'), pfOff('Orientation')]), ...one(s.color, 'Print in')]),
+      sec('Saving', s.save ? [].concat(s.save) : [pfOff('File type (for saving)'), pfOff('Resolution (for saving)')]),
+      sec('Notes', [...one(s.notes, 'Numbered notes and details'), ...one(s.lines, 'Notes area with lines', true)]),
+      sec(s.extraTitle || 'Options for this layout', s.extra && [].concat(s.extra).filter(Boolean).length ? [].concat(s.extra).filter(Boolean) : [h('p', { class: 'hint', style: { margin: 0 } }, 'None: everything for this layout is above.')]),
+      sec('Decorations', one(s.deco, 'Decorations')),
+    ];
+  }
+  const pfField = (label, ...kids) => h('label', { class: 'field' }, h('span', null, label), ...kids);
   const pvWidth = (pv) => Math.max(260, (pv.clientWidth || 760) - 56);
   // pictures (canvas pages): each on a sheet of paper; at most `max` shown, then how many more
   function pvPictures(pv, canvases, total = canvases.length) {
@@ -3299,8 +3328,10 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
     const tabName = (TABS.find(([k]) => k === ui.tab) || [0, 'This page'])[1];
     const keep = () => { try { localStorage.setItem(KEY + '-pagepr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
     const content = () => [h('div', { class: 'main' }, [...$('#main').children].map((c) => c.cloneNode(true)))];
-    const pw = printWindow({ title: `Print or save · ${tabName}`, kind: 'page', reopen: () => printPageDialog(), opts: [...paperChoices(o, () => pw.refresh()), ...saveChoices(o, () => pw.refresh()),
-      h('p', { class: 'hint' }, 'This tab as it is now, in light colours. Print screen makes a picture of the screen itself.')],
+    const pw = printWindow({ title: `Print or save · ${tabName}`, kind: 'page', reopen: () => printPageDialog(), opts: printFrame({
+      what: pfFixed('What', `The ${tabName} tab, as it is now`),
+      paper: paperChoices(o, () => pw.refresh()), color: pfFixed('Print in', 'Light colours'), save: saveChoices(o, () => pw.refresh()),
+      extraTitle: 'Options for this page', extra: [h('p', { class: 'hint', style: { margin: 0 } }, 'Print screen makes a picture of the screen itself.')] }),
       draw: (pv) => { const [w, hgt] = paperOf(o), n = pvDom(pv, content(), { pw: w, ph: hgt }); return `${tabName} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(content(), o, w, hgt); return; } setPrintPage(w, hgt); setTimeout(() => window.print(), 80); } },
@@ -5754,16 +5785,17 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
       return [h('div', { class: 'main' }, kids.filter((k) => k !== sep).map((k) => k.cloneNode(true))), sep ? h('div', { class: 'main' }, sep.cloneNode(true)) : null].filter(Boolean); };
     const MARGIN = 10 / 25.4;
     pw = printWindow({ title: `Print or save the calendar · ${monthLabel(cal.ym)}`, use: 'calendar', kind: 'calendar', reopen: () => calPrintDialog(), keep: () => { kept = true; calpSave(); },
-      opts: [...paperChoices(calp, changed),
+      opts: printFrame({
+        what: pfFixed('What', `The month: ${monthLabel(cal.ym)} (as on the Calendar)`),
+        paper: paperChoices(calp, changed), save: saveChoices(calp, changed),
+        notes: [field('Numbered notes and details', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })), tablesBox],
+        deco: field('Decorations', decoControls(() => { render(); pw && pw.refresh(); })),
+        extraTitle: 'Options for the calendar', extra: [
         field('On the month', tick(calp.grid, 'look', 'Day colours, hatching, pictures and notes'), tick(calp.grid, 'hours', 'Store hours by the date'), tick(calp.grid, 'timeoff', 'Time off bars'), tick(calp.grid, 'events', 'Events'), tick(calp.grid, 'signs', 'Signs (payday, produce, truck…)'), tick(calp.grid, 'holidays', 'Holidays'), tick(calp.grid, 'legend', 'Legend (what the signs mean)'), tick(calp.grid, 'closed', 'Closed days: a no sign over the date')),
         field('Month heading', calSeg('Month heading', [['left', 'Large left'], ['center', 'Large centre'], ['right', 'Large right']], calp.title || 'left', (v) => { calp.title = v; changed(); })),
         field('Cross off the days gone by', calSeg('Cross off the days gone by', [['off', 'Off'], ['dim', 'Dim'], ['day', 'X in the middle'], ['date', 'X on the date']], past0, (v) => { calp.grid.past = v !== 'off'; if (v !== 'off') calp.pastAt = v; changed(); })),
         field('Days before the 1st and after the last day (blank: the legend can go there)', calSeg('Days outside the month', [['show', 'Show'], ['dim', 'Dim'], ['blank', 'Leave blank']], calp.out, (v) => { calp.out = v; changed(); })),
-        field('Details: store hours, time off, events and holidays, with the numbers from the month', calSeg('Details', [['page', 'Under the month'], ['separate', 'Own page'], ['off', 'None']], notesWhere, (v) => { setNotesWhere(v); tablesBox.style.display = v === 'off' ? 'none' : ''; changed(); })),
-        tablesBox,
-        field('Decorations', decoControls(() => { render(); pw && pw.refresh(); })),
-        ...saveChoices(calp, changed),
-        h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks up top: requests, approved, store hours, events, holidays).')],
+        h('p', { class: 'hint', style: { margin: 0 } }, 'Prints what the Calendar shows (its ticks up top: requests, approved, store hours, events, holidays). Details = store hours, time off, events and holidays, with the numbers from the month.')] }),
       draw: (pv) => { const [w, hgt] = paperOf(calp), n = pvDom(pv, sections(), { pw: w, ph: hgt, m: MARGIN }); return `${monthLabel(cal.ym)} · ${PAPERS[calp.paper][2]} ${calp.orient} · ${n} page${n > 1 ? 's' : ''}${notesWhere === 'separate' ? ' · details on a page of their own' : ''}`; },
       onClose: () => { if (kept) return; Object.keys(calp).forEach((k) => delete calp[k]); Object.assign(calp, before); calpSave(); setNotesWhere(whereBefore); render(); },
       actions: [{ label: 'Cancel' },
@@ -6587,13 +6619,14 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
       return sortStaff(people); };
     const sheets = () => peopleOf().map((p) => personSheet(p, weeksOf(), tasks.checked));
     const keep = () => { try { localStorage.setItem(KEY + '-people-pr', JSON.stringify(o)); } catch (e) { /* blocked */ } };
-    pw = printWindow({ title: 'Print or save a schedule for a person or group', use: 'person', kind: 'person', reopen: () => printPeopleDialog(presetId), opts: [
-      h('label', { class: 'field' }, h('span', null, 'Who'), who),
-      h('label', { class: 'field' }, h('span', null, 'Weeks'), range),
-      h('label', { class: 'check' }, tasks, ' Include tasks and training'),
-      h('label', { class: 'check' }, onlyScheduled, ' Skip people with no shifts in these weeks (groups only)'),
-      ...paperChoices(o, changed), ...saveChoices(o, changed),
-      h('p', { class: 'hint' }, 'Each person gets their own page.')],
+    pw = printWindow({ title: 'Print or save a schedule for a person or group', use: 'person', kind: 'person', reopen: () => printPeopleDialog(presetId), opts: printFrame({
+      what: h('label', { class: 'field' }, h('span', null, 'What: who'), who),
+      week: h('label', { class: 'field' }, h('span', null, 'Week'), range),
+      paper: paperChoices(o, changed), save: saveChoices(o, changed),
+      extraTitle: 'Options for a person or group', extra: [
+        h('label', { class: 'check' }, tasks, ' Include tasks and training'),
+        h('label', { class: 'check' }, onlyScheduled, ' Skip people with no shifts in these weeks (groups only)'),
+        h('p', { class: 'hint', style: { margin: 0 } }, 'Each person gets their own page.')] }),
     draw: (pv) => { const list = sheets(); if (!list.length) { pv.replaceChildren(h('p', { class: 'hint' }, 'Nobody to print for those weeks.')); return 'Nobody'; } const [w, hgt] = paperOf(o), n = pvDom(pv, list, { pw: w, ph: hgt }); return `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${PAPERS[o.paper][2]} ${o.orient} · ${n} page${n > 1 ? 's' : ''}`; },
     actions: [{ label: 'Cancel' },
       { label: 'Print…', onClick: () => { const people = peopleOf(); if (!people.length) { toast('Nobody to print for those weeks.'); return false; } keep(); const [w, hgt] = paperOf(o); if (deco.border) { printDomPictures(sheets(), o, w, hgt); return; } setPrintPage(w, hgt); printPeople(people, weeksOf(), tasks.checked); } },
@@ -6683,10 +6716,23 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
   // (… v2026.11.18.14.05.33.pdf); a name that has one already keeps it. A batch (pages) shares one stamp.
   const stampNow = () => { const n = new Date(), p = (x) => String(x).padStart(2, '0'); return `${n.getFullYear()}.${p(n.getMonth() + 1)}.${p(n.getDate())}.${p(n.getHours())}.${p(n.getMinutes())}.${p(n.getSeconds())}`; };
   const uniqueName = (name, stamp = stampNow()) => (/ v\d{4}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}(\.|$)/.test(name) ? name : name.replace(/(\.[a-z0-9]{1,5})?$/i, (ext) => ` v${stamp}${ext}`));
+  // A download (and the Save as window) needs a click that is still fresh: a page may start one download on its own,
+  // then the browser quietly blocks more until the page is reloaded. Pictures and PDFs take a few seconds to make, so the
+  // click that asked for them is stale by then: the files come in a small window with a button to click for each.
+  const freshClick = () => !navigator.userActivation || navigator.userActivation.isActive;
+  function readyToSave(files) {
+    return new Promise((done) => {
+      let n = 0;
+      const btns = files.map((f) => { const b = h('button', { class: 'btn' + (files.length === 1 ? ' primary' : ''), style: { justifyContent: 'flex-start', textAlign: 'left' }, onclick: async () => { b.disabled = true; const r = await saveBlob(f.name, f.blob, f.type); if (r) { n++; b.textContent = '✓ ' + r; } else b.disabled = false; } }, '⤓ Save ' + f.name); return b; });
+      modal({ title: files.length === 1 ? 'Your file is ready' : `Your ${files.length} files are ready`, body: [h('p', { class: 'hint' }, files.length === 1 ? 'Click to save it.' : 'Click each one to save it (the browser lets a page save one file a click).'), h('div', { style: { display: 'grid', gap: '6px' } }, btns)],
+        actions: [{ label: 'Done', primary: files.length > 1 }], onClose: () => done(n) });
+    });
+  }
   // Save one file: reuses the remembered file for handleKey when there is one, otherwise asks where.
   async function saveBlob(name, blob, type, handleKey) {
     if (blockedHere()) return null;
     name = uniqueName(name);
+    if (!freshClick() && !(handleKey && ui.handles[handleKey])) return (await readyToSave([{ name, blob, type }])) ? name : null;
     if (window.showSaveFilePicker) {
       try {
         const handle = (handleKey && ui.handles[handleKey]) || await window.showSaveFilePicker({ suggestedName: name, types: [type] });
@@ -6709,15 +6755,14 @@ html.craft-railed :is(#start.start,#lc-start.lc-start){left:var(--craft-rail,0px
     if (blockedHere()) return 0;
     { const st = stampNow(); files = files.map((f) => ({ ...f, name: uniqueName(f.name, st) })); }
     if (files.length === 1) return (await saveBlob(files[0].name, files[0].blob, files[0].type)) ? 1 : 0;
-    if (window.showDirectoryPicker) {
+    if (window.showDirectoryPicker && freshClick()) {
       try {
         const dir = await window.showDirectoryPicker({ id: 'shiftcraft-out', mode: 'readwrite' });
         for (const f of files) { const w = await (await dir.getFileHandle(f.name, { create: true })).createWritable(); await w.write(f.blob); await w.close(); }
         return files.length;
       } catch (e) { if (e.name === 'AbortError') return 0; }
     }
-    for (const f of files) { downloadBlob(f.name, f.blob); await new Promise((r) => setTimeout(r, 400)); }
-    return files.length;
+    return readyToSave(files); // several downloads at once: the browser would block all but the first
   }
 
   // ===================================================================
@@ -8252,8 +8297,12 @@ function buildWeek() {
     const head = (t) => h('div', { class: 'pd-head' }, t);
     const weekSel = h('select', { class: 'input', onchange: () => { wk = +weekSel.value; refresh(); } }, ws.map((w, i) => h('option', { value: i, selected: i === wk }, `Week ${i + 1}: ${short(w)} – ${short(addDays(w, 6))}${i === tw ? ' (this week)' : ''}`)));
     const fileName = () => fileStem('hourly week', fileDate(weeksList()[wk]));
-    pw = printWindow({ title: 'Hourly week: print or save', kind: 'hourly', use: 'hourly', reopen: () => hourlyWeekDialog(), opts: [
-      fld('Week', weekSel), ...paperChoices(O, refresh), fld('Print in', sel('page', [['color', 'Colour'], ['gray', 'Black and white']])),
+    pw = printWindow({ title: 'Hourly week: print or save', kind: 'hourly', use: 'hourly', reopen: () => hourlyWeekDialog(), opts: printFrame({
+      what: pfFixed('What', 'One week: 7 days on a page'), week: fld('Week', weekSel),
+      paper: paperChoices(O, refresh), color: fld('Print in', sel('page', [['color', 'Colour'], ['gray', 'Black and white']])),
+      save: saveChoices(O, refresh),
+      notes: fld('Numbered notes and details', sel('notes', [['auto', 'On the page if room'], ['page', 'On a page of their own'], ['off', 'Off']])),
+      extraTitle: 'Options for the hourly week', extra: [
       head('The shifts'),
       fld('Names', sel('name', [['first', 'First name (Luke)'], ['full', 'First Last (Luke Smith)'], ['firstl', 'First L. (Luke S.)'], ['lastfirst', 'Last, First (Smith, Luke)'], ['lastf', 'Last F. (Smith L.)'], ['init', 'Initials (LS)'], ['none', 'None']])), tick('time', 'Times in the pill'),
       fld('Colour', sel('col', [['role', 'By role'], ['person', 'By person'], ['mono', 'One colour'], ['bw', 'Black and white (leads filled)']])), fld('Shape', sel('shape', [['pill', 'Pill'], ['sq', 'Box']])),
@@ -8262,9 +8311,7 @@ function buildWeek() {
       fld('Hour lines', sel('grid', [[1, 'Every hour'], [2, 'Every 2 hours'], [0.5, 'Every half hour'], [0, 'None']], true)), tick('shut', 'Shade the hours the store is closed'), tick('cov', 'How many on, each hour'), tick('past', 'Dim the days gone by'), tick('now', 'A line at the time now (today, on screen)'),
       head('By the day’s name'),
       tick('signs', 'Signs (truck, produce, payday…)'), tick('hol', 'Holidays'), tick('ev', 'Events'), tick('off', 'Time off'), tick('at', 'Markers at their time of day'),
-      head('Notes and legend'),
-      fld('Notes', sel('notes', [['auto', 'On the page if room'], ['page', 'On a page of their own'], ['off', 'Off']])), tick('legend', 'Legend (roles, signs)'),
-      ...saveChoices(O, refresh)],
+      head('Legend'), tick('legend', 'Legend (roles, signs)')] }),
     draw: (pv) => {
       const r = buildPages(false), w = pvWidth(pv), k = w / (r.pw * 96);
       pv.replaceChildren(...r.pages.flatMap((p, i) => { p.style.transform = `scale(${k})`; p.style.transformOrigin = '0 0';
@@ -8527,7 +8574,7 @@ function hourlyWeekDialog() { HW.dialog(); }
     const o = { layout: 'table', range: 'week', format: 'png', paper: 'letter', orient: 'landscape', dpi: 300, notes: true, coverage: true, ...imgPrefs, ...preset };
     o.range = preset.range || ONE[o.layout] || 'week';
     if (!DPI_OPTIONS.some(([v]) => v === +o.dpi)) o.dpi = 300;
-    const box = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' } });
+    const box = h('div', { style: { display: 'grid', gap: '10px' } });
     // the availability list's preview: the real sheet on a white landscape page, scaled down to fit the window
     const pagePrev = h('div', { 'aria-label': 'Print preview', style: { display: 'none', position: 'relative', overflow: 'hidden', border: '1px solid var(--line)', borderRadius: '6px', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)' } });
     const showPage = () => {
@@ -8537,7 +8584,6 @@ function hourlyWeekDialog() { HW.dialog(); }
       pagePrev.replaceChildren(inner);
       requestAnimationFrame(() => { const k = (pagePrev.clientWidth || 600) / PW; inner.style.transform = `scale(${k})`; pagePrev.style.height = PH * k + 'px'; });
     };
-    const checks = h('div', { class: 'inline' });
     const curWeek = () => weekDays(weekOf(PD))[0];
     const items = () => {
       if (o.layout === 'timeline') return o.range === 'day' ? [PD] : o.range === 'weektile' ? [weekDays(weekOf(PD))[0]] : o.range === 'week' ? weekDays(weekOf(PD)) : planDays();
@@ -8588,29 +8634,39 @@ function hourlyWeekDialog() { HW.dialog(); }
       // place. Its code (35-calendar-sheet.js) stays, to bring back or remove later.
       if (!RANGES[o.layout] || o.layout === 'calendar') o.layout = 'table';
       if (!RANGES[o.layout]().some(([v]) => v === o.range)) o.range = RANGES[o.layout]()[0][0];
-      if (o.layout === 'avail') { if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; box.replaceChildren(sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2].replace(/ in$/, ' in, landscape')]), 'Paper (printer stock)'), sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')); if (!o.availFormat) o.availFormat = 'pdf';
+      const deco = pfField('Decorations', decoControls(() => update()));
+      // every layout fills the same frame (printFrame, 05b-print-window.js): what it does not use is greyed in its place
+      if (o.layout === 'avail') {
+        if (!PAPERS[o.availPaper]) o.availPaper = availPaperPref; if (!o.availFormat) o.availFormat = 'pdf';
         const ds = (key, opts, label) => { const x = h('select', { class: 'input', 'aria-label': label, onchange: () => { availDet[key] = x.value; saveAvailDet(); update(); } }, opts.map(([v, l]) => h('option', { value: v, selected: availDet[key] === v }, l))); return h('label', { class: 'field' }, h('span', null, label), x); };
-        checks.replaceChildren(ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Colours'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)'), ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Details go'),
-          h('div', { class: 'field' }, h('span', null, 'On the page'), ...[['key', 'The colour key'], ['qr', 'Contact QR codes (name and phone: scan to add to a phone)']].map(([k, l]) =>
+        box.replaceChildren(...printFrame({
+          what: sel('range', RANGES.avail(), 'What'),
+          paper: [sel('availPaper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size (printer stock)'), pfFixed('Orientation', 'Landscape (wide): always for this list')],
+          color: ds('mode', [['color', 'Colour'], ['bw', 'Black and white (OFF in black)']], 'Print in'),
+          save: [sel('availFormat', [['pdf', 'PDF – one page, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS.filter(([v]) => v <= 1200), 'Resolution (for saving)')],
+          notes: [ds('where', [['page', 'Under the list'], ['separate', 'On a page of their own'], ['off', 'Leave them out']], 'Numbered notes and details'), ds('range', AVAIL_RANGES, 'Details for (store hours, time off, events, holidays)')],
+          extraTitle: 'Options for the availability list',
+          extra: [h('div', { class: 'field' }, h('span', null, 'On the page'), ...[['key', 'The colour key'], ['qr', 'Contact QR codes (name and phone: scan to add to a phone)']].map(([k, l]) =>
             h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet[k] !== false && (k !== 'qr' || availDet.qr), onchange: (e) => { availDet[k] = e.target.checked; saveAvailDet(); update(); } }), ' ' + l)),
             ...[['hours', 'Store hours'], ['timeoff', 'Time off'], ['events', 'Events'], ['holidays', 'Holidays']].map(([k, l]) =>
-              h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet.tables[k] !== false, onchange: (e) => { availDet.tables[k] = e.target.checked; saveAvailDet(); update(); } }), ` Details: ${l}`))));
-        return; }
-      // (nulls left out: replaceChildren would write them as the word “null”)
-      box.replaceChildren(...[
-        sel('range', RANGES[o.layout](), 'What'),
-        o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
-        o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
-        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'),
-        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation'),
-        sel('format', [['pdf', 'PDF – all pages in one file'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'),
-        sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')].filter(Boolean));
-      checks.replaceChildren(...[
-        notesWhereSel(),
-        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
-        o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
-        o.layout === 'cards' ? cardChecks() : null,
-        o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null].filter(Boolean));
+              h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: availDet.tables[k] !== false, onchange: (e) => { availDet.tables[k] = e.target.checked; saveAvailDet(); update(); } }), ` Details: ${l}`)))],
+          deco }));
+        return;
+      }
+      const NAMES = { table: 'the week table', timeline: 'the visual timeline', cards: 'contact cards' };
+      box.replaceChildren(...printFrame({
+        what: sel('range', RANGES[o.layout](), 'What'),
+        week: o.layout === 'cards' || o.range === 'all' ? null : weekSel(),
+        day: o.layout === 'timeline' && o.range === 'day' ? daySel() : null,
+        paper: [sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'), sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation')],
+        save: [sel('format', [['pdf', 'PDF – all pages in one file'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – vector, any size']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')],
+        notes: pfField('Numbered notes and details', notesWhereSel()),
+        lines: h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.notes, onchange: (e) => { o.notes = e.target.checked; update(); } }), ' Notes area with lines'),
+        extraTitle: 'Options for ' + NAMES[o.layout],
+        extra: [o.layout === 'timeline' ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: o.coverage, onchange: (e) => { o.coverage = e.target.checked; update(); } }), ' “People on the floor” chart') : null,
+          o.layout === 'cards' ? cardChecks() : null,
+          o.layout === 'cards' ? h('button', { type: 'button', class: 'btn', title: 'Put these contact QR codes in the shared barcode library, for Insert › Barcode in the other Craft apps', onclick: () => cardsToLibrary(cardPeople(o.range)) }, 'Add to barcode library') : null],
+        deco }));
     }
     const pageSize = () => { let [pw, ph] = PAPERS[o.paper]; if (o.orient === 'landscape') [pw, ph] = [ph, pw]; return [pw, ph]; };
     let pw = null;
@@ -8636,7 +8692,7 @@ function hourlyWeekDialog() { HW.dialog(); }
       return text;
     };
     build();
-    pw = printWindow({ title: 'Print or save', kind: o.layout, onKind: (k) => { if (!['table', 'timeline', 'avail', 'cards'].includes(k)) return false; o.layout = k; o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); update(); return true; }, use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box, checks, h('div', { class: 'field' }, h('span', null, 'Decorations'), decoControls(() => update()))], draw: drawPv,
+    pw = printWindow({ title: 'Print or save', kind: o.layout, onKind: (k) => { if (!['table', 'timeline', 'avail', 'cards'].includes(k)) return false; o.layout = k; o.range = ONE[o.layout] || RANGES[o.layout]()[0][0]; build(); update(); return true; }, use: o.layout === 'timeline' ? 'hourly' : 'week', reopen: () => exportImageDialog(preset), opts: [box], draw: drawPv,
       actions: [{ label: 'Cancel' },
         { label: 'Print…', onClick: () => { remember(); if (o.layout === 'avail') { setTimeout(() => printAvailability(false, o.availPaper)); return; } printSurfaces(allPages({ ...o, dpi: 300, vector: true }), o); } },
         { label: 'Save', primary: true, onClick: () => {
@@ -8764,13 +8820,13 @@ function hourlyWeekDialog() { HW.dialog(); }
         : big ? `At ${o.dpi} DPI this screen would be ${W.toLocaleString()} × ${H.toLocaleString()} pixels, too big for a picture file, so it will be saved as SVG (sharp at any size).`
           : `${tabName} · ${W.toLocaleString()} × ${H.toLocaleString()} pixels · ${o.dpi} DPI (the screen is drawn ${scale.toFixed(1)}× sharper than it looks) · prints on ${sheets.length} page${sheets.length > 1 ? 's' : ''}`;
     };
-    pw = printWindow({ title: `Print screen · ${tabName}`, kind: 'screen', reopen: () => printScreenDialog(), opts: [
-        sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type'),
-        sel('dpi', DPI_OPTIONS, 'Resolution'),
-        sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper (for printing and PDF)'),
-        sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation (for printing and PDF)'),
-      h('p', { class: 'hint' }, 'Pictures and printouts always use light colors, even when you edit in dark mode.'),
-      h('p', { class: 'hint' }, 'Takes the whole page of the tab you are on, including parts you would have to scroll to. Change tabs or days first to capture something else.')],
+    pw = printWindow({ title: `Print screen · ${tabName}`, kind: 'screen', reopen: () => printScreenDialog(), opts: printFrame({
+        what: pfFixed('What', `The ${tabName} tab, as on the screen`),
+        paper: [sel('paper', Object.entries(PAPERS).map(([k, v]) => [k, v[2]]), 'Paper size'), sel('orient', [['landscape', 'Landscape (wide)'], ['portrait', 'Portrait (tall)']], 'Orientation')],
+        color: pfFixed('Print in', 'Light colours (always, even in dark mode)'),
+        save: [sel('format', [['pdf', 'PDF – the pages, ready to print or send'], ['png', 'PNG – sharpest picture'], ['jpg', 'JPG – smaller file'], ['bmp', 'BMP – plain bitmap'], ['svg', 'SVG – opens in a browser, any size']], 'File type (for saving)'), sel('dpi', DPI_OPTIONS, 'Resolution (for saving)')],
+        extraTitle: 'Options for print screen',
+        extra: [h('p', { class: 'hint', style: { margin: 0 } }, 'Takes the whole page of the tab you are on, including parts you would have to scroll to. Change tabs or days first to capture something else.')] }),
     draw: drawPv,
     actions: [{ label: 'Cancel' },
       { label: 'Print', onClick: async () => {
