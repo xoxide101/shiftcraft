@@ -1,0 +1,9 @@
+{
+ "name": "ShiftCraft",
+ "icon": "📅",
+ "about": "Work schedules and shift plans",
+ "group": "Your account and everyday",
+ "order": 50,
+ "entry": "index.html",
+ "status": "beta"
+}
