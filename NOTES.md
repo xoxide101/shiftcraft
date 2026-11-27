@@ -502,3 +502,8 @@ A new ribbon tab, **Border designer** (between Company & Location and Print & sh
 
 - Every print window (Print this page, Week table, Visual timeline, Hourly week, Calendar, Person or group, Availability list, Contact cards, Print screen) has the same sections in the same order, built by `printFrame` (05b-print-window.js): Layout · What to print (What, Week, Day) · Paper (Paper size, Orientation, Print in) · Saving (File type, Resolution) · Notes (Numbered notes and details, Notes area with lines) · Options for <the layout> · Decorations · Border. A box a layout does not use stays in its place, greyed ("not used for this layout"); a fixed one shows its value greyed (`pfFixed`).
 - **Saving after a long make** (25-names.js): a browser lets a page start one download without a fresh click, then quietly blocks more until a reload (that was "had to refresh to save another"). When the click is stale by the time the file is made (`navigator.userActivation.isActive` false), the files come in a "Your file is ready" window with a button each; several files always do.
+
+## 2026-11-27: the Craft Hub
+- launcher.json: this app's card in the Craft Hub (the launcher at /craft/: an expanding pie of every app, read from each folder's launcher.json); launcher.png: its picture there
+- The Craft rail (the bar down the left) has the Craft Hub at the top, back to /craft/ from any page
+- See every app: https://github.com/xoxide101
